@@ -42,6 +42,7 @@ fn build() {
 	fs::copy("./buildroot/output/images/disk.img", "./output");
 
 	if fs::is_prog("VBoxManage") {
+		fs::delete("./output/disk.vdi");
 		let vbox = cmd([
 			"VBoxManage", "convertfromraw", "--format", "VDI",
 			"./output/disk.img", "./output/disk.vdi"
