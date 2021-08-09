@@ -1,4 +1,0 @@
-
-
-for custom splash screen use plymouth
-and change grub-efi.cfg adding quiet splash
