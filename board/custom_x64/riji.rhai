@@ -6,16 +6,12 @@ fn post_build(target_dir, binaries_dir) {
 	fs::copy("./grub-efi.cfg", binaries_dir + "/efi-part/EFI/BOOT/grub.cfg");
 	//cp -f "$BOARD_DIR/grub-efi.cfg" "$BINARIES_DIR/efi-part/EFI/BOOT/grub.cfg"
 
-}
-
-// called when inside the fake root
-fn fakeroot() {
-
 	// make root login bootable
 	let root_login = regex("#PermitRootLogin .*");
-	root_login.replace_file("./etc/ssh/sshd_config", "PermitRootLogin yes");
+	root_login.replace_file(target_dir + "/etc/ssh/sshd_config", "PermitRootLogin yes");
 
-
+	// create .profile file
+	fs::append(target_dir + "/etc/profile", "\nXDG_RUNTIME_DIR=/tmp");
 }
 
 fn post_image(binaries_dir) {

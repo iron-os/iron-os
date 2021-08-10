@@ -12,3 +12,5 @@ http://lists.busybox.net/pipermail/buildroot/2014-May/097233.html
 for custom splash screen use plymouth  
 and change grub-efi.cfg adding quiet splash  
 addd https://github.com/googlefonts/noto-emoji
+
+Look at systemd-repart seams to be what is needed
