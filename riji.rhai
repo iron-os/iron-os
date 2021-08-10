@@ -56,7 +56,7 @@ fn create() {
 	print("create patch");
 
 	// copy board/custom_x64
-	fs::copy("./buildroot/board/custom_x64", "./board/");
+	//fs::copy("./buildroot/board/custom_x64", "./board/");
 	// copy .config
 	fs::copy("./buildroot/.config", "./");
 }
