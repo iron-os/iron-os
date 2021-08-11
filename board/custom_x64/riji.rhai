@@ -15,6 +15,16 @@ fn post_build(target_dir, binaries_dir) {
 	if fs::contains(profile_file, "XDG_RUNTIME_DIR") == false {
 		fs::append(profile_file, "\nexport XDG_RUNTIME_DIR='/tmp'\n");
 	}
+
+	// set session optional pam_systemd.so
+	let pam_dir = target_dir + "/etc/pam.d";
+	if fs::contains(pam_dir + "/login", "pam_systemd") == false {
+		fs::append(pam_dir + "/login", "\nsession optional pam_systemd.so\n");
+	}
+
+	//if fs::contains(pam_dir + "/sshd", "pam_systemd") == false {
+	//	fs::append(pam_dir + "/sshd", "\nsession optional pam_systemd.so\n");
+	//}
 }
 
 fn post_image(binaries_dir) {
@@ -26,4 +36,10 @@ fn post_image(binaries_dir) {
 	support/scripts/genimage.sh -c "$BINARIES_DIR/genimage-efi.cfg"
 
 	*/
+}
+
+fn qemu() {
+
+	// qemu-system-x86_64 -m 4096 -drive format=raw,file=<img>.img
+
 }
