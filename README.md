@@ -14,3 +14,7 @@ and change grub-efi.cfg adding quiet splash
 addd https://github.com/googlefonts/noto-emoji
 
 Look at systemd-repart seams to be what is needed
+
+
+## Users see
+http://underpop.online.fr/b/buildroot/en/makeuser-syntax.htm.gz

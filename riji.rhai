@@ -52,8 +52,8 @@ fn build() {
 }
 
 // creates the patch
-fn create() {
-	print("create patch");
+fn save() {
+	print("save");
 
 	// copy board/custom_x64
 	//fs::copy("./buildroot/board/custom_x64", "./board/");
@@ -81,6 +81,13 @@ fn patch() {
 fn clean() {
 
 	let make = cmd(["make", "clean"]);
+	make.dir(BUILDROOT);
+	make.execute();
+}
+
+fn rebuild(pack) {
+	print("rebuilding package: " + pack);
+	let make = cmd(["make", pack + "-dirclean", pack + "-rebuild"]);
 	make.dir(BUILDROOT);
 	make.execute();
 }

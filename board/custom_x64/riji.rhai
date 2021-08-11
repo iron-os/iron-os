@@ -11,7 +11,10 @@ fn post_build(target_dir, binaries_dir) {
 	root_login.replace_file(target_dir + "/etc/ssh/sshd_config", "PermitRootLogin yes");
 
 	// create .profile file
-	fs::append(target_dir + "/etc/profile", "\nXDG_RUNTIME_DIR=/tmp");
+	let profile_file = target_dir + "/etc/profile";
+	if fs::contains(profile_file, "XDG_RUNTIME_DIR") == false {
+		fs::append(profile_file, "\nexport XDG_RUNTIME_DIR='/tmp'\n");
+	}
 }
 
 fn post_image(binaries_dir) {
