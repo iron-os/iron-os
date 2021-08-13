@@ -18,9 +18,35 @@ fn post_build(target_dir, binaries_dir) {
 
 	// set session optional pam_systemd.so
 	let pam_dir = target_dir + "/etc/pam.d";
-	if fs::contains(pam_dir + "/login", "pam_systemd") == false {
-		fs::append(pam_dir + "/login", "\nsession optional pam_systemd.so\n");
-	}
+	//if fs::contains(pam_dir + "/login", "pam_systemd") == false {
+	//	fs::append(pam_dir + "/login", "\nsession optional pam_systemd.so\n");
+	//}
+
+	// rewrite pam
+	fs::write(pam_dir + "/login", [
+		"session		required	pam_loginuid.so",
+		"auth			required	pam_unix.so nullok",
+		"account		required	pam_unix.so",
+		"password		required	pam_unix.so nullok",
+		"session		required	pam_limits.so",
+		"session		required	pam_env.so",
+		"session		required	pam_unix.so",
+		"session		optional	pam_lastlog.so",
+		"session		optional	pam_systemd.so"
+	]);
+
+	// rewrite sudo
+	fs::write(pam_dir + "/sudo", [
+	//	"session		required	pam_loginuid.so",
+		"auth			required	pam_unix.so nullok",
+		"account		required	pam_unix.so",
+		"password		required	pam_unix.so nullok",
+		"session		required	pam_limits.so",
+		"session		required	pam_env.so",
+		"session		required	pam_unix.so",
+	//	"session		optional	pam_lastlog.so",
+		"session		optional	pam_systemd.so"
+	]);
 
 	//if fs::contains(pam_dir + "/sshd", "pam_systemd") == false {
 	//	fs::append(pam_dir + "/sshd", "\nsession optional pam_systemd.so\n");
