@@ -28,6 +28,14 @@ fn config() {
 	make.execute();
 }
 
+fn linux_config() {
+	let make = cmd(["make", "linux-menuconfig"]);
+	make.dir(BUILDROOT);
+	make.execute();
+
+	// output in output/build/linux-<>/.config
+}
+
 fn build() {
 	print("build");
 
@@ -59,6 +67,7 @@ fn save() {
 	//fs::copy("./buildroot/board/custom_x64", "./board/");
 	// copy .config
 	fs::copy("./buildroot/.config", "./");
+	fs::copy("./buildroot/output/build/linux-5.10.43/.config", "./board/linux.config");
 }
 
 // apply the patch
@@ -69,6 +78,8 @@ fn patch() {
 	fs::copy("./board/custom_x64", "./buildroot/board/");
 	// copy .config
 	fs::copy("./.config", "./buildroot/");
+
+	//fs::copy("./board/linux.config", "./buildroot/output/build/linux-5.10.43/.config");
 
 	let git = git(BUILDROOT);
 
