@@ -24,3 +24,6 @@ to launch chromium the flag --in-process-gpu needs to be defined
 also XDG_RUNTIME_DIR and WAYLAND_DISPLAY need to be defined  
 why in-process-gpu is required is not quite clear could be because of:
 `ERROR:command_buffer_proxy_impl.cc(126)] ContextResult::kTransientFailure: Failed to send GpuControl.CreateCommandBuffer.`
+
+## Need to add dri support
+probably need to customize the kernel that it contains the correct drivers.
