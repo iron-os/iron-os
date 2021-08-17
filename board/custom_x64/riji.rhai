@@ -11,42 +11,13 @@ fn post_build(target_dir, binaries_dir) {
 	root_login.replace_file(target_dir + "/etc/ssh/sshd_config", "PermitRootLogin yes");
 
 	// create .profile file
-	let profile_file = target_dir + "/etc/profile";
-	if fs::contains(profile_file, "XDG_RUNTIME_DIR") == false {
-		fs::append(profile_file, "\nexport XDG_RUNTIME_DIR='/tmp'\n");
-	}
-
-	// set session optional pam_systemd.so
-	let pam_dir = target_dir + "/etc/pam.d";
-	//if fs::contains(pam_dir + "/login", "pam_systemd") == false {
-	//	fs::append(pam_dir + "/login", "\nsession optional pam_systemd.so\n");
+	//let profile_file = target_dir + "/etc/profile";
+	//if fs::contains(profile_file, "XDG_RUNTIME_DIR") == false {
+	//	fs::append(profile_file, "\nexport XDG_RUNTIME_DIR='/tmp'\n");
 	//}
 
-	// rewrite pam
-	fs::write(pam_dir + "/login", [
-		"session		required	pam_loginuid.so",
-		"auth			required	pam_unix.so nullok",
-		"account		required	pam_unix.so",
-		"password		required	pam_unix.so nullok",
-		"session		required	pam_limits.so",
-		"session		required	pam_env.so",
-		"session		required	pam_unix.so",
-		"session		optional	pam_lastlog.so",
-		"session		optional	pam_systemd.so"
-	]);
-
-	// rewrite sudo
-	fs::write(pam_dir + "/sudo", [
-	//	"session		required	pam_loginuid.so",
-		"auth			required	pam_unix.so nullok",
-		"account		required	pam_unix.so",
-		"password		required	pam_unix.so nullok",
-		"session		required	pam_limits.so",
-		"session		required	pam_env.so",
-		"session		required	pam_unix.so",
-	//	"session		optional	pam_lastlog.so",
-		"session		optional	pam_systemd.so"
-	]);
+	// copy pam.d
+	fs::copy("./pam.d", target_dir + "/etc/");
 
 	//if fs::contains(pam_dir + "/sshd", "pam_systemd") == false {
 	//	fs::append(pam_dir + "/sshd", "\nsession optional pam_systemd.so\n");
