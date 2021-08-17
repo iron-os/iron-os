@@ -67,7 +67,7 @@ fn save() {
 	//fs::copy("./buildroot/board/custom_x64", "./board/");
 	// copy .config
 	fs::copy("./buildroot/.config", "./");
-	fs::copy("./buildroot/output/build/linux-5.10.43/.config", "./board/linux.config");
+	//fs::copy("./buildroot/output/build/linux-5.10.43/.config", "./board/linux.config");
 }
 
 // apply the patch
