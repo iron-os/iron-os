@@ -7,11 +7,6 @@ with `riji config` call `riji create`.
 
 ## TODO
 
-http://lists.busybox.net/pipermail/buildroot/2014-May/097233.html
-
-for custom splash screen use plymouth  
-and change grub-efi.cfg adding quiet splash  
-addd https://github.com/googlefonts/noto-emoji
 
 Look at systemd-repart seams to be what is needed
 
@@ -25,5 +20,16 @@ also XDG_RUNTIME_DIR and WAYLAND_DISPLAY need to be defined
 why in-process-gpu is required is not quite clear could be because of:
 `ERROR:command_buffer_proxy_impl.cc(126)] ContextResult::kTransientFailure: Failed to send GpuControl.CreateCommandBuffer.`
 
-## Need to add dri support
-probably need to customize the kernel that it contains the correct drivers.
+## external disk
+Create a partition with:
+```
+fdisk -l
+```
+format partition with:
+```
+mkfs -t ext4 /dev/sdb1
+```
+Then mount the filesystem:
+```
+mount /dev/sdb1 /data
+```

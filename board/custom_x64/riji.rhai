@@ -19,9 +19,27 @@ fn post_build(target_dir, binaries_dir) {
 	// copy pam.d
 	fs::copy("./pam.d", target_dir + "/etc/");
 
+	// copy dbus
+	fs::copy("./dbus/dbus.service", target_dir + "/usr/lib/systemd/user/");
+	fs::copy("./dbus/dbus.socket", target_dir + "/usr/lib/systemd/user/");
+
+	// create symlinks to /systemd/user/sockets.target.wants/dbus.socket
+	// create directory
+	let socket_want = target_dir + "/usr/lib/systemd/user/sockets.target.wants";
+	fs::create_dir(socket_want);
+
+	let ln = cmd(["ln", "-sf", "../dbus.socket", "dbus.socket"]);
+	ln.dir(socket_want);
+	ln.execute();
+
 	//if fs::contains(pam_dir + "/sshd", "pam_systemd") == false {
 	//	fs::append(pam_dir + "/sshd", "\nsession optional pam_systemd.so\n");
 	//}
+
+	// let's add chromium in the build process
+	//let chrome_dir = 
+	//if fs::exists("")
+	//fs::copy("")
 }
 
 fn post_image(binaries_dir) {
