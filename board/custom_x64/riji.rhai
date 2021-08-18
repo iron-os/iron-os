@@ -32,14 +32,8 @@ fn post_build(target_dir, binaries_dir) {
 	ln.dir(socket_want);
 	ln.execute();
 
-	//if fs::contains(pam_dir + "/sshd", "pam_systemd") == false {
-	//	fs::append(pam_dir + "/sshd", "\nsession optional pam_systemd.so\n");
-	//}
-
-	// let's add chromium in the build process
-	//let chrome_dir = 
-	//if fs::exists("")
-	//fs::copy("")
+	// add weston.ini
+	fs::copy("./weston.ini", target_dir + "/home/user/");
 }
 
 fn post_image(binaries_dir) {
@@ -51,10 +45,4 @@ fn post_image(binaries_dir) {
 	support/scripts/genimage.sh -c "$BINARIES_DIR/genimage-efi.cfg"
 
 	*/
-}
-
-fn qemu() {
-
-	// qemu-system-x86_64 -m 4096 -drive format=raw,file=<img>.img
-
 }
