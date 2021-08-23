@@ -33,6 +33,7 @@ fn post_build(target_dir, binaries_dir) {
 	ln.execute();
 
 	// add weston.ini
+	fs::create_dir(target_dir + "/home/user");
 	fs::copy("./weston.ini", target_dir + "/home/user/");
 }
 
