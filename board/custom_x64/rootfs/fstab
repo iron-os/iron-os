@@ -1,0 +1,3 @@
+/dev/root / auto ro 0 1
+UUID=DATA_UUID /data ext4 rw,suid,exec,nouser,relatime 0 2
+/data/var /var none bind 0 2
