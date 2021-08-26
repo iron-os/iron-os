@@ -98,7 +98,7 @@ the image of chnobli should be for all uses the same
 
 - start chnobli_ui (or chnobli_shell)
 - start chromium
-- start chnobli_updater
+- start chnobli_packages
 - send logs
 - maybe need chromium debug protocol (to be able to log console.logs warnings etc)
 
@@ -107,6 +107,7 @@ the image of chnobli should be for all uses the same
 
 - start installer if not installed
 
+- start chnobli_core
 - start frame package
  - 
 
