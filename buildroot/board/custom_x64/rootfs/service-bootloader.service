@@ -1,0 +1,9 @@
+[Unit]
+Description=Service Buildroot
+Wants=network.target
+After=network.target multi-user.target
+
+[Service]
+ExecStart=/usr/bin/service-bootloader
+Restart=always
+RestartSec=2
