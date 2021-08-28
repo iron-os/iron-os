@@ -71,3 +71,18 @@ packages
   - package.jdb.tmp
   - left
   - right
+
+
+## Install disk (everything as small as possible)
+- efi partition
+- rootfs partition
+- data partition
+
+## Final disk
+- efi partition
+- rootfs partition 1 (res. 500mb)
+- rootfs partition 2 (res. 500mb)
+- data partition (50% of target filesize)
+
+## Todo
+probably update psplash https://git.yoctoproject.org/cgit/cgit.cgi/psplash/
