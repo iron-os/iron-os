@@ -1,0 +1,18 @@
+[package]
+name = "service_bootloader"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+lto = true
+
+[dependencies]
+file-db = { version = "0.1", path = "./../file-db" }
+serde = { version = "1.0", features = ["derive"] }
+# gpt = "2.0"
+linux-info = "0.1.6"
+# linux-info = { version = "0.1", path = "/dev-drive/linux-info" }
+gpt = { version = "2.0", git = "https://github.com/soerenmeier/gpt", branch = "relax_lifetime" }
+uuid = "0.8"
