@@ -1,3 +1,19 @@
+## Installing
+
+After cloning and installing riji execute:
+```
+riji download
+```
+This will download buildroot and set the git head to the
+correct version.
+
+Then run:
+```
+riji patch
+```
+Which will copy all needed files.
+
+*Todo Prepare packages*
 
 ## Changes
 

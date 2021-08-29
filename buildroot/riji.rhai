@@ -1,6 +1,6 @@
 
 const BUILDROOT = "./buildroot";
-const STABLE = "2021.02.3";
+const STABLE = "2021.02.4";
 
 fn help() {
 	print([
