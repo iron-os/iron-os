@@ -1,6 +1,6 @@
 [Unit]
 Description=Service Buildroot
-Wants=network.target
+Wants=multi-user.target
 After=network.target multi-user.target
 
 [Service]

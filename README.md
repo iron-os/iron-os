@@ -72,6 +72,13 @@ packages
   - left
   - right
 
+package.db
+ - name
+ - version_str
+ - version // hash
+ - signature // signature of the current version
+ - current // folder of the current left|right
+
 
 ## Install disk (everything as small as possible)
 - efi partition

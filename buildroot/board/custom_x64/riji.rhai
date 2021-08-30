@@ -24,7 +24,7 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/service-bootloader.service", target_dir + "/etc/systemd/system/");
 
 	fs::copy(binaries_dir + "/service-bootloader", target_dir + "/usr/bin/");
-	// todo should symlink
+	// symlink get's created in fakeroot
 
 	// create empty data folder (needed for fresh build since else device_table.mk failes)
 	fs::create_dir(target_dir + "/data");
@@ -57,6 +57,11 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 
 fn fakeroot(host_dir, target_dir, binaries_dir) {
 	// target dir is in ext2/target but we can't se that folder
+
+	// create service-bootloader symlink
+	let ln = cmd(["ln", "-sf", "../service-bootloader.service", "service-bootloader.service"]);
+	ln.dir(target_dir + "/etc/systemd/system/multi-user.target.wants/");
+	ln.execute();
 
 	// copy data folder
 	fs::copy("./data", target_dir + "/");
