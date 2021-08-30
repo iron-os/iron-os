@@ -2,11 +2,13 @@
 use std::thread;
 use std::time::Duration;
 use std::path::{Path, PathBuf};
-use std::fs::{self, File};
-use std::io::{self, Read, Seek, SeekFrom};
+use std::fs::{self, File, read_to_string, create_dir_all};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::error::Error as StdError;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
+use std::process::Command as StdCommand;
+use std::ffi::OsStr;
 
 use gpt::{GptConfig, GptDisk};
 use gpt::partition::{Partition as GptPartition};
@@ -92,7 +94,7 @@ fn main() {
 		println!("doing install in 10s");
 		thread::sleep(Duration::from_secs(5));
 		println!("doing install in 5s");
-		thread::sleep(Duration::from_secs(5));
+		thread::sleep(Duration::from_secs(3));
 		println!("doing install in 2s");
 		thread::sleep(Duration::from_secs(2));
 		println!("doing install");
@@ -272,8 +274,17 @@ impl Disk {
 		self.is_root
 	}
 
+	// gets the sector size via ioctl
+	// this should return the sector size advertised the harddrive
+	// and not what gpt actually uses
 	fn raw_sector_size(&self) -> io::Result<u64> {
 		sector_size(&self.path)
+	}
+
+	/// returns the sector size if gpt was opened
+	fn sector_size(&self) -> Option<u64> {
+		self.gpt_disk.as_ref()
+			.map(|d| (*d.logical_block_size()).into())
 	}
 
 	pub fn read_mbr(&self) -> io::Result<ProtectiveMBR> {
@@ -281,22 +292,42 @@ impl Disk {
 		ProtectiveMBR::from_disk(&mut file, LogicalBlockSize::Lb512)
 	}
 
-	pub fn writable_file(&mut self) -> io::Result<File> {
+	pub fn readable_file(&self) -> io::Result<File> {
+		fs::OpenOptions::new()
+			.read(true)
+			.open(&self.path)
+	}
+
+	pub fn writable_file(&self) -> io::Result<File> {
 		fs::OpenOptions::new()
 			.read(true)
 			.write(true)
 			.open(&self.path)
 	}
 
-	pub fn clone_part(&self, name: &str) -> Option<GptPartition> {
-		let disk = self.gpt_disk.as_ref()?;
-		for (_, part) in disk.partitions() {
-			if part.name == name {
-				return Some(part.clone())
-			}
-		}
+	pub fn get_part(&self, name: &str) -> Option<&GptPartition> {
+		self.gpt_disk.as_ref()?
+			.partitions()
+			.values()
+			.find(|v| v.name == name)
+	}
 
-		None
+	pub fn clone_part(&self, name: &str) -> Option<GptPartition> {
+		self.get_part(name)
+			.map(Clone::clone)
+	}
+
+	pub fn part_path(&self, name: &str) -> Option<PathBuf> {
+		// get partition number
+		let id = self.gpt_disk.as_ref()?
+			.partitions()
+			.iter()
+			.find(|(id, v)| v.name == name)
+			.map(|(id, _)| *id)?;
+		let mut os_str = self.path.clone().into_os_string();
+		let id_str = format!("{}", id);
+		os_str.push(id_str);
+		Some(os_str.into())
 	}
 
 }
@@ -338,6 +369,19 @@ fn install_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Resu
 	// do we need to write the entire drive
 	// or is it enough to 
 
+	write_gpt_to_new_disk(install_disk, new_disk)?;
+
+	copy_to_new_disk(install_disk, new_disk)?;
+
+	configure_disk(new_disk)?;
+
+	// success
+	// after a reboot we should boot on the new rootfs
+
+	Ok(())
+}
+
+fn write_gpt_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<()> {
 	// delete previous gpt if it exists
 	new_disk.gpt_disk = None;
 
@@ -400,23 +444,165 @@ fn install_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Resu
 	// data partition
 	let data_lba = (header.last_usable - root_b.last_lba) / 2;
 	let mut data = install_disk.clone_part("data")
-		.ok_or_else(|| io_other("could not get root partition"))?;
+		.ok_or_else(|| io_other("could not get data partition"))?;
 	data.part_guid = Uuid::new_v4();
 	data.first_lba = root_b.last_lba + 1;
 	data.last_lba = data.first_lba + data_lba - 1;
 	data.name = "data".into();
 
 	let mut map = BTreeMap::new();
-	map.insert(0, boot);
-	map.insert(1, root_a);
-	map.insert(2, root_b);
-	map.insert(3, data);
+	map.insert(1, boot);
+	map.insert(2, root_a);
+	map.insert(3, root_b);
+	map.insert(4, data);
 
 	disk.update_partitions(map)?;
 
 	disk.write_inplace()?;
 
 	new_disk.gpt_disk = Some(disk);
+
+	Ok(())
+}
+
+///
+/// This function expects
+/// all new partitions to be bigger or the same size as the previous ones
+fn copy_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<()> {
+
+	let old_sector_size = install_disk.sector_size()
+		.ok_or_else(|| io_other("could not get sector_size"))?;
+	let new_sector_size = new_disk.sector_size()
+		.ok_or_else(|| io_other("could not get sector_size"))?;
+
+	// copy boot to new boot
+	let old_boot = install_disk.get_part("boot")
+		.ok_or_else(|| io_other("could not get old boot partition"))?;
+	let new_boot = new_disk.get_part("boot")
+		.ok_or_else(|| io_other("could not get new boot partition"))?;
+
+	let old_first_byte = old_boot.first_lba * old_sector_size;
+	let new_first_byte = new_boot.first_lba * new_sector_size;
+	let length = (old_boot.last_lba + 1 - old_boot.first_lba) * old_sector_size;
+	copy_len_to_new(install_disk, old_first_byte, length, new_disk, new_first_byte)?;
+
+
+	// copy rootfs to new rootfs
+	let old_root = install_disk.get_part("root")
+		.ok_or_else(|| io_other("could not get old root partition"))?;
+	let new_root = new_disk.get_part("root a")
+		.ok_or_else(|| io_other("could not get new root a partition"))?;
+
+	let old_first_byte = old_root.first_lba * old_sector_size;
+	let new_first_byte = new_root.first_lba * new_sector_size;
+	let length = (old_root.last_lba + 1 - old_root.first_lba) * old_sector_size;
+	copy_len_to_new(install_disk, old_first_byte, length, new_disk, new_first_byte)?;
+
+	// since the data filesystem is mounted rw
+	// and /var can write to it
+	// we need to copy the files manually
+	// for this we need to first create a filesystem
+	// 
+	let data_path = new_disk.part_path("data")
+		.ok_or_else(|| io_other("could not data path"))?;
+
+	// create data filesystem
+	Command::new("mkfs")
+		.args(&["-F", "-t", "ext4"])
+		.arg(&data_path)
+		.exec()?;
+
+	mount(&data_path, "/mnt")?;
+
+	// now we need to copy everything
+	// let's use the cp command
+	cp("/data/home", "/mnt/")?;
+	create_dir_all("/mnt/etc/ssh")?;
+
+	umount(&data_path)?;
+
+	Ok(())
+}
+
+// length should be div by 4096
+fn copy_len_to_new(
+	install_disk: &mut Disk,
+	install_first_byte: u64,
+	length: u64,
+	new_disk: &mut Disk,
+	new_first_byte: u64
+) -> io::Result<()> {
+
+	let mut install = install_disk.readable_file()?;
+	let mut new = new_disk.writable_file()?;
+
+	let mut buf = [0; 4096];
+	let mut read = 0u64;
+
+	// seek to the correct locations
+	install.seek(SeekFrom::Start(install_first_byte))?;
+	new.seek(SeekFrom::Start(new_first_byte))?;
+
+	loop {
+
+		let rem = (length - read).min(buf.len() as u64) as usize;
+
+		if rem == 0 {
+			break
+		}
+
+		// fill buffer
+		let read_b = install.read(&mut buf[..rem])?;
+		if read_b == 0 {
+			return Err(io_other("returned 0 bytes but did not read all"))
+		}
+
+		// this is just an info
+		if rem != read_b {
+			println!("could not fill entire buffer expected {} filled {}", rem, read_b);
+		}
+
+		read += read_b as u64;
+
+		new.write_all(&buf[..read_b])?;
+	}
+
+	Ok(())
+}
+
+fn configure_disk(disk: &mut Disk) -> io::Result<()> {
+
+	// update fstab to with the new uuid
+
+	let root_path = disk.part_path("root a")
+		.ok_or_else(|| io_other("could not get root path"))?;
+
+	// now replace DATA_UUID with the uuid
+	let data_uuid = disk.get_part("data")
+		.ok_or_else(|| io_other("could not get data partition"))?
+		.part_guid.to_string();
+
+	mount(&root_path, "/mnt")?;
+	let fstab = read_to_string("/mnt/etc/fstab.templ")?;
+	let fstab = fstab.replace("DATA_UUID", &data_uuid);
+	fs::write("/mnt/etc/fstab", fstab)?;
+
+	umount(&root_path)?;
+
+	// update grub
+
+	let boot_path = disk.part_path("boot")
+		.ok_or_else(|| io_other("could not get boot path"))?;
+
+	let root_uuid = disk.get_part("root a")
+		.ok_or_else(|| io_other("could not get root partition"))?
+		.part_guid.to_string();
+
+	mount(&boot_path, "/mnt")?;
+	let grub = read_to_string("/mnt/EFI/BOOT/grub.templ")?;
+	let grub = grub.replace("ROOTFS_UUID", &root_uuid);
+	fs::write("/mnt/EFI/BOOT/grub.tmp", grub)?;
+	fs::rename("/mnt/EFI/BOOT/grub.tmp", "/mnt/EFI/BOOT/grub.cfg")?;
 
 	Ok(())
 }
@@ -428,21 +614,80 @@ fn install_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Resu
 // start weston with
 // systemctl start weston
 
-// this should probably be done better
-fn is_real_disk(s: &str) -> bool {
-	if s.starts_with("sd") {
-		// sda
-		// sda1
-		let last = s.chars().last().unwrap();
+// // this should probably be done better
+// fn is_real_disk(s: &str) -> bool {
+// 	if s.starts_with("sd") {
+// 		// sda
+// 		// sda1
+// 		let last = s.chars().last().unwrap();
 		
-		last.is_ascii_alphabetic()
-	} else if s.starts_with("nvme") {
-		// nvme0n1
-		// nvme0n1p2
-		let p = s.chars().rev().nth(1).unwrap();
+// 		last.is_ascii_alphabetic()
+// 	} else if s.starts_with("nvme") {
+// 		// nvme0n1
+// 		// nvme0n1p2
+// 		let p = s.chars().rev().nth(1).unwrap();
 
-		p != 'p'
-	} else {
-		false
+// 		p != 'p'
+// 	} else {
+// 		false
+// 	}
+// }
+
+pub struct Command(StdCommand);
+
+impl Command {
+
+	pub fn new<S: AsRef<OsStr>>(program: S) -> Self {
+		Self(StdCommand::new(program))
 	}
+
+	pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Self {
+		self.0.arg(arg);
+		self
+	}
+
+	pub fn args<I, S>(&mut self, args: I) -> &mut Self
+	where
+		I: IntoIterator<Item = S>,
+		S: AsRef<OsStr>
+	{
+		self.0.args(args);
+		self
+	}
+
+	pub fn exec(&mut self) -> io::Result<()> {
+		self.0.status()
+			.and_then(|s| {
+				s.success()
+					.then(|| ())
+					.ok_or_else(|| io_other("command exited with non success status"))
+			})
+	}
+
+}
+
+fn mount(path: impl AsRef<Path>, dest: impl AsRef<Path>) -> io::Result<()> {
+	let dest = dest.as_ref();
+	// first unmount
+	// but ignore the result since it returns an error of nothing is mounted
+	let _ = umount(dest);
+	Command::new("mount")
+		.arg(path.as_ref())
+		.arg(dest)
+		.exec()
+}
+
+fn umount(path: impl AsRef<Path>) -> io::Result<()> {
+	Command::new("umount")
+		.arg("-f")
+		.arg(path.as_ref())
+		.exec()
+}
+
+fn cp(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
+	Command::new("cp")
+		.args(&["-r", "-p"])
+		.arg(from.as_ref())
+		.arg(to.as_ref())
+		.exec()
 }
