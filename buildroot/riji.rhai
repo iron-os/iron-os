@@ -59,6 +59,7 @@ fn build() {
 			"./output/disk.img", "./output/disk.vdi"
 		]);
 		vbox.execute();
+		// the reverse is VBoxManage clonemedium --format RAW debian.vdi debian.img
 	}
 }
 

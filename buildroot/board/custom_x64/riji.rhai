@@ -107,9 +107,6 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 
 	// remove getty
 	fs::delete(target_dir + "/usr/lib/systemd/system/multi-user.target.wants/getty.target");
-
-	// let upps = cmd("upps");
-	// upps.execute();
 }
 
 fn post_image(buildroot_dir, host_dir, binaries_dir) {
@@ -137,21 +134,6 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 		"-c", binaries_dir + "/genimage-efi.cfg"
 	]);
 	genimage.execute();
-
-
-	/*
-
-	UUID=$(dumpe2fs "$BINARIES_DIR/rootfs.ext2" 2>/dev/null | sed -n 's/^Filesystem UUID: *\(.*\)/\1/p')
-	sed -i "s/UUID_TMP/$UUID/g" "$BINARIES_DIR/efi-part/EFI/BOOT/grub.cfg"
-	sed "s/UUID_TMP/$UUID/g" board/pc/genimage-efi.cfg > "$BINARIES_DIR/genimage-efi.cfg"
-	support/scripts/genimage.sh -c "$BINARIES_DIR/genimage-efi.cfg"
-
-	UUID=$(dumpe2fs "$BINARIES_DIR/rootfs.ext2" 2>/dev/null | sed -n 's/^Filesystem UUID: *\(.*\)/\1/p')
-	sed -i "s/UUID_TMP/$UUID/g" "$BINARIES_DIR/efi-part/EFI/BOOT/grub.cfg"
-	sed "s/UUID_TMP/$UUID/g" board/custom_x64/genimage-efi.cfg > "$BINARIES_DIR/genimage-efi.cfg"
-	support/scripts/genimage.sh -c "$BINARIES_DIR/genimage-efi.cfg"
-
-	*/
 }
 
 fn fs_uuid(host_dir, path) {
