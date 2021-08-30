@@ -1,0 +1,29 @@
+enable_pdf = false
+use_gnome_keyring = false
+use_kerberos = false
+use_pulseaudio = true
+enable_js_type_check = false
+
+use_lld = true
+use_gold = false
+enable_remoting = false
+enable_nacl = false
+fieldtrial_testing_like_official_build = true
+
+use_ozone = true
+ozone_auto_platforms = false
+ozone_platform = "wayland"
+ozone_platform_headless = false
+ozone_platform_wayland = true
+ozone_platform_x11 = false
+enable_webui_tab_strip = false
+use_gtk = false
+use_x11 = false
+enable_basic_printing = false
+use_cups = false
+enable_paint_preview = false
+
+enable_linux_installer = true
+is_component_build = false
+
+angle_enable_vulkan = true
