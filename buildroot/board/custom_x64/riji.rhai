@@ -102,6 +102,7 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 
 	let data_uuid_reg = regex("DATA_UUID");
 	fs::copy("./rootfs/fstab", target_dir + "/etc/fstab");
+	fs::copy("./rootfs/fstab", target_dir + "/etc/fstab.templ");
 	data_uuid_reg.replace_file(target_dir + "/etc/fstab", data_uuid);
 
 	// remove getty
@@ -114,10 +115,12 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	let uuid = fs_uuid(host_dir, binaries_dir + "/rootfs.ext2");
 
-	let uuid_tmp_reg = regex("ROOTFS_UUID");
 	// fill grub.cfg
-	let grub_cfg = binaries_dir + "/efi-part/EFI/BOOT/grub.cfg";
+	let efi_dir = binaries_dir + "/efi-part/EFI/BOOT";
+	let grub_cfg = efi_dir + "/grub.cfg";
 	fs::copy("./grub-efi.cfg", grub_cfg);
+	fs::copy("./grub-efi.cfg", efi_dir + "/grub.templ");
+	let uuid_tmp_reg = regex("ROOTFS_UUID");
 	uuid_tmp_reg.replace_file(grub_cfg, uuid);
 	// fill genimage-efi.cfg
 	fs::copy("./genimage-efi.cfg", binaries_dir + "/");
