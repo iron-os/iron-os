@@ -1,0 +1,15 @@
+[package]
+name = "stdio-api"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+async = ["tokio"]
+
+[dependencies]
+tokio = { version = "1.0", features = ["io-util", "io-std", "process"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["io-util", "io-std", "process"] }
