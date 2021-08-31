@@ -1,10 +1,14 @@
 
+mod ui;
+
 use tokio::time::{sleep, Duration};
+use stdio_api::AsyncStdio;
 
 #[tokio::main]
 async fn main() {
 
 	// initialize api
+	let stdio = AsyncStdio::from_env();
 
 /*
 ## Chnobli service
@@ -12,7 +16,6 @@ async fn main() {
 - start chnobli_ui (or chnobli_shell)
 - start chromium
 - start chnobli_packages
-- send logs
 - maybe need chromium debug protocol (to be able to log console.logs warnings etc)
 
 - api to start other packages
