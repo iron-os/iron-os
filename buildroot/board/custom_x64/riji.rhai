@@ -74,13 +74,15 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	fs::delete(target_dir + "/home");
 
 	// copy chromium
-	fs::copy(binaries_dir + "/chromium", target_dir + "/data/");
+	fs::copy(binaries_dir + "/packages", target_dir + "/data/");
 
 	// set corrects rights
 	chown("14:15", target_dir + "/data/home");
 	chown("0:0", target_dir + "/data/etc");
-	chown("0:0", target_dir + "/data/chromium/chrome-sandbox");
-	chmod("4755", target_dir + "/data/chromium/chrome-sandbox");
+	// do we need those chromium hacks??
+	chown("14:15", target_dir + "/data/packages");
+	chown("0:0", target_dir + "/data/packages/chromium/left/chrome-sandbox");
+	chmod("4755", target_dir + "/data/packages/chromium/left/chrome-sandbox");
 
 	// execute gen_image
 	fs::delete(binaries_dir + "/data.ext2");
@@ -92,7 +94,7 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 		"-m", "5",
 		"-L", "data",
 		binaries_dir + "/data.ext2",
-		"256M"
+		"300M"
 	]);
 	mkfs.dir(binaries_dir);
 	mkfs.execute();

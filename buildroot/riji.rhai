@@ -83,7 +83,7 @@ fn patch() {
 	// copy .config
 	fs::copy("./.config", "./buildroot/");
 
-	//fs::copy("./board/linux.config", "./buildroot/output/build/linux-5.10.43/.config");
+	fs::copy("./packages", "./buildroot/output/images/");
 
 	let git = git(BUILDROOT);
 

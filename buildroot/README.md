@@ -52,6 +52,7 @@ http://underpop.online.fr/b/buildroot/en/makeuser-syntax.htm.gz
 
 ## chromium
 // To launch chromium the XDG_RUNTIME_DIR and WAYLAND_DISPLAY need to be defined.l
+// XDG_RUNTIME_DIR=/run/user/14 WAYLAND_DISPLAY=wayland-0 ./chrome --cache-dir=/tmp/ --user-profile=/tmp/ --disable-infobars --disable-rollback-option --disable-speech-api --disable-sync --disable-pinch --kiosk --app="https://youtube.com"
 
 ## external disk
 Create a partition with:
