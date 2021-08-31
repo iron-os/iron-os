@@ -15,11 +15,11 @@ impl<T> FileDb<T> {
 	fn sanitze_paths(mut main: PathBuf) -> (PathBuf, PathBuf) {
 		if main.file_name().is_none() {
 			main.set_file_name("");
+			main.set_extension("fdb");
 		}
-		main.set_extension("fdb");
-		let mut tmp = main.clone();
-		tmp.set_extension("fdb.tmp");
-		(main, tmp)
+		let mut tmp = main.clone().into_os_string();
+		tmp.push(".tmp");
+		(main, tmp.into())
 	}
 
 	// the file extension of path will be set to fdb
