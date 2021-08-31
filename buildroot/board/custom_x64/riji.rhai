@@ -22,6 +22,7 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	// copy service-bootloader
 	fs::copy("./rootfs/weston.service", target_dir + "/etc/systemd/system/");
 	fs::copy("./rootfs/service-bootloader.service", target_dir + "/etc/systemd/system/");
+	fs::copy("./rootfs/chromium.service", target_dir + "/etc/systemd/system/");
 
 	fs::copy(binaries_dir + "/service-bootloader", target_dir + "/usr/bin/");
 	// symlink get's created in fakeroot

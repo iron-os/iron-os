@@ -56,11 +56,15 @@ pub fn start() -> io::Result<()> {
 		.stdout_piped()
 		.spawn()?;
 
+	// todo kill the process if the child is dropped
+
 	let mut std_io = Stdio::from_child(&mut child)
 		.ok_or_else(|| io_other("could not get stdin or stdout"))?;
 
 	while let Some(line) = std_io.read()? {
 		eprintln!("got line kind: {:?} {:?}: {:?}", line.kind(), line.key(), line.data());
+
+		// should handle SystemctlStart service
 	}
 
 	let s = child.wait()?;

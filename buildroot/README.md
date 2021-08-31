@@ -22,7 +22,7 @@ call `riji patch`. If changes are done in the buildroot or
 with `riji config` call `riji save`.
 
 ## TODO
-Look at systemd-repart seams to be what is needed
+- remove audit since we it produces to many logs
 
 ## Boot process
 
@@ -87,3 +87,7 @@ target remote <ip>:<port>
 ### Todo
 - check what happens if weston crashes
   do we need to restart chromium?
+
+## Package Server
+The package server only stores package.fdb data and a hash of the specific version
+which then can be downloaded only by providing the hash.

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Chromium
+Requires=weston.service
+BindsTo=weston.service
+After=weston.serivice
+
+[Service]
+ExecStart=/data/packages/chromium/start.sh
+User=user
+Restart=always
+RestartSec=2
