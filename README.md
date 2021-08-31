@@ -65,19 +65,19 @@ for software that changes fast.
 
 ## packages folder
 packages
- - packages.jdb
+ - packages.fdb
  - chnobli_ui
-  - package.jdb // json_db containing information about the package
-  - package.jdb.tmp
+  - package.fdb // json_db containing information about the package
   - left
   - right
 
-package.db
+package.fdb
  - name
  - version_str
  - version // hash
  - signature // signature of the current version
  - current // folder of the current left|right
+ - binary // Option<String>
 
 
 ## Install disk (everything as small as possible)
