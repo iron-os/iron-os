@@ -16,3 +16,4 @@ linux-info = "0.1.6"
 # linux-info = { version = "0.1", path = "/dev-drive/linux-info" }
 gpt = { version = "2.0", git = "https://github.com/soerenmeier/gpt", branch = "relax_lifetime" }
 uuid = "0.8"
+stdio-api = { version = "0.1", path = "./../stdio-api" }
