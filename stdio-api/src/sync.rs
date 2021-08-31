@@ -17,13 +17,19 @@ impl<H> Handle<H> {
 		}
 	}
 
-	pub fn read(&mut self) -> io::Result<Line>
+	/// if none is returned the underlying
+	/// buffer has closed
+	pub fn read(&mut self) -> io::Result<Option<Line>>
 	where H: BufRead {
 		loop {
-			self.inner.read_line(self.buffer.as_mut())?;
+			let r = self.inner.read_line(self.buffer.as_mut())?;
+			if r == 0 {
+				return Ok(None)
+			}
+
 			let line = self.buffer.parse_line();
 			if let Some(line) = line {
-				return Ok(line)
+				return Ok(Some(line))
 			}
 		}
 	}
@@ -64,12 +70,16 @@ impl Stdio {
 		})
 	}
 
-	pub fn read(&mut self) -> io::Result<Line> {
+	pub fn read(&mut self) -> io::Result<Option<Line>> {
 		loop {
-			self.read.read(self.buffer.as_mut())?;
+			let r = self.read.read(self.buffer.as_mut())?;
+			if r == 0 {
+				return Ok(None)
+			}
+
 			let line = self.buffer.parse_line();
 			if let Some(line) = line {
-				return Ok(line)
+				return Ok(Some(line))
 			}
 		}
 	}
@@ -87,11 +97,11 @@ enum StdRead {
 
 impl StdRead {
 
-	fn read(&mut self, buf: &mut String) -> io::Result<()> {
+	fn read(&mut self, buf: &mut String) -> io::Result<usize> {
 		match self {
 			Self::Child(c) => c.read_line(buf),
 			Self::This(io) => io.lock().read_line(buf)
-		}.map(|_| ())
+		}
 	}
 
 }
