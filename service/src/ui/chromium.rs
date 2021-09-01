@@ -1,11 +1,8 @@
 
 use std::io;
-use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
 
-use tokio::task::JoinHandle;
-use tokio::process::Command;
-use tokio::fs::{self, OpenOptions};
+use tokio::fs::OpenOptions;
 use tokio::io::{AsyncWriteExt};
 
 use serde::Deserialize;
@@ -32,7 +29,7 @@ pub async fn start(url: &str, client: &mut AsyncClient) -> io::Result<()> {
 		format!("{}/package.fdb", CHROME_PACKAGE)
 	).await?.into_data();
 	let curr_path = format!("{}/{}", CHROME_PACKAGE, package.current);
-	let bin_path = format!("{}/{}", CHROME_PACKAGE, package.binary);
+	let bin_path = format!("{}/{}", curr_path, package.binary);
 
 
 	// todo: there should be a way to not display the: out of storage
@@ -45,6 +42,7 @@ pub async fn start(url: &str, client: &mut AsyncClient) -> io::Result<()> {
 
 	// start script
 	let mut script = OpenOptions::new()
+		.create(true)
 		.write(true)
 		.truncate(true)
 		.open(format!("{}/start.sh", CHROME_PACKAGE))

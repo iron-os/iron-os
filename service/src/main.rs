@@ -1,7 +1,6 @@
 
 mod ui;
 
-use tokio::time::{sleep, Duration};
 use bootloader_api::AsyncClient;
 
 #[tokio::main]
@@ -11,7 +10,10 @@ async fn main() {
 	let mut client = AsyncClient::new();
 
 	// start the ui
-	let ui_bg_task = ui::start(&mut client).await;
+	let ui_bg_task = ui::start(&mut client).await
+		.expect("ui start failed");
+
+	ui_bg_task.await.expect("ui task failed");
 
 
 	// start basic ui
