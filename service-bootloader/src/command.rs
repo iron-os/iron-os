@@ -1,11 +1,12 @@
 
 use crate::io_other;
 
-use std::process::{Child, Command as StdCommand, Stdio};
+use std::process::{Child as StdChild, Command as StdCommand, Stdio};
 use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
 use std::os::unix::process::CommandExt;
+use std::ops::{Deref, DerefMut};
 
 
 pub struct Command(StdCommand);
@@ -16,6 +17,7 @@ impl Command {
 		Self(StdCommand::new(program))
 	}
 
+	#[allow(dead_code)]
 	pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Self {
 		self.0.arg(arg);
 		self
@@ -61,6 +63,7 @@ impl Command {
 		self
 	}
 
+	#[allow(dead_code)]
 	pub fn stderr_piped(&mut self) -> &mut Self {
 		self.0.stderr(Stdio::piped());
 		self
@@ -68,6 +71,45 @@ impl Command {
 
 	pub fn spawn(&mut self) -> io::Result<Child> {
 		self.0.spawn()
+			.map(|inner| Child {
+				inner, should_kill: false
+			})
 	}
 
+}
+
+pub struct Child {
+	inner: StdChild,
+	should_kill: bool
+}
+
+impl Child {
+	pub fn kill_on_drop(&mut self, should_kill: bool) {
+		self.should_kill = should_kill;
+	}
+}
+
+impl Deref for Child {
+	type Target = StdChild;
+
+	fn deref(&self) -> &StdChild {
+		&self.inner
+	}
+}
+
+impl DerefMut for Child {
+	fn deref_mut(&mut self) -> &mut StdChild {
+		&mut self.inner
+	}
+}
+
+impl Drop for Child {
+	fn drop(&mut self) {
+		if self.should_kill {
+			let e = self.inner.kill();
+			if let Err(e) = e {
+				eprintln!("killing process returned {:?}", e);
+			}
+		}
+	}
 }

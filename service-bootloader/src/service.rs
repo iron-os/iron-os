@@ -5,7 +5,7 @@ use crate::io_other;
 use std::io;
 use std::path::Path;
 
-use stdio_api::Stdio;
+use bootloader_api::{Server, Request};
 use file_db::FileDb;
 
 use serde::Deserialize;
@@ -55,14 +55,25 @@ pub fn start() -> io::Result<()> {
 		.stdin_piped()
 		.stdout_piped()
 		.spawn()?;
+	child.kill_on_drop(true);
 
 	// todo kill the process if the child is dropped
 
-	let mut std_io = Stdio::from_child(&mut child)
+	let mut server = Server::new(&mut child)
 		.ok_or_else(|| io_other("could not get stdin or stdout"))?;
 
-	while let Some(line) = std_io.read()? {
-		eprintln!("got line kind: {:?} {:?}: {:?}", line.kind(), line.key(), line.data());
+	while let Some(req) = server.receive()? {
+		match req {
+			// receiving request to restart a systemd service
+			Request::SystemdRestart { name } => {
+				Command::new("systemctl")
+					.args(&["restart", &name])
+					.exec()?;
+			},
+			// got an unknown request
+			// maybe should return something
+			e => eprintln!("got req {:?}", e)
+		}
 
 		// should handle SystemctlStart service
 	}
