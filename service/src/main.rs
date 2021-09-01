@@ -2,13 +2,32 @@
 mod ui;
 
 use tokio::time::{sleep, Duration};
-use stdio_api::AsyncStdio;
+use bootloader_api::AsyncClient;
 
 #[tokio::main]
 async fn main() {
 
 	// initialize api
-	let stdio = AsyncStdio::from_env();
+	let mut client = AsyncClient::new();
+
+	// start the ui
+	let ui_bg_task = ui::start(&mut client).await;
+
+
+	// start basic ui
+
+
+	// then we either need to start the next package
+	// or we start the service installer
+	// run factory tests
+
+
+
+
+
+
+
+
 
 /*
 ## Chnobli service
@@ -26,13 +45,5 @@ async fn main() {
 - start chnobli_core
 - start frame package
 */
-
-	for i in 0..20 {
-		eprintln!("hey");
-
-		sleep(Duration::from_secs(30)).await;
-
-		println!(":>:Hi some data");
-	}
 
 }
