@@ -1,5 +1,5 @@
 
-use std::io;
+use std::{io, env};
 use std::os::unix::fs::PermissionsExt;
 
 use tokio::fs::OpenOptions;
@@ -31,6 +31,11 @@ pub async fn start(url: &str, client: &mut AsyncClient) -> io::Result<()> {
 	let curr_path = format!("{}/{}", CHROME_PACKAGE, package.current);
 	let bin_path = format!("{}/{}", curr_path, package.binary);
 
+	let my_curr_path = env::current_dir()?
+		.into_os_string().into_string()
+		.map_err(|_| io::Error::new(io::ErrorKind::Other, "invalid package path"))?;
+	let extension_path = format!("{}/{}", my_curr_path, "extension");
+
 
 	// todo: there should be a way to not display the: out of storage
 	// message
@@ -38,7 +43,8 @@ pub async fn start(url: &str, client: &mut AsyncClient) -> io::Result<()> {
 	// this is not really efficient
 	let cmd = CMD.replace("CURRENT_DIR", &curr_path)
 		.replace("BINARY", &bin_path)
-		.replace("URL", url);
+		.replace("URL", url)
+		.replace("EXTENSION", &extension_path);
 
 	// start script
 	let mut script = OpenOptions::new()
