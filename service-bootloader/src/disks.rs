@@ -18,7 +18,8 @@ use linux_info::storage::{MountPoints, Partitions, sector_size};
 use uuid::Uuid;
 
 // the size is set in genimage-efi.cfg
-const BOOT_SIZE: u64 = 16_744_448;
+// bzImage max size is 20m which allows to have a bzImage tmp
+const BOOT_SIZE: u64 = 52_396_032;
 
 // should create around 500mb
 // that should be enough since our rootfs at the moment
@@ -560,32 +561,6 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 
 	Ok(())
 }
-
-// service api
-// all requests start with :<:
-// all responses start with :>:
-
-// start weston with
-// systemctl start weston
-
-// // this should probably be done better
-// fn is_real_disk(s: &str) -> bool {
-// 	if s.starts_with("sd") {
-// 		// sda
-// 		// sda1
-// 		let last = s.chars().last().unwrap();
-		
-// 		last.is_ascii_alphabetic()
-// 	} else if s.starts_with("nvme") {
-// 		// nvme0n1
-// 		// nvme0n1p2
-// 		let p = s.chars().rev().nth(1).unwrap();
-
-// 		p != 'p'
-// 	} else {
-// 		false
-// 	}
-// }
 
 fn mount(path: impl AsRef<Path>, dest: impl AsRef<Path>) -> io::Result<()> {
 	let dest = dest.as_ref();
