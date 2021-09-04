@@ -7,9 +7,12 @@ edition = "2018"
 
 [features]
 async = ["tokio"]
+serde = ["_serde", "serde_json"]
 
 [dependencies]
 tokio = { version = "1.0", features = ["io-util", "io-std", "process"], optional = true }
+_serde = { package = "serde", version = "1.0", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["io-util", "io-std", "process"] }
