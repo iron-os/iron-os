@@ -1,11 +1,16 @@
 
 use crate::command::Command;
 use crate::io_other;
+use crate::disks::{api_disks, install_on};
+use crate::version_info::version_info;
 
 use std::io;
 use std::path::Path;
 
-use bootloader_api::{Server, Request};
+use bootloader_api::{
+	Server, request_handler, SystemdRestart, Disks,
+	Disk, InstallOn, VersionInfoReq, VersionInfo
+};
 use file_db::FileDb;
 
 use serde::Deserialize;
@@ -23,6 +28,34 @@ pub struct Package {
 // open packages folder
 // and then open the folder
 // service
+
+
+request_handler!{
+	fn systemd_restart(req: SystemdRestart) -> io::Result<()> {
+		Command::new("systemctl")
+			.args(&["restart", &req.name])
+			.exec()?;
+		Ok(())
+	}
+}
+
+request_handler!{
+	fn disks(_d: Disks) -> io::Result<Vec<Disk>> {
+		api_disks()
+	}
+}
+
+request_handler!{
+	fn install_on_handler(req: InstallOn) -> io::Result<()> {
+		install_on(req.name)
+	}
+}
+
+request_handler!{
+	fn version_info_handle(_r: VersionInfoReq) -> io::Result<VersionInfo> {
+		version_info()
+	}
+}
 
 pub fn start() -> io::Result<()> {
 
@@ -62,21 +95,12 @@ pub fn start() -> io::Result<()> {
 	let mut server = Server::new(&mut child)
 		.ok_or_else(|| io_other("could not get stdin or stdout"))?;
 
-	while let Some(req) = server.receive()? {
-		match req {
-			// receiving request to restart a systemd service
-			Request::SystemdRestart { name } => {
-				Command::new("systemctl")
-					.args(&["restart", &name])
-					.exec()?;
-			},
-			// got an unknown request
-			// maybe should return something
-			e => eprintln!("got req {:?}", e)
-		}
+	server.register(systemd_restart);
+	server.register(disks);
+	server.register(install_on_handler);
+	server.register(version_info_handle);
 
-		// should handle SystemctlStart service
-	}
+	server.run()?;
 
 	let s = child.wait()?;
 	s.success().then(|| ())

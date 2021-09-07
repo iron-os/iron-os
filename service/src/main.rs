@@ -1,16 +1,43 @@
 
 mod ui;
+mod context;
+mod bootloader;
+
+use context::Context;
+use bootloader::Bootloader;
+
+use std::env;
 
 use bootloader_api::AsyncClient;
 
 #[tokio::main]
 async fn main() {
 
+	let mut args = env::args();
+	let _ = args.next();
+	let ctx = args.next();
+	if matches!(ctx, Some(a) if a == "debug") || cfg!(debug_assertions) {
+		unsafe {
+			// safe because multithreading hasn't started
+			context::set(Context::Debug);
+		}
+	}
+
+	if context::get().is_debug() {
+		eprintln!("Service started in Debug context, chromium will not start");
+		if !cfg!(debug_assertions) {
+			// only show address in release since else
+			// fire displays it
+			eprintln!("Access the page via 127.0.0.1:8888");
+		}
+	}
+
+
 	// initialize api
-	let mut client = AsyncClient::new();
+	let bootloader = Bootloader::new();
 
 	// start the ui
-	let ui_bg_task = ui::start(&mut client).await
+	let ui_bg_task = ui::start(bootloader.clone()).await
 		.expect("ui start failed");
 
 	ui_bg_task.await.expect("ui task failed");

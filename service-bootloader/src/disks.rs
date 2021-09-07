@@ -1,21 +1,22 @@
 
-use std::thread;
-use std::time::Duration;
+use crate::io_other;
+use crate::command::Command;
+
 use std::path::{Path, PathBuf};
 use std::fs::{self, File, read_to_string, create_dir_all};
 use std::io::{self, Read, Seek, SeekFrom, Write};
-use std::error::Error as StdError;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
-use std::ffi::OsStr;
 
 use gpt::{GptConfig, GptDisk};
 use gpt::partition::{Partition as GptPartition};
 use gpt::mbr::ProtectiveMBR;
 use gpt::disk::LogicalBlockSize;
-use linux_info::storage::{MountPoints, Partitions, sector_size};
+use linux_info::storage::{sector_size};
 
 use uuid::Uuid;
+
+use bootloader_api::Disk as ApiDisk;
 
 // the size is set in genimage-efi.cfg
 // bzImage max size is 20m which allows to have a bzImage tmp
@@ -27,89 +28,63 @@ const BOOT_SIZE: u64 = 52_396_032;
 //
 // in bytes
 // is divisable by 512 and 4096
-const ROOTFS_SIZE: u64 = 500_002_816;
+const ROOTFS_SIZE: u64 = 524_288_000;
 
-// get's started as root
-fn main() {
-
-/*
-## Chnobli service bootloader
-
-- manage pssplash
-- start chnobli service package
-
-- supports api via stdin
- - can switch boot img
- - update images from img file
- - can restart
- - watchdog for chnobli service
-	 restart if chnobli service does not send
-	 connected for a given period
- - start weston service
- - api for setuid root
-*/
-
-	
-
-	let disks = Disks::read().expect("disks could not be read");
-
-	let mut sda = None;
-	let mut sdb = None;
-
+pub fn api_disks() -> io::Result<Vec<ApiDisk>> {
+	let mut list = vec![];
+	let disks = Disks::read()?;
 
 	for (name, disk) in disks.inner {
-		// println!("disk {:?}", name);
-		// println!("mbr {:#?}", disk.read_mbr());
-		// println!("gpt {:#?}", disk.gpt_disk);
-
-		if name == "sda" {
-			sda = Some(disk);
-		} else if name == "sdb" {
-			sdb = Some(disk);
-		}
+		let api_disk = ApiDisk {
+			name,
+			active: disk.is_root,
+			initialized: disk.gpt_disk.is_some(),
+			size: disk.size()?
+		};
+		list.push(api_disk);
 	}
 
-	println!("got sda {:#?}", sda);
-
-	println!("got sdb {:#?}", sdb);
-
-	let (mut sda, mut sdb) = match (sda, sdb) {
-		(Some(sda), Some(sdb)) => (sda, sdb),
-		_ => panic!("sda or sdb not found")
-	};
-
-	// now we wan't to install
-	// 
-
-	if arg == "install" {
-		println!("doing install in 10s");
-		thread::sleep(Duration::from_secs(5));
-		println!("doing install in 5s");
-		thread::sleep(Duration::from_secs(3));
-		println!("doing install in 2s");
-		thread::sleep(Duration::from_secs(2));
-		println!("doing install");
-		install_to_new_disk(&mut sda, &mut sdb)
-			.expect("could not do install");
-	}
+	Ok(list)
 }
 
+enum NewDisk {
+	New(Disk),
+	Active
+}
 
-// returns the file name
-fn list_files(dir: impl AsRef<Path>) -> io::Result<Vec<PathBuf>> {
-	let mut v = vec![];
+pub fn install_on(name: String) -> io::Result<()> {
 
-	for entry in fs::read_dir(dir)? {
-		let e = entry?;
-		if e.file_type()?.is_dir() {
-			continue
+	let mut active = None;
+	let mut new = None;
+
+	let disks = Disks::read()?;
+
+	for (disk_name, disk) in disks.inner {
+		match (disk.is_root, name == disk_name) {
+			(true, true) => {
+				active = Some(disk);
+				new = Some(NewDisk::Active);
+			},
+			(true, false) => {
+				active = Some(disk);
+			},
+			(false, true) => {
+				new = Some(NewDisk::New(disk));
+			},
+			_ => {}
 		}
-
-		// so we have a file
-		v.push(e.path());
 	}
 
-	Ok(v)
+	let (mut active, new) = active.and_then(|a| new.map(|b| (a, b)))
+		.ok_or_else(|| io_other("active or new disk not found"))?;
+
+	match new {
+		NewDisk::New(mut disk) => {
+			install_to_new_disk(&mut active, &mut disk)?;
+			Ok(())
+		},
+		NewDisk::Active => todo!("not installed")
+	}
 }
 
 macro_rules! try_cont {
@@ -120,7 +95,7 @@ macro_rules! try_cont {
 }
 
 #[derive(Debug)]
-pub struct Disks {
+struct Disks {
 	// the path (sda, sdb)
 	inner: HashMap<String, Disk>
 }
@@ -129,17 +104,6 @@ impl Disks {
 
 	pub fn read() -> io::Result<Self> {
 		let mut list = HashMap::new();
-
-
-		// read partitions to get their sizes
-		let mut part_blocks = HashMap::new();
-
-		for part in Partitions::read()?.entries() {
-			let name = try_cont!(part.name());
-			let blocks = try_cont!(part.blocks());
-			part_blocks.insert(name.to_string(), blocks);
-		}
-
 
 		// first get every disk
 		let disks = list_files("/sys/block")?;
@@ -153,9 +117,7 @@ impl Disks {
 
 			let name = name.to_string();
 
-			let blocks = part_blocks.get(&name);
-
-			let mut disk = Disk::new(&name, blocks.cloned())?;
+			let disk = Disk::new(&name)?;
 
 			list.insert(name, disk);
 
@@ -180,20 +142,19 @@ impl Disks {
 }
 
 #[derive(Debug)]
-pub struct Disk {
+struct Disk {
 	path: PathBuf,
-	blocks: Option<usize>,
 	gpt_disk: Option<GptDisk<'static>>,
 	is_root: bool
 }
 
 impl Disk {
 
-	pub fn new(name: &str, blocks: Option<usize>) -> io::Result<Self> {
+	pub fn new(name: &str) -> io::Result<Self> {
 		let path = Path::new("/dev").join(name);
 
 		let mut me = Self {
-			path, blocks,
+			path,
 			gpt_disk: None,
 			is_root: false
 		};
@@ -282,7 +243,7 @@ impl Disk {
 		let id = self.gpt_disk.as_ref()?
 			.partitions()
 			.iter()
-			.find(|(id, v)| v.name == name)
+			.find(|(_, v)| v.name == name)
 			.map(|(id, _)| *id)?;
 		let mut os_str = self.path.clone().into_os_string();
 		let id_str = format!("{}", id);
@@ -290,33 +251,13 @@ impl Disk {
 		Some(os_str.into())
 	}
 
-}
+	pub fn size(&self) -> io::Result<u64> {
+		let mut file = File::open(&self.path)?;
+		file.seek(SeekFrom::Start(0))?;
+		let len = file.seek(SeekFrom::End(0))?;
+		Ok(len)
+	}
 
-
-// installation partions
-// efi
-// rootfs
-// data
-
-
-
-fn root_uuid() -> io::Result<Uuid> {
-	// read the cmdline and get the root parameter
-	let cmd = fs::read_to_string("/proc/cmdline")?;
-	cmd.split_ascii_whitespace()
-		.find_map(|p| {
-			p.split_once('=')
-				.filter(|(a, _)| a == &"root")
-				.map(|(_, b)| b)
-		})
-		.and_then(|v| {
-			v.split_once('=')
-				.filter(|(a, _)| matches!(*a, "UUID" | "PARTUUID"))
-				.map(|(_, b)| b)
-		})
-		.map(Uuid::parse_str)
-		.ok_or_else(|| io_other("no root or uuid"))
-		.and_then(|o| o.map_err(io_other))
 }
 
 /// writes a new partition
@@ -348,10 +289,11 @@ fn write_gpt_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Re
 	{
 		let prev_mbr = install_disk.read_mbr()?;
 
-		let mut file = new_disk.writable_file()?;
-		let len = file.seek(SeekFrom::End(0))?;
+		let len = new_disk.size()?;
 		let sectors = len.checked_div(sector_size)
 			.ok_or_else(|| io_other("file len not % sector size"))?;
+
+		let mut file = new_disk.writable_file()?;
 
 		let mut mbr = ProtectiveMBR::with_lb_size((sectors - 1) as u32);
 		mbr.set_bootcode(prev_mbr.bootcode().clone());
@@ -586,4 +528,40 @@ fn cp(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
 		.arg(from.as_ref())
 		.arg(to.as_ref())
 		.exec()
+}
+
+// returns the file name
+fn list_files(dir: impl AsRef<Path>) -> io::Result<Vec<PathBuf>> {
+	let mut v = vec![];
+
+	for entry in fs::read_dir(dir)? {
+		let e = entry?;
+		if e.file_type()?.is_dir() {
+			continue
+		}
+
+		// so we have a file
+		v.push(e.path());
+	}
+
+	Ok(v)
+}
+
+fn root_uuid() -> io::Result<Uuid> {
+	// read the cmdline and get the root parameter
+	let cmd = fs::read_to_string("/proc/cmdline")?;
+	cmd.split_ascii_whitespace()
+		.find_map(|p| {
+			p.split_once('=')
+				.filter(|(a, _)| a == &"root")
+				.map(|(_, b)| b)
+		})
+		.and_then(|v| {
+			v.split_once('=')
+				.filter(|(a, _)| matches!(*a, "UUID" | "PARTUUID"))
+				.map(|(_, b)| b)
+		})
+		.map(Uuid::parse_str)
+		.ok_or_else(|| io_other("no root or uuid"))
+		.and_then(|o| o.map_err(io_other))
 }

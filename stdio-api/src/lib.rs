@@ -73,6 +73,7 @@ impl Line {
 mod serde {
 
 	use std::fmt;
+	use std::ops::Not;
 
 	use _serde::{Serialize, Deserialize};
 
@@ -98,7 +99,7 @@ mod serde {
 	where T: Serialize + ?Sized {
 		let s = serde_json::to_string(value)
 			.map_err(Error::Json)?;
-		s.contains('\n')
+		s.contains('\n').not()
 			.then(|| s)
 			.ok_or(Error::ContainsInvalidChars)
 	}

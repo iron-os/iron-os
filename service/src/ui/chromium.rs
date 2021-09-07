@@ -1,4 +1,6 @@
 
+use crate::Bootloader;
+
 use std::{io, env};
 use std::os::unix::fs::PermissionsExt;
 
@@ -8,7 +10,7 @@ use tokio::io::{AsyncWriteExt};
 use serde::Deserialize;
 use file_db::FileDb;
 
-use bootloader_api::{AsyncClient, Request};
+use bootloader_api::{SystemdRestart};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Package {
@@ -21,7 +23,7 @@ const CMD: &str = include_str!("start_chrome.templ");
 const CHROME_PACKAGE: &str = "/data/packages/chromium";
 
 // the url needs https or http
-pub async fn start(url: &str, client: &mut AsyncClient) -> io::Result<()> {
+pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	// do we need to setsid?
 	// so chrome closes if this process closes??
 
@@ -60,7 +62,7 @@ pub async fn start(url: &str, client: &mut AsyncClient) -> io::Result<()> {
 	script.set_permissions(permission).await?;
 
 	// now restart service
-	client.send(Request::SystemdRestart { name: "chromium".into() }).await?;
+	client.request(&SystemdRestart { name: "chromium".into() }).await?;
 
 	Ok(())
 }

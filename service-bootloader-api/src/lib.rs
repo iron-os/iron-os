@@ -262,6 +262,7 @@ kind!{
 	SystemdRestart,
 	Disks,
 	InstallOn,
+	VersionInfo
 }
 
 
@@ -308,4 +309,27 @@ impl Request for InstallOn {
 	type Response = ();
 	fn kind() -> Kind { Kind::InstallOn }
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct VersionInfoReq;
+
+impl Request for VersionInfoReq {
+	type Response = VersionInfo;
+	fn kind() -> Kind { Kind::VersionInfo }
+}
+
+// version info stored in /buildroot/riji.rhai
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionInfo {
+	// in the format 20.03.20
+	buildroot_version: String,
+	version: u64,
+	channel: VersionChannel,
+	installed: bool
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum VersionChannel {
+	Debug,
+	Release
 }

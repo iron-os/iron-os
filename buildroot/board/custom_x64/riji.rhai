@@ -27,6 +27,9 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy(binaries_dir + "/service-bootloader", target_dir + "/usr/bin/");
 	// symlink get's created in fakeroot
 
+	// create version file
+	fs::copy(binaries_dir + "/version.fdb", target_dir + "/etc/");
+
 	// create empty data folder (needed for fresh build since else device_table.mk failes)
 	fs::create_dir(target_dir + "/data");
 

@@ -1,6 +1,8 @@
 
 const BUILDROOT = "./buildroot";
 const STABLE = "2021.02.4";
+const VERSION = "1";
+const CHANNEL = "Debug";// Debug | Release
 
 fn help() {
 	print([
@@ -84,6 +86,15 @@ fn patch() {
 	fs::copy("./.config", "./buildroot/");
 
 	fs::copy("./packages", "./buildroot/output/images/");
+
+	// this file is defined in service-bootloader-api as VersionInfo
+	fs::write(
+		"./buildroot/output/images/version.fdb",
+		"{\"buildroot_version\":\"" + STABLE + "\"," + 
+		"\"version\":" + VERSION + "," +
+		"\"installed\":false," +
+		"\"channel\":\"" + CHANNEL + "\"}"
+	);
 
 	let git = git(BUILDROOT);
 

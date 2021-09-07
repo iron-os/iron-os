@@ -1,6 +1,8 @@
 
 mod command;
 mod service;
+mod disks;
+mod version_info;
 
 use command::Command;
 
