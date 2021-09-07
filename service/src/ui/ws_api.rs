@@ -114,14 +114,15 @@ macro_rules! msg_handler {
 		#[allow(non_camel_case_types)]
 		$($vis)* struct $name;
 
-		impl $crate::Handler<$data_ty> for $name {
-			fn name() -> $crate::Name { $name_kind }
+		impl $crate::ui::ws_api::Handler<$data_ty> for $name {
+			fn name() -> $crate::ui::ws_api::Name { $name_kind }
+			#[allow(unused_mut)]
 			fn handle(
 				&self,
-				mut $req: $crate::Message,
-				mut $sender: $crate::Sender,
+				mut $req: $crate::ui::ws_api::Message,
+				mut $sender: $crate::ui::ws_api::Sender,
 				data: &$data_ty
-			) -> $crate::JoinHandle<()> {
+			) -> $crate::ui::ws_api::JoinHandle<()> {
 				// extract data
 				$(
 					let mut $data = data.$data().to_owned();
@@ -261,42 +262,6 @@ impl<D> ConnectionBuilder<D> {
 
 }
 
-// async fn bg_task(
-// 	builder: ConnectionBuilder,
-// 	rx: mpsc::Receiver<(Message, mpsc::Sender<Message>)>
-// ) {
-// 	/*
-// 	tasks:
-// 	 - listen for new messages
-// 	*/
-// 	loop {
-
-// 		let (msg, sender) = rx.recv().await.expect("connection closed");
-
-// 		// create a real sender
-// 		sender = match Sender::from_msg(&msg, sender) {
-// 			Some(sender) => sender,
-// 			None => {
-// 				eprintln!("received invalid msg {:?}", msg);
-// 				continue
-// 			}
-// 		};
-
-// 		// now search a handler
-// 		let handler = builder.handlers.get(&msg.name);
-
-// 		match handler {
-// 			Some(handler) => {
-// 				handler.handle(msg, sender, )
-// 			},
-// 			None => {
-// 				todo!("send a response that we don't have this handler")
-// 			}
-// 		}
-
-// 	}
-// }
-
 #[derive(Clone)]
 pub struct Connection<D> {
 	inner: Arc<HashMap<Name, Box<dyn Handler<D>>>>
@@ -326,20 +291,20 @@ macro_rules! route {
 		$crate::route!($name<Data>, $($toks)*);
 	);
 	($name:ident<$data_ty:ty>, $path:expr, $ws_data:ident, $connection:ident) => (
-		$crate::ws_route! {
-			$name<$data_ty>, $path, |ws, $ws_data, $connection| -> $crate::Result<()> {
-				let (tx, mut rx) = $crate::mpsc::channel(10);
+		fire::ws_route! {
+			$name<$data_ty>, $path, |ws, $ws_data, $connection| -> $crate::ui::ws_api::Result<()> {
+				let (tx, mut rx) = $crate::ui::ws_api::mpsc::channel(10);
 				loop {
 
 					tokio::select!{
 						msg = ws.deserialize() => {
-							let msg = msg.map_err($crate::Error::Fire)?;
+							let msg = msg.map_err($crate::ui::ws_api::Error::Fire)?;
 							let msg = match msg {
 								Some(m) => m,
 								None => return Ok(())
 							};
 
-							let sender = match $crate::Sender::from_msg(&msg, tx.clone()) {
+							let sender = match $crate::ui::ws_api::Sender::from_msg(&msg, tx.clone()) {
 								Some(sender) => sender,
 								None => {
 									eprintln!("received invalid msg {:?}", msg);
@@ -351,7 +316,7 @@ macro_rules! route {
 						},
 						Some(msg) = rx.recv() => {
 							ws.serialize(&msg).await
-								.map_err($crate::Error::Fire)?;
+								.map_err($crate::ui::ws_api::Error::Fire)?;
 						}
 					}
 

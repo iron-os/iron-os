@@ -8,8 +8,6 @@ use bootloader::Bootloader;
 
 use std::env;
 
-use bootloader_api::AsyncClient;
-
 #[tokio::main]
 async fn main() {
 

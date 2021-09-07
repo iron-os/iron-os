@@ -1,5 +1,7 @@
 
 mod chromium;
+#[macro_use]
+mod ws_api;
 mod ws;
 
 use crate::context;

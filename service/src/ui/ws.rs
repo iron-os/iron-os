@@ -2,7 +2,7 @@
 use super::WsData;
 
 use bootloader_api::VersionInfoReq;
-use ws_api::{route, ConnectionBuilder, Connection, msg_handler, Name, Result};
+use super::ws_api::{self, ConnectionBuilder, Connection, Name, Result};
 
 // version info
 msg_handler!( for Name::VersionInfo,
