@@ -415,6 +415,7 @@ fn copy_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<
 	// let's use the cp command
 	cp("/data/home", "/mnt/")?;
 	create_dir_all("/mnt/etc/ssh")?;
+	cp("/data/packages", "/mnt/")?;
 
 	umount(&data_path)?;
 
