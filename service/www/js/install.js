@@ -24,9 +24,8 @@ export default class Install {
 			const disk = new Disk(d);
 			const el = new DiskEl(disk);
 
-			el.btn.onPrevDef('click', async e => {
+			el.onClick(async e => {
 				const r = await con.request('InstallOn', disk.name);
-				console.log('disk installed', r);
 				alert('disk installed');
 			});
 
@@ -69,6 +68,14 @@ class DiskEl {
 			this.size,
 			this.btn
 		).raw
+	}
+
+	onClick(fn) {
+		this.btn.onPrevDef('click', async e => {
+			this.btn.text = 'Installing';
+			await fn();
+			this.btn.text = 'Installed';
+		});
 	}
 
 }

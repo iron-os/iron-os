@@ -322,10 +322,11 @@ impl Request for VersionInfoReq {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionInfo {
 	// in the format 20.03.20
-	buildroot_version: String,
-	version: u64,
-	channel: VersionChannel,
-	installed: bool
+	pub buildroot_version: String,
+	pub version: u64,
+	pub channel: VersionChannel,
+	pub installed: bool
+	// add partial installed or full install
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

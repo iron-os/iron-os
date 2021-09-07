@@ -91,3 +91,8 @@ target remote <ip>:<port>
 ## Package Server
 The package server only stores package.fdb data and a hash of the specific version
 which then can be downloaded only by providing the hash.
+
+## Install to usb stick
+```
+dd bs=4M if=disk.img of=/dev/sdc status=progress oflag=sync
+```

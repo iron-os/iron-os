@@ -1,6 +1,7 @@
 
 use crate::io_other;
 use crate::command::Command;
+use crate::version_info::update_version_info;
 
 use std::path::{Path, PathBuf};
 use std::fs::{self, File, read_to_string, create_dir_all};
@@ -484,6 +485,9 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	let fstab = read_to_string("/mnt/etc/fstab.templ")?;
 	let fstab = fstab.replace("DATA_UUID", &data_uuid);
 	fs::write("/mnt/etc/fstab", fstab)?;
+
+	// update version info
+	update_version_info()?;
 
 	umount(&root_path)?;
 
