@@ -3,52 +3,36 @@ import doc, { c } from '/fire-html/doc.js';
 import { timeout, randomToken } from '/fire-html/util.js';
 import Connection from './connection.js';
 import Data from '/fire-html/data/data.js';
+import Install from './install.js';
 
 async function main() {
 
-	const h1 = c('h1', { text: 'Welcome' });
-	const div = c('div');
-
-	doc.body.insert(h1);
-	doc.body.insert(div);
-
-	// const con = new Connection;
-
-	// con.on(msg => {
-	// 	console.log('received a message');
-	// });
-
-	// setInterval(() => {
-	// 	window.postMessage({ cls: 'nice' });
-	// }, 1000);
-
-	await timeout(1000);
-
 	const con = new Connection;
-	const r = await con.request('VersionInfo', 'hey');
+	await con.connect();// wait until a connection is made
 
-	const version = new VersionInfo(r);
-	console.log('version', version.export());
+	const main = c('main');
+	doc.body.insert(main);
 
-	div.insert(
-		field('version: ', version.version),
-		field('buildroot: ', version.buildroot_version),
-		field('installed: ', version.installed),
-		field('channel: ', version.channel)
-	);
+	const rawVersionInfo = await con.request('VersionInfo', 'versioninfo');
+	const versionInfo = new VersionInfo(rawVersionInfo);
+
+	if (!versionInfo.installed) {
+
+		const page = new Install;
+
+		await page.prepare(con);
+
+		main.clear();
+		main.insert(page);
+
+	} else {
+
+		const w = c('h1', { text: 'installed' });
+		doc.body.insert(w);
+
+	}
 
 }
-
-function field(name, value) {
-	const g = c('p');
-	const nameEl = c('b', { text: name });
-	const valueEl = c('span', { text: value });
-	return g.insert(
-		nameEl,
-		valueEl
-	)
-}
-
 
 class VersionInfo extends Data {
 	constructor(d) {

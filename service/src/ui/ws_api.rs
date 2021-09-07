@@ -203,7 +203,9 @@ impl Sender {
 /// this is the kind of message
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Name {
-	VersionInfo
+	VersionInfo,
+	Disks,
+	InstallOn
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

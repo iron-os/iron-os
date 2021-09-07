@@ -35,8 +35,11 @@ class Connection {
 		this.connect();
 	}
 
-	connect() {
+	async connect() {
 		this.port = chrome.runtime.connect();
+		if (chrome.runtime.lastError) {
+			console.log('connection errored', chrome.runtime.lastError);
+		}
 		this.port.onMessage.addListener(msg => {
 			console.log('content: received message from bg:', msg);
 			window.postMessage({
@@ -44,12 +47,24 @@ class Connection {
 				data: msg
 			});
 		});
+
+		let stillConnected = true;
 		this.port.onDisconnect.addListener(async () => {
 			this.port = null;
 			console.log('port disconnected');
-			await timeout(1000);
+			stillConnected = false;
+			await timeout(200);
 			this.connect();
 		});
+
+		await timeout(100);
+
+		if (stillConnected) {
+			window.postMessage({
+				origin: 'Extension',
+				connected: true
+			});
+		}
 	}
 
 	send(msg) {

@@ -1,0 +1,22 @@
+@import defaults
+
+*
+	@core
+
+pre
+	background-color: #eee
+	padding: 10px
+
+// install page
+#install-page
+	padding: 10px
+
+	.disk
+		margin-bottom: 20px
+
+	a
+		display: inline-block
+		padding: 5px 10px
+		color: #fff
+		background-color: #fd4141
+		text-decoration: none

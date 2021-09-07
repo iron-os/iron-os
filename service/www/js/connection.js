@@ -21,13 +21,29 @@ export default class Connection {
 		this.requests = {};
 		// contains {id: fn(data)}
 		this.streams = {};
-
-		this.connect();
 	}
 
 	// on(fn) {
 	// 	this.onFn = fn;
 	// }
+
+	async connect() {
+		// waits until a connection could be established
+		const prom = new Promise(resolve => {
+			const firstEv = ev => {
+				// we received a first message
+				window.removeEventListener('message', firstEv);
+				resolve(ev);
+			};
+			window.addEventListener('message', firstEv);
+
+		});
+
+		const ev = await prom;
+		console.log('received first ev', ev);
+
+		this.connectRaw();
+	}
 
 	async request(name, data) {
 		return new Promise(resolve => {
@@ -71,7 +87,7 @@ export default class Connection {
 
 
 	//------ Private
-	connect() {
+	connectRaw() {
 		window.addEventListener('message', ev => {
 
 			// only accept messages from the same frame

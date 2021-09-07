@@ -11,7 +11,7 @@ use std::io;
 
 use tokio::task::JoinHandle;
 
-use fire::{data_struct, static_file, static_files};
+use fire::{data_struct, static_file, static_files, mgcss_files};
 
 // start chromium and the server manually
 // but then return a task which contains the serevr
@@ -33,6 +33,7 @@ static_files!(Js, "/js" => "./www/js");
 
 static_files!(FireHtml, "/fire-html" => "./www/fire-html");
 
+mgcss_files!(Mgcss, "/mgcss" => "./www/mgcss");
 
 /*
 struct Message {
@@ -59,6 +60,7 @@ data_struct!{
 }
 
 impl Data {
+	#[allow(dead_code)]
 	pub fn bootloader(&self) -> &Bootloader {
 		&self.ws_data.bootloader
 	}
@@ -89,6 +91,7 @@ pub fn start_server(port: u16, bootloader: Bootloader) -> JoinHandle<()> {
 	server.add_route(Index::new());
 	server.add_route(Js::new());
 	server.add_route(FireHtml::new());
+	server.add_route(Mgcss::new());
 	server.add_raw_route(ws::MainWs);
 
 	// tokio::spawn(async move {

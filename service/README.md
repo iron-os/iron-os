@@ -24,4 +24,8 @@
 make sure no client can connect to `/websocket`
 
 ## Responses
-:<:VersionInfo {"buildroot_version":"2021.02.4","version":1,"installed":true,"channel":"Debug"}
+```
+:<:VersionInfo {"buildroot_version":"2021.02.4","version":1,"installed":false,"channel":"Debug"}
+
+:<:Disks [{"active":true,"initialized":true,"name":"sda","size":576733696}]
+```
