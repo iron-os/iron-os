@@ -98,7 +98,7 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 		"-m", "5",
 		"-L", "data",
 		binaries_dir + "/data.ext2",
-		"300M"
+		"350M"
 	]);
 	mkfs.dir(binaries_dir);
 	mkfs.execute();

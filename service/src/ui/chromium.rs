@@ -60,6 +60,8 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	let mut permission = script.metadata().await?.permissions();
 	permission.set_mode(0o755);
 	script.set_permissions(permission).await?;
+	// this is done to free start.sh so the service can start chromium
+	drop(script);
 
 	// now restart service
 	client.request(&SystemdRestart { name: "chromium".into() }).await?;

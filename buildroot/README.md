@@ -88,6 +88,8 @@ target remote <ip>:<port>
 - check what happens if weston crashes
   do we need to restart chromium?
 
+- add /usr/lib/dri/i965_dri.so
+
 ## Package Server
 The package server only stores package.fdb data and a hash of the specific version
 which then can be downloaded only by providing the hash.

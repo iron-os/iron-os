@@ -2,7 +2,7 @@
 Description=Run Chromium
 Requires=weston.service
 BindsTo=weston.service
-After=weston.serivice
+After=weston.service
 
 [Service]
 ExecStart=/data/packages/chromium/start.sh

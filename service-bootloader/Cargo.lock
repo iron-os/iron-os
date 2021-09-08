@@ -57,7 +57,7 @@ dependencies = [
 [[package]]
 name = "gpt"
 version = "2.0.0"
-source = "git+https://github.com/soerenmeier/gpt?branch=relax_lifetime#b651cd041bbf0fb9b915498b9c3be63987a704c4"
+source = "git+https://github.com/soerenmeier/gpt?branch=tmp_master#48629e0d863250ef56122c540098e1b2a70af9b7"
 dependencies = [
  "bitflags",
  "crc",
