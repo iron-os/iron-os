@@ -1,13 +1,23 @@
 
-use crypto::signature::PublicKey;
+use crypto::signature::{PublicKey, Signature};
 
 use serde::{Serialize, Deserialize};
+
+
+// todo should we use this??
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Channel {
+	Debug,
+	Alpha,
+	Beta,
+	Release
+}
 
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Source {
 	/// example packages.lvgd.ch:9281
-	pub url: String,
+	pub addr: String,
 	/// if public == false an authentication token is sent?
 	pub public: bool,
 	/// the connection signature key
@@ -21,7 +31,6 @@ pub struct Source {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesCfg {
-	list: Vec<String>,
 	/// sources to fetch for updates
 	/// updates are checked in reverse order
 	/// until some source is found that contains that package
@@ -31,7 +40,9 @@ pub struct PackagesCfg {
 	/// the package that should be run when installing
 	pub on_install: String,
 	/// the package that should be run normally
-	pub on_run: String
+	pub on_run: String,
+	/// this information get's overriden if the image is in Debug
+	pub channel: Channel
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,6 +51,23 @@ pub struct Package {
 	pub version_str: String,
 	/// blake2s hash of the full compressed file
 	pub version: String,
-	pub current: String,
+	pub signature: Signature,
+	pub size: u64,
 	pub binary: Option<String>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum PackageCfg {
+	// do i need to other package??
+	Left(Package),
+	Right(Package)
+}
+
+impl PackageCfg {
+	pub fn package(&self) -> &Package {
+		match self {
+			Self::Left(p) => p,
+			Self::Right(p) => p
+		}
+	}
 }

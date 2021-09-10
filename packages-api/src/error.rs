@@ -1,5 +1,5 @@
 
-use std::io;
+use std::{io, fmt, error};
 use stream::StreamError;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -22,3 +22,11 @@ impl Error {
 	}
 
 }
+
+impl fmt::Display for Error {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		fmt::Debug::fmt(self, f)
+	}
+}
+
+impl error::Error for Error {}

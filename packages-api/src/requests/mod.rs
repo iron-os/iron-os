@@ -21,7 +21,7 @@ get file
 mod macros;
 
 use crate::message::{Action, Message};
-use crate::packages::{Package};
+use crate::packages::{Channel, Package};
 
 use stream::Result;
 use stream::basic::request::Response;
@@ -29,16 +29,7 @@ use stream::packet::EncryptedBytes;
 
 use serde::{Serialize, Deserialize};
 
-
-
-// todo should we use this??
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Channel {
-	Debug,
-	Alpha,
-	Beta,
-	Release
-}
+use crypto::signature::Signature;
 
 
 // All packages
@@ -89,7 +80,11 @@ serde_req!(Action::ImageInfo, ImageInfoReq, ImageInfo);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImageInfo {
-
+	pub buildroot_version: String,
+	pub version: u64,
+	pub hash: String,
+	pub signature: Signature,
+	pub size: u64
 }
 
 serde_res!(ImageInfo);

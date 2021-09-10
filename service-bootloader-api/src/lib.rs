@@ -334,3 +334,13 @@ pub enum VersionChannel {
 	Debug,
 	Release
 }
+
+impl VersionChannel {
+	pub fn is_debug(&self) -> bool {
+		matches!(self, VersionChannel::Debug)
+	}
+
+	pub fn is_release(&self) -> bool {
+		matches!(self, VersionChannel::Release)
+	}
+}

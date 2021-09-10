@@ -2,6 +2,8 @@
 mod ui;
 mod context;
 mod bootloader;
+mod packages;
+mod util;
 
 use context::Context;
 use bootloader::Bootloader;
@@ -21,6 +23,10 @@ async fn main() {
 		}
 	}
 
+	// initialize api
+	let bootloader = Bootloader::new();
+
+	// if we are in debug only start the ui
 	if context::get().is_debug() {
 		eprintln!("Service started in Debug context, chromium will not start");
 		if !cfg!(debug_assertions) {
@@ -28,31 +34,37 @@ async fn main() {
 			// fire displays it
 			eprintln!("Access the page via 127.0.0.1:8888");
 		}
+
+		// start the ui
+		let ui_bg_task = ui::start(bootloader).await
+			.expect("ui start failed");
+
+		ui_bg_task.await.expect("ui task failed");
+
+		return;
 	}
 
-
-	// initialize api
-	let bootloader = Bootloader::new();
 
 	// start the ui
 	let ui_bg_task = ui::start(bootloader.clone()).await
 		.expect("ui start failed");
 
-	ui_bg_task.await.expect("ui task failed");
+	// ui_bg_task.await.expect("ui task failed");
+
+	let packages_bg_task = packages::start(bootloader.clone()).await
+		.expect("packages failed");
+
+	// start service api
 
 
-	// start basic ui
+	// detect what package should be run
+	// and run it
 
-
-	// then we either need to start the next package
-	// or we start the service installer
-	// run factory tests
-
-
-
-
-
-
+	// now wait until some task fail and restart
+	let (_ui, _packages) = tokio::try_join!(
+		ui_bg_task,
+		packages_bg_task
+	).expect("some task failed");
 
 
 
