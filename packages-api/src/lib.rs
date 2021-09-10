@@ -1,8 +1,7 @@
 
+pub mod requests;
 pub mod message;
-
-pub mod request;
-
 pub mod client;
-
+pub mod server;
 pub mod error;
+pub mod packages;

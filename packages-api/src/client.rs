@@ -1,13 +1,14 @@
 
-use crate::message::Message;
+use crate::message::Action;
 use crate::error::{Result, Error};
-use crate::request::{Request, Response};
 
-use std::io;
 use std::time::Duration;
 
+use stream::basic::{
+	self,
+	request::Request
+};
 use stream::packet::EncryptedBytes;
-use stream::{encrypted};
 
 use crypto::signature::PublicKey;
 
@@ -17,7 +18,7 @@ use tokio::net::{TcpStream, ToSocketAddrs};
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct Client {
-	inner: stream::Client<Message>
+	inner: basic::Client<Action, EncryptedBytes>
 }
 
 impl Client {
@@ -26,16 +27,15 @@ impl Client {
 	where A: ToSocketAddrs {
 		let stream = TcpStream::connect(addr).await
 			.map_err(Error::io)?;
-		let inner = encrypted::client(stream, TIMEOUT, pub_key);
-		Ok(Self { inner })
+		Ok(Self {
+			inner: basic::Client::<_, EncryptedBytes>::new(stream, TIMEOUT, pub_key)
+		})
 	}
 
 	pub async fn request<R>(&self, req: R) -> Result<R::Response>
-	where R: Request {
-		let req = req.into_message()?;
-		let res = self.inner.request(req).await
-			.map_err(Error::Stream)?;
-		R::Response::from_message(res)
+	where R: Request<Action, EncryptedBytes> {
+		self.inner.request(req).await
+			.map_err(Error::Stream)
 	}
 
 }
