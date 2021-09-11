@@ -7,7 +7,7 @@ macro_rules! serde_req {
 				$action
 			}
 			fn into_message(self) -> stream::Result<Message> {
-				Message::serialize($action, &self)
+				Message::serialize(&self)
 			}
 			fn from_message(msg: Message) -> stream::Result<Self> {
 				msg.deserialize()
@@ -20,8 +20,7 @@ macro_rules! serde_res {
 	($res:ident) => (
 		impl stream::basic::request::Response<Action, stream::packet::EncryptedBytes> for $res {
 			fn into_message(self) -> stream::Result<Message> {
-				// the action should not matter
-				Message::serialize(Action::Empty, &self)
+				Message::serialize(&self)
 			}
 			fn from_message(msg: Message) -> stream::Result<Self> {
 				msg.deserialize()

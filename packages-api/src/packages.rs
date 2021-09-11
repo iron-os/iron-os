@@ -1,5 +1,6 @@
 
 use crypto::signature::{PublicKey, Signature};
+use crypto::hash::Hash;
 
 use serde::{Serialize, Deserialize};
 
@@ -50,7 +51,7 @@ pub struct Package {
 	pub name: String,
 	pub version_str: String,
 	/// blake2s hash of the full compressed file
-	pub version: String,
+	pub version: Hash,
 	pub signature: Signature,
 	pub size: u64,
 	pub binary: Option<String>
