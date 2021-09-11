@@ -6,7 +6,7 @@ use serde::{Serialize, Deserialize};
 
 
 // todo should we use this??
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Channel {
 	Debug,
 	Alpha,

@@ -4,6 +4,7 @@ use std::{io, fs};
 
 use serde::{de::DeserializeOwned, Serialize};
 
+#[derive(Debug)]
 pub struct FileDb<T> {
 	path: PathBuf,
 	tmp_path: PathBuf,

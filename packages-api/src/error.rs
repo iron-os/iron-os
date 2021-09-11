@@ -21,6 +21,12 @@ impl Error {
 		Self::Stream(StreamError::io_other(e))
 	}
 
+	pub fn into_stream(self) -> StreamError {
+		match self {
+			Self::Stream(s) => s
+		}
+	}
+
 }
 
 impl fmt::Display for Error {

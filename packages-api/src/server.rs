@@ -53,3 +53,50 @@ impl Server {
 	}
 
 }
+
+///
+/// ```dont_run
+/// async fn test(req: Request, data: Data) -> Result<Response> { todo!() }
+/// ```
+#[macro_export]
+macro_rules! request_handler {
+	(async fn $name:ident( $($args:tt)* ) $($tt:tt)*) => (
+		$crate::request_handler!(
+			async fn $name<$crate::message::Action, $crate::stream::packet::EncryptedBytes>
+			( $($args)* )
+			$($tt)*
+		);
+	);
+	(async fn $name:ident<$a:ty, $b:ty>($req:ident: $req_ty:ty) $($tt:tt)*) => (
+		$crate::request_handler!(
+			async fn $name<$a, $b>($req: $req_ty,) $($tt)*
+		);
+	);
+	(
+		async fn $name:ident<$a:ty, $b:ty>(
+			$req:ident: $req_ty:ty,
+			$($data:ident: $data_ty:ty),*
+		) -> $ret_ty:ty
+		$block:block
+	) => (
+		$crate::stream::request_handler!(
+			async fn $name<$a, $b>(
+				$req: $req_ty,
+				$($data: $data_ty),*
+			) -> $crate::stream::Result<<$req_ty as $crate::StreamRequest<$a, $b>>::Response> {
+				async fn __req_handle(
+					$req: $req_ty,
+					$($data: &$data_ty),*
+				) -> $ret_ty {
+					$block
+				}
+
+				let resp = __req_handle($req, $($data),*).await;
+
+				let resp: $crate::error::Result<<$req_ty as $crate::StreamRequest<$a, $b>>::Response> = resp;
+				resp.map_err(|e| e.into_stream())
+			}
+			// __req_handle()
+		);
+	);
+}
