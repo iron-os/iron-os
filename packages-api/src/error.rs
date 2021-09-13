@@ -11,12 +11,11 @@ pub enum Error {
 
 impl Error {
 
-	pub(crate) fn io(e: io::Error) -> Self {
+	pub fn io(e: io::Error) -> Self {
 		Self::Stream(e.into())
 	}
 
-	#[allow(dead_code)]
-	pub(crate) fn io_other<E>(e: E) -> Self
+	pub fn io_other<E>(e: E) -> Self
 	where E: Into<Box<dyn std::error::Error + Send + Sync>> {
 		Self::Stream(StreamError::io_other(e))
 	}

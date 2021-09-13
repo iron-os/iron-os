@@ -34,10 +34,12 @@ macro_rules! action {
 
 action!{
 	Empty = 0,
-	AllPackages = 10,
+	// AllPackages = 10,
 	PackageInfo = 11,
+	SetPackageInfo = 13,
 	ImageInfo = 15,
-	GetFile = 20
+	GetFile = 20,
+	SetFile = 22
 }
 
 pub type Message = message::Message<Action, EncryptedBytes>;

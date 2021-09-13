@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tokio::fs;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
-use packages::packages::{Package, Channel};
+use packages::packages::{Package, Channel, Image};
 use file_db::FileDb;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -20,11 +20,46 @@ impl PackagesDbFile {
 			indexes: HashMap::new()
 		}
 	}
+
+	fn get(&self, channel: &Channel) -> Option<&PackagesIndex> {
+		self.indexes.get(channel)
+	}
+
+	fn set(&mut self, channel: Channel, package: Package) {
+		let index = self.indexes.entry(channel)
+			.or_insert_with(|| PackagesIndex::new());
+		index.set(package);
+		// 
+	}
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesIndex {
-	list: HashMap<String, Package>
+	list: HashMap<String, Package>,
+	image: Option<Image>
+}
+
+impl PackagesIndex {
+
+	fn new() -> Self {
+		Self {
+			list: HashMap::new(),
+			image: None
+		}
+	}
+
+	fn get(&self, name: &str) -> Option<&Package> {
+		self.list.get(name)
+	}
+
+	fn image(&self) -> Option<&Image> {
+		self.image.as_ref()
+	}
+
+	fn set(&mut self, package: Package) {
+		self.list.insert(package.name.clone(), package);
+	}
+
 }
 
 #[derive(Debug)]
@@ -55,6 +90,28 @@ impl PackagesDb {
 		Ok(Self {
 			inner: RwLock::new(db)
 		})
+	}
+
+	pub async fn get_package(&self, channel: &Channel, name: &str) -> Option<Package> {
+		let lock = self.inner.read().await;
+		let db = lock.data();
+		let index = db.get(channel)?;
+		index.get(name)
+			.map(Clone::clone)
+	}
+
+	pub async fn get_image(&self, channel: &Channel) -> Option<Image> {
+		let lock = self.inner.read().await;
+		let db = lock.data();
+		let index = db.get(channel)?;
+		index.image()
+			.map(Clone::clone)
+	}
+
+	pub async fn set_package(&self, channel: Channel, package: Package) {
+		let mut lock = self.inner.write().await;
+		let db = lock.data_mut();
+		db.set(channel, package);
 	}
 
 }

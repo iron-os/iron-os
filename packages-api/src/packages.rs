@@ -15,7 +15,7 @@ pub enum Channel {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
 	/// example packages.lvgd.ch:9281
 	pub addr: String,
@@ -30,7 +30,7 @@ pub struct Source {
 	// from this source
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackagesCfg {
 	/// sources to fetch for updates
 	/// updates are checked in reverse order
@@ -46,18 +46,18 @@ pub struct PackagesCfg {
 	pub channel: Channel
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Package {
 	pub name: String,
 	pub version_str: String,
 	/// blake2s hash of the full compressed file
 	pub version: Hash,
 	pub signature: Signature,
-	pub size: u64,
+	// pub size: u64,
 	pub binary: Option<String>
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PackageCfg {
 	// do i need to other package??
 	Left(Package),
@@ -71,4 +71,20 @@ impl PackageCfg {
 			Self::Right(p) => p
 		}
 	}
+
+	pub fn current(&self) -> &'static str {
+		match self {
+			Self::Left(_) => "left",
+			Self::Right(_) => "right"
+		}
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Image {
+	pub buildroot_version: String,
+	pub version: u64,
+	pub hash: Hash,
+	pub signature: Signature,
+	// pub size: u64
 }

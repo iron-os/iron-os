@@ -6,7 +6,6 @@ pub mod server;
 pub mod error;
 pub mod packages;
 
-#[doc(hidden)]
 pub use stream;
 
 #[doc(hidden)]

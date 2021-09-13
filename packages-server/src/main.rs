@@ -3,8 +3,10 @@ mod config;
 mod error;
 mod packages;
 mod server;
+mod files;
 
 use config::Config;
+use files::Files;
 use error::{Result, Error};
 use crate::packages::PackagesDb;
 
@@ -79,9 +81,11 @@ async fn main() -> Result<()> {
 async fn create() -> Result<()> {
 	println!("creating config.toml file if it doesn't exist");
 
-	let _cfg = Config::create().await?;
+	let cfg = Config::create().await?;
 
 	let _pack_db = PackagesDb::create().await?;
+
+	let _files = Files::create(&cfg).await?;
 
 	Ok(())
 }
