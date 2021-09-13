@@ -30,6 +30,7 @@ use stream::packet::EncryptedBytes;
 use serde::{Serialize, Deserialize};
 
 use crypto::signature::Signature;
+use crypto::hash::Hash;
 
 
 // All packages
@@ -82,7 +83,7 @@ serde_req!(Action::ImageInfo, ImageInfoReq, ImageInfo);
 pub struct ImageInfo {
 	pub buildroot_version: String,
 	pub version: u64,
-	pub hash: String,
+	pub hash: Hash,
 	pub signature: Signature,
 	pub size: u64
 }
@@ -94,8 +95,7 @@ serde_res!(ImageInfo);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetFileReq {
-	// only Debug and Release are supported
-	pub hash: String,
+	pub hash: Hash,
 	pub start: Option<u64>,
 	pub end: Option<u64>
 }
@@ -106,6 +106,8 @@ serde_req!(Action::GetFile, GetFileReq, GetFile);
 pub struct GetFile {
 	inner: Message
 }
+
+// to file
 
 impl Response<Action, EncryptedBytes> for GetFile {
 	fn into_message(self) -> Result<Message> {

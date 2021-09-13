@@ -12,12 +12,7 @@ use file_db::FileDb;
 
 use bootloader_api::{SystemdRestart};
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Package {
-	current: String,
-	binary: String
-	// we don't care about all other fields
-}
+use packages::packages::PackageCfg;
 
 const CMD: &str = include_str!("start_chrome.templ");
 const CHROME_PACKAGE: &str = "/data/packages/chromium";
@@ -27,7 +22,7 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	// do we need to setsid?
 	// so chrome closes if this process closes??
 
-	let package: Package = FileDb::open(
+	let package: PackageCfg = FileDb::open(
 		format!("{}/package.fdb", CHROME_PACKAGE)
 	).await?.into_data();
 	let curr_path = format!("{}/{}", CHROME_PACKAGE, package.current);

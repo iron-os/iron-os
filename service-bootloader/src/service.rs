@@ -17,13 +17,34 @@ use serde::Deserialize;
 
 
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Package {
-	current: String,
-	binary: String
-	// we don't care about all other fields
+	pub name: String,
+	pub binary: String
 }
 
+#[derive(Debug, Deserialize)]
+pub enum PackageCfg {
+	// do i need to other package??
+	Left(Package),
+	Right(Package)
+}
+
+impl PackageCfg {
+	pub fn current(&self) -> &'static str {
+		match self {
+			Self::Left(_) => "left",
+			Self::Right(_) => "right"
+		}
+	}
+
+	pub fn pack(&self) -> &Package {
+		match self {
+			Self::Left(p) => p,
+			Self::Right(p) => p
+		}
+	}
+}
 
 // open packages folder
 // and then open the folder
@@ -78,9 +99,9 @@ pub fn start() -> io::Result<()> {
 
 	let service_package = Path::new("/data/packages/service");
 	let package_file = service_package.join("package.fdb");
-	let package: Package = FileDb::open_sync(package_file)?.into_data();
-	let curr_path = service_package.join(&package.current);
-	let bin_path = curr_path.join(&package.binary);
+	let package: PackageCfg = FileDb::open_sync(package_file)?.into_data();
+	let curr_path = service_package.join(package.current());
+	let bin_path = curr_path.join(&package.pack().binary);
 
 	let mut child = Command::new(bin_path)
 		.current_dir(curr_path)

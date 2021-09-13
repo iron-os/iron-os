@@ -49,6 +49,12 @@ pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 			let version_info = client.request(&VersionInfoReq).await
 				.expect("fetching version failed");
 
+				if !version_info.installed {
+					// not installed
+					eprintln!("not installed, only update when installed");
+					return
+				}
+
 			// we do this step on every iteration to
 			// always get a new random value
 			let time = match version_info.channel.is_debug() {

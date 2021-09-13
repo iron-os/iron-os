@@ -24,7 +24,7 @@ fn help() {
 pub enum Command {
 	Create,
 	Serve,
-	GenSignature
+	Keys
 }
 
 impl Command {
@@ -36,7 +36,7 @@ impl Command {
 		match cmd.as_ref().map(|a| a.as_str()) {
 			Some("create") => Some(Self::Create),
 			Some("serve") => Some(Self::Serve),
-			Some("gen-signature") => Some(Self::GenSignature),
+			Some("keys") => Some(Self::Keys),
 			None => Some(Self::Serve),
 			_ => None
 		}
@@ -57,10 +57,19 @@ async fn main() -> Result<()> {
 	match cmd {
 		Command::Create => create().await,
 		Command::Serve => server::serve().await,
-		Command::GenSignature => {
+		Command::Keys => {
+			// get connection public key
+			let cfg = Config::read().await?;
+			println!("Connection public key: {}", cfg.con_key.public());
+
+			if let Some(sign_key) = cfg.sign_key {
+				println!("Current signature public key: {}", sign_key);
+			}
+
 			let sign = Keypair::new();
-			println!("Private Key: {}", sign.to_b64());
-			println!("Public Key: {}", sign.public());
+			println!("New signature private key: {}", sign.to_b64());
+			println!("New signature public key: {}", sign.public());
+
 			Ok(())
 		}
 	}

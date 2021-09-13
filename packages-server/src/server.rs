@@ -50,6 +50,18 @@ pub async fn serve() -> Result<()> {
 
 request_handler!(
 	 async fn all_packages(req: AllPackagesReq, packages: PackagesDb) -> ApiResult<AllPackages> {
-	 	todo!()
+	 	todo!("all packages")
 	 }
+);
+
+request_handler!(
+	async fn package_info(req: PackageInfoReq, packages: PackagesDb) -> ApiResult<PackageInfo> {
+		todo!("package info")
+	}
+);
+
+request_handler!(
+	async fn get_file(req: GetFileReq, packages: PackagesDb) -> ApiResult<GetFile> {
+
+	}
 );
