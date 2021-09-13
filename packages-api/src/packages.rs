@@ -1,8 +1,11 @@
 
+use std::str::FromStr;
+
 use crypto::signature::{PublicKey, Signature};
 use crypto::hash::Hash;
 
 use serde::{Serialize, Deserialize};
+use serde::de::{value, IntoDeserializer};
 
 
 // todo should we use this??
@@ -12,6 +15,14 @@ pub enum Channel {
 	Alpha,
 	Beta,
 	Release
+}
+
+impl FromStr for Channel {
+	type Err = value::Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Self::deserialize(s.into_deserializer())
+	}
 }
 
 
