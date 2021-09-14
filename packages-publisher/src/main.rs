@@ -8,21 +8,20 @@ download packages folder for image from packages.toml
 
 */
 
+#[macro_use]
+mod error;
+mod util;
+mod script;
 mod upload;
 
 use upload::Upload;
 
+use std::process;
+
 use packages::packages::Channel;
 use clap::{AppSettings, Clap};
 
-pub struct PackageToml {
-	pub name: String,
-	pub version_str: String,
-	pub binary: Option<String>,
-	/// Default is package.rhai
-	pub script: Option<String>
-}
-
+use riji::paint_err;
 
 
 #[derive(Clap)]
@@ -52,12 +51,21 @@ async fn main() {
 
 	let opts = Opts::parse();
 
-	match opts.subcmd {
+	let r = match opts.subcmd {
 		SubCommand::Upload(u) => {
 			upload::upload(u).await
 		},
 		SubCommand::Download(d) => {
 			todo!("download")
+		}
+	};
+
+	match r {
+		Ok(_) => {},
+		Err(e) => {
+			paint_err!("{}", e.description);
+			eprintln!("{:?}", e.error);
+			process::exit(1);
 		}
 	}
 

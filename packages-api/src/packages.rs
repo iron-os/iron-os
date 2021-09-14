@@ -1,5 +1,6 @@
 
 use std::str::FromStr;
+use std::fmt;
 
 use crypto::signature::{PublicKey, Signature};
 use crypto::hash::Hash;
@@ -22,6 +23,12 @@ impl FromStr for Channel {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		Self::deserialize(s.into_deserializer())
+	}
+}
+
+impl fmt::Display for Channel {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.serialize(f)
 	}
 }
 
