@@ -42,6 +42,8 @@ fn linux_config() {
 fn build() {
 	print("build");
 
+	fs::create_dir("./buildroot/output/images");
+
 	// build service-bootloader
 	let cargo = cmd([
 		"cargo", "build", "--release"

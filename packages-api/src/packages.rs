@@ -1,6 +1,6 @@
 
 use std::str::FromStr;
-use std::fmt;
+use std::{fmt, mem};
 
 use crypto::signature::{PublicKey, Signature};
 use crypto::hash::Hash;
@@ -95,6 +95,21 @@ impl PackageCfg {
 			Self::Left(_) => "left",
 			Self::Right(_) => "right"
 		}
+	}
+
+	pub fn other(&self) -> &'static str {
+		match self {
+			Self::Left(_) => "right",
+			Self::Right(_) => "left"
+		}
+	}
+
+	pub fn switch(&mut self, new: Package) {
+		let new = match self {
+			Self::Left(_) => PackageCfg::Right(new),
+			Self::Right(_) => PackageCfg::Left(new)
+		};
+		let _ = mem::replace(self, new);
 	}
 }
 

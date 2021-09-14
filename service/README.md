@@ -23,6 +23,8 @@
 ## Todo
 make sure no client can connect to `/websocket`
 
+Improve error reporting
+
 ## Responses
 ```
 :<:VersionInfo {"buildroot_version":"2021.02.4","version":1,"installed":false,"channel":"Debug"}

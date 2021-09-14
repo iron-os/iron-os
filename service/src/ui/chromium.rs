@@ -7,7 +7,6 @@ use std::os::unix::fs::PermissionsExt;
 use tokio::fs::OpenOptions;
 use tokio::io::{AsyncWriteExt};
 
-use serde::Deserialize;
 use file_db::FileDb;
 
 use bootloader_api::{SystemdRestart};

@@ -24,13 +24,14 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, sleep};
+use tokio::process::Command;
 
 use rand::{thread_rng, Rng};
 
 use bootloader_api::{VersionInfoReq, VersionInfo};
 use packages::packages::{PackagesCfg, PackageCfg, Package, Source, Channel};
 use packages::client::Client;
-use packages::requests::PackageInfoReq;
+use packages::requests::{PackageInfoReq, GetFileReq};
 use file_db::FileDb;
 
 const PACKAGES_DIR: &str = "/data/packages";
@@ -138,6 +139,11 @@ pub async fn update_from_source(
 			continue
 		}
 
+		// validate signature
+		if !source.sign_key.verify(package.version.as_slice(), &package.signature) {
+			return Err(io_other(format!("signature mismatch {:?}", package)))
+		}
+
 		// todo we got an update
 		update_package(cfg, package, &client).await?;
 
@@ -153,15 +159,53 @@ pub async fn update_package(
 	client: &Client
 ) -> io::Result<()> {
 
-	todo!("make update")
-
 	// download new file
-	// validate hash
-	// validate signature
-	// extract
-	// update cfg
-	// write cfg
+	let req = GetFileReq {
+		hash: new.version.clone()
+	};
+	let file = client.request(req).await
+		.map_err(io_other)?;
 
+	if file.is_empty() {
+		return Err(io_other(format!("file empty {:?}", new)));
+	}
+
+	// validate hash
+	if file.hash() != new.version {
+		return Err(io_other(format!("hash mismatch {:?}", new)))
+	}
+
+	// extract
+	let path = format!("{}/{}", PACKAGES_DIR, new.name);
+
+	let tar = format!("{}/{}.tar.gz", path, new.name);
+
+	// remove tar if it exists
+	let _ = fs::remove_file(&tar).await;
+
+	fs::write(&tar, file.file()).await?;
+
+	let other_path = format!("{}/{}", path, cfg.other());
+
+	// remove other folder
+	let _ = fs::remove_dir_all(&other_path).await;
+
+	// extract
+	extract(&tar, &path).await?;
+
+	let extracted_path = format!("{}/{}", path, new.name);
+
+	fs::rename(extracted_path, other_path).await?;
+
+	// update cfg
+	cfg.switch(new);
+
+	// write cfg
+	let db_path = format!("{}/package.fdb", path);
+	let db = FileDb::new(&db_path, cfg.clone());
+	db.write().await?;
+
+	Ok(())
 }
 
 
@@ -197,4 +241,15 @@ impl Packages {
 		Ok(Self { cfg, list })
 	}
 
+}
+
+async fn extract(path: &str, to: &str) -> io::Result<()> {
+	let stat = Command::new("tar")
+		.args(&["-zxvf", path, "-C", to])
+		.status().await?;
+	if stat.success() {
+		Ok(())
+	} else {
+		Err(io_other("extraction failed"))
+	}
 }
