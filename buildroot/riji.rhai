@@ -3,6 +3,7 @@ const BUILDROOT = "./buildroot";
 const STABLE = "2021.02.4";
 const VERSION = "1";
 const CHANNEL = "Debug";// Debug | Release
+const PACK_PUB = "./../packages-publisher/target/release/packages-publisher";
 
 fn help() {
 	print([
@@ -41,8 +42,44 @@ fn linux_config() {
 fn build() {
 	print("build");
 
-	// for the moment service-bootloader should be copied manually
-	// to buildroot/output/images
+	// build service-bootloader
+	let cargo = cmd([
+		"cargo", "build", "--release"
+	]);
+	cargo.dir("./../service-bootloader");
+	cargo.execute();
+
+	// copy service-bootloader
+	fs::copy(
+		"./../service-bootloader/target/release/service_bootloader",
+		"./buildroot/output/images/service-bootloader"
+	);
+
+	// create version.fdb
+	// this file is defined in service-bootloader-api as VersionInfo
+	fs::write(
+		"./buildroot/output/images/version.fdb",
+		"{\"buildroot_version\":\"" + STABLE + "\"," + 
+		"\"version\":" + VERSION + "," +
+		"\"installed\":false," +
+		"\"channel\":\"" + CHANNEL + "\"}"
+	);
+
+	// build packages-publisher
+	let cargo = cmd([
+		"cargo", "build", "--release"
+	]);
+	cargo.dir("./../packages-publisher");
+	cargo.execute();
+
+	// download packages
+	let publish = cmd([
+		PACK_PUB, "download"
+	]);
+	publish.execute();
+
+	fs::delete("./buildroot/output/images/packages");
+	fs::move("./packages", "./buildroot/output/images/packages");
 
 	let make = cmd("make");
 	make.dir(BUILDROOT);
@@ -85,18 +122,7 @@ fn patch() {
 	// copy .config
 	fs::copy("./.config", "./buildroot/");
 
-	fs::copy("./packages", "./buildroot/output/images/");
-
-	// this file is defined in service-bootloader-api as VersionInfo
-	fs::write(
-		"./buildroot/output/images/version.fdb",
-		"{\"buildroot_version\":\"" + STABLE + "\"," + 
-		"\"version\":" + VERSION + "," +
-		"\"installed\":false," +
-		"\"channel\":\"" + CHANNEL + "\"}"
-	);
-
-	let git = git(BUILDROOT);
+	// let git = git(BUILDROOT);
 
 	// get psplash patch
 	// let psplash = diff_from_file("./patches/psplash.patch");

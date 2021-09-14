@@ -1,0 +1,7 @@
+list = ["chromium", "service"]
+address = "localhost:5426"
+pub-key = "EsIsSNb1Xc-MI836-r0tWssgyDzvSwQNevuXzuBy6fk"
+sign-key = "67eu2h5GiA-pQiZX8Er-YRGh6NVaXd1cw2a_InEl0dI"
+channel = "Release"
+on-install = "frame-install"
+on-run = "frame"
