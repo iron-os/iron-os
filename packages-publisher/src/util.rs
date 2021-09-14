@@ -40,6 +40,18 @@ pub fn compress(name: &str, path: &str, inner: &str) -> Result<()> {
 	}
 }
 
+pub fn extract(path: &str, to: &str) -> Result<()> {
+	let stat = Command::new("tar")
+		.args(&["-zxvf", path, "-C", to])
+		.status()
+		.map_err(|e| err!(e, "could not call tar"))?;
+	if stat.success() {
+		Ok(())
+	} else {
+		Err(err!("exit status non zero", "extracting failed"))
+	}
+}
+
 pub async fn hash_file(path: &str) -> Result<Hash> {
 
 	let v = fs::read(path).await

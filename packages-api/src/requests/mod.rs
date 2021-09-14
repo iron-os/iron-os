@@ -153,6 +153,19 @@ impl GetFile {
 	pub fn empty() -> Self {
 		Self { inner: Message::new() }
 	}
+
+	pub fn is_empty(&self) -> bool {
+		self.inner.body().len() == 0
+	}
+
+	pub fn file(&self) -> &[u8] {
+		self.inner.body().inner()
+	}
+
+	/// creates a hash of the file
+	pub fn hash(&self) -> Hash {
+		Hasher::hash(self.file())
+	}
 }
 
 impl Response<Action, EncryptedBytes> for GetFile {

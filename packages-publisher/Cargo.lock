@@ -233,6 +233,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-db"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "fire-crypto"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -580,6 +589,7 @@ name = "packages-publisher"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "file-db",
  "fire-crypto",
  "packages-api",
  "riji",

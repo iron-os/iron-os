@@ -13,8 +13,10 @@ mod error;
 mod util;
 mod script;
 mod upload;
+mod download;
 
 use upload::Upload;
+use download::Download;
 
 use std::process;
 
@@ -37,14 +39,6 @@ enum SubCommand {
 	Download(Download)
 }
 
-/// Downloads and fills a full packages folder
-/// with the packages listed in `packages.toml`
-/// the address and the channel should be in `packages.toml`
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Download {}
-
-
 #[tokio::main]
 async fn main() {
 
@@ -55,7 +49,7 @@ async fn main() {
 			upload::upload(u).await
 		},
 		SubCommand::Download(d) => {
-			todo!("download")
+			download::download(d).await
 		}
 	};
 
