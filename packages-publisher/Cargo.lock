@@ -234,9 +234,9 @@ dependencies = [
 
 [[package]]
 name = "fire-crypto"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97f8145584af5c5863c9100270de51b64505036158760cc9871dead2ee82b23c"
+checksum = "9e2719f225076458c2cf772d8ac52e4ed3bee2b5a677527159d2910de4140b99"
 dependencies = [
  "base64",
  "blake2",

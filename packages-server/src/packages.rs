@@ -112,6 +112,8 @@ impl PackagesDb {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
 		db.set(channel, package);
+		lock.write().await
+			.expect("writing failed unexpectetly")
 	}
 
 }

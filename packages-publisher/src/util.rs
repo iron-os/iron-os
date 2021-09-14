@@ -1,7 +1,6 @@
 
-use crate::error::{Result, Error};
+use crate::error::Result;
 
-use std::io::ErrorKind;
 use std::process::Command;
 use tokio::fs::{self, read_to_string};
 use serde::de::DeserializeOwned;

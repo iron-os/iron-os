@@ -1,0 +1,3 @@
+name = "service"
+version = "v0.1"
+binary = "service"

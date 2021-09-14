@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{self, AsyncWriteExt};
 
-use crypto::hash::{Hash, Hasher};
+use crypto::hash::Hash;
 
 pub struct Files {
 	path: PathBuf

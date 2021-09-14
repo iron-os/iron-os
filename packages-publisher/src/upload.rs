@@ -1,9 +1,17 @@
 
-use crate::error::{Result, Error};
+use crate::error::Result;
 use crate::util::{read_toml, create_dir, compress, remove_dir, hash_file};
 use crate::script::Script;
 
-use packages::packages::Channel;
+use std::io;
+
+use crypto::signature::{Keypair, PublicKey};
+
+use tokio::fs::{self, File};
+
+use packages::client::Client;
+use packages::requests::{SetFileReq, SetPackageInfoReq};
+use packages::packages::{Channel, Package};
 use clap::{AppSettings, Clap};
 
 use riji::paint_act;
@@ -33,10 +41,12 @@ impl PackageToml {
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
 pub struct Upload {
+	/// To what channel should this be updated
+	channel: Channel,
 	/// The address of the package server
 	address: String,
-	/// To what channel should this be updated
-	channel: Channel
+	/// The public key of the package server
+	public_key: PublicKey
 }
 
 pub async fn upload(cfg: Upload) -> Result<()> {
@@ -66,13 +76,76 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 	let hash = hash_file(&tar_name).await?;
 
-	println!("hash {}", hash);
+	println!();
+	println!("Please enter the private signature key:");
+
+	let mut priv_key_b64 = String::new();
+	let stdin = io::stdin();
+	stdin.read_line(&mut priv_key_b64)
+		.map_err(|e| err!(e, "could not read private key"))?;
+	let priv_key = Keypair::from_b64(priv_key_b64.trim())
+		.map_err(|e| err!(format!("{:?}", e), "invalid private key"))?;
 
 	// sign
+	let sign = priv_key.sign(hash.as_slice());
 
-	// signed
+	// create the package
+	let package = Package {
+		name: package.name,
+		version_str: package.version,
+		version: hash,
+		signature: sign.clone(),
+		binary: package.binary
+	};
 
-	// and uploaded
+	println!();
+	println!("do you really wan't to upload package:");
+	print_package(&package);
+	println!();
+	println!("Enter YES to confirm");
 
-	todo!("")
+	let mut confirm = String::new();
+	let stdin = io::stdin();
+	stdin.read_line(&mut confirm)
+		.map_err(|e| err!(e, "could not read private key"))?;
+
+	if confirm.trim() != "YES" {
+		return Err(err!(confirm, "confirmation not received"))
+	}
+
+	// build a connection
+	let client = Client::connect(&cfg.address, cfg.public_key.clone()).await
+		.map_err(|e| err!(e, "connect to {} failed", cfg.address))?;
+
+	let tar = File::open(&tar_name).await
+		.expect("tar file deleted");
+	let file_req = SetFileReq::new(sign, tar).await
+		.expect("reading tar failed");
+	assert_eq!(file_req.hash(), package.version);
+
+	client.request(file_req).await
+		.map_err(|e| err!(e, "failed to upload file"))?;
+
+
+	let pack_req = SetPackageInfoReq {
+		channel: cfg.channel,
+		package
+	};
+	client.request(pack_req).await
+		.map_err(|e| err!(e, "failed to upload package"))?;
+
+	fs::remove_file(&tar_name).await
+		.expect("could not remove tar");
+
+	println!("package uploaded");
+
+	Ok(())
+}
+
+fn print_package(pack: &Package) {
+	println!("name: {}", pack.name);
+	println!("version_str: {}", pack.version_str);
+	println!("version: {}", pack.version);
+	println!("signature: {}", pack.signature);
+	println!("binary: {:?}", pack.binary);
 }

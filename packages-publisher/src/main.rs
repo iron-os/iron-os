@@ -18,7 +18,6 @@ use upload::Upload;
 
 use std::process;
 
-use packages::packages::Channel;
 use clap::{AppSettings, Clap};
 
 use riji::paint_err;

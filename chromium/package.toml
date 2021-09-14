@@ -1,0 +1,3 @@
+name = "chromium"
+version = "v0.1"
+binary = "chrome"

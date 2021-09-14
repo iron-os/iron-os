@@ -35,7 +35,7 @@ use serde::{Serialize, Deserialize};
 use crypto::signature::Signature;
 use crypto::hash::{Hasher, Hash};
 
-use bytes::{BytesRead, BytesSeek};
+use bytes::{BytesRead, BytesWrite};
 
 
 // All packages
@@ -138,7 +138,7 @@ impl GetFile {
 			.unwrap_or(0);
 
 		let mut body = msg.body_mut();
-		body.resize(buf_size);
+		body.reserve(buf_size);
 
 		unsafe {
 			// safe because file.read_to_end only appends
@@ -174,15 +174,40 @@ pub struct SetFileReq {
 
 impl SetFileReq {
 
+	pub async fn new(sign: Signature, mut file: File) -> Result<Self> {
+
+		let mut msg = Message::new();
+
+		// check how big the file is then allocate
+		let buf_size = file.metadata().await
+			.map(|m| m.len() as usize + 1)
+			.unwrap_or(0);
+
+		let mut body = msg.body_mut();
+		body.reserve(buf_size + Signature::LEN);
+
+		body.write(sign.as_slice());
+
+		unsafe {
+			// safe because file.read_to_end only appends
+			let v = body.as_mut_vec();
+			file.read_to_end(v).await
+				.map_err(Error::io)?;
+		}
+
+		Ok(Self {
+			signature: sign,
+			message: msg
+		})
+	}
+
 	pub fn signature(&self) -> &Signature {
 		&self.signature
 	}
 
 	/// creates a hash of the file
 	pub fn hash(&self) -> Hash {
-		let mut body = self.message.body();
-		body.seek(Signature::LEN);
-		Hasher::hash(body.remaining())
+		Hasher::hash(self.file())
 	}
 
 	pub fn file(&self) -> &[u8] {
@@ -202,7 +227,7 @@ impl Request<Action, EncryptedBytes> for SetFileReq {
 		Ok(self.message)
 	}
 	fn from_message(msg: Message) -> stream::Result<Self> {
-		if msg.body().len() > Signature::LEN {
+		if msg.body().len() <= Signature::LEN {
 			return Err(PacketError::Body("no signature".into()).into());
 		}
 
