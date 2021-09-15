@@ -28,7 +28,7 @@ use tokio::process::Command;
 
 use rand::{thread_rng, Rng};
 
-use bootloader_api::{VersionInfoReq, VersionInfo};
+use bootloader_api::{VersionInfoReq, VersionInfo, SystemdRestart};
 use packages::packages::{PackagesCfg, PackageCfg, Package, Source, Channel};
 use packages::client::Client;
 use packages::requests::{PackageInfoReq, GetFileReq};
@@ -72,7 +72,21 @@ pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 
 			// update every
 			match update(version_info).await {
-				Ok(()) => {},
+				Ok(updated) => {
+					eprintln!("updated: {:?}", updated);
+
+					// if image update
+					// restart pc
+
+					// if packages update
+					if !updated.packages.is_empty() {
+						client.request(&SystemdRestart {
+							name: "service-bootloader".into()
+						}).await
+							.expect("could not restart service-bootloader");
+					}
+
+				},
 				Err(e) => {
 					eprintln!("update error {:?}", e);
 				}
@@ -82,10 +96,11 @@ pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 	}))
 }
 
-pub async fn update(version: VersionInfo) -> io::Result<()> {
+pub async fn update(version: VersionInfo) -> io::Result<Updated> {
 
 	let mut packages = Packages::load().await?;
 	let mut image = Some(version);
+	let mut updated = Updated::new();
 
 	for source in packages.cfg.sources.into_iter().rev() {
 
@@ -93,23 +108,25 @@ pub async fn update(version: VersionInfo) -> io::Result<()> {
 			source,
 			packages.cfg.channel,
 			&mut image,
-			&mut packages.list
+			&mut packages.list,
+			&mut updated
 		).await?;
 
 	}
 
-	Ok(())
+	Ok(updated)
 }
 
 pub async fn update_from_source(
 	source: Source,
 	channel: Channel,
 	image: &mut Option<VersionInfo>,
-	list: &mut Vec<PackageCfg>
-) -> io::Result<Vec<String>> {
+	list: &mut Vec<PackageCfg>,
+	updated: &mut Updated
+) -> io::Result<()> {
 
 	if image.is_none() && list.is_empty() {
-		return Ok(vec![])
+		return Ok(())
 	}
 
 	// build connection
@@ -117,7 +134,6 @@ pub async fn update_from_source(
 		.map_err(io_other)?;
 
 	let mut to_rem = vec![];
-	let mut updated = vec![];
 
 	for (id, cfg) in list.iter_mut().enumerate() {
 		let pack = cfg.package();
@@ -151,14 +167,14 @@ pub async fn update_from_source(
 		// todo we got an update
 		update_package(cfg, package, &client).await?;
 
-		updated.push(cfg.package().name.clone());
+		updated.packages.push(cfg.package().clone());
 
 	}
 
 	eprintln!("check image for update {:?}", image);
 	// todo!("check image for update")
 
-	Ok(updated)
+	Ok(())
 }
 
 pub async fn update_package(
@@ -262,4 +278,20 @@ async fn extract(path: &str, to: &str) -> io::Result<()> {
 	} else {
 		Err(io_other("extraction failed"))
 	}
+}
+
+#[derive(Debug)]
+pub struct Updated {
+	packages: Vec<Package>,
+	// image: Image
+}
+
+impl Updated {
+
+	fn new() -> Self {
+		Self {
+			packages: vec![]
+		}
+	}
+
 }
