@@ -22,10 +22,10 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	// copy service-bootloader
 	fs::copy("./rootfs/weston.service", target_dir + "/etc/systemd/system/");
 	fs::copy("./rootfs/service-bootloader.service", target_dir + "/etc/systemd/system/");
+	// symlink get's created in fakeroot
 	fs::copy("./rootfs/chromium.service", target_dir + "/etc/systemd/system/");
 
 	fs::copy(binaries_dir + "/service-bootloader", target_dir + "/usr/bin/");
-	// symlink get's created in fakeroot
 
 	// create version file
 	fs::copy(binaries_dir + "/version.fdb", target_dir + "/etc/");
@@ -83,10 +83,7 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	// set corrects rights
 	chown("14:15", target_dir + "/data/home");
 	chown("0:0", target_dir + "/data/etc");
-	// do we need those chromium hacks??
 	chown("14:15", target_dir + "/data/packages");
-	chown("0:0", target_dir + "/data/packages/chromium/left/chrome-sandbox");
-	chmod("4755", target_dir + "/data/packages/chromium/left/chrome-sandbox");
 
 	// execute gen_image
 	fs::delete(binaries_dir + "/data.ext2");

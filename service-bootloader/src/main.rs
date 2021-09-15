@@ -3,6 +3,7 @@ mod command;
 mod service;
 mod disks;
 mod version_info;
+mod util;
 
 use command::Command;
 

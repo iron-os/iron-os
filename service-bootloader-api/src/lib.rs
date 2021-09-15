@@ -262,7 +262,8 @@ kind!{
 	SystemdRestart,
 	Disks,
 	InstallOn,
-	VersionInfo
+	VersionInfo,
+	MakeRoot
 }
 
 
@@ -343,4 +344,14 @@ impl VersionChannel {
 	pub fn is_release(&self) -> bool {
 		matches!(self, VersionChannel::Release)
 	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MakeRoot {
+	pub path: String
+}
+
+impl Request for MakeRoot {
+	type Response = ();
+	fn kind() -> Kind { Kind::MakeRoot }
 }

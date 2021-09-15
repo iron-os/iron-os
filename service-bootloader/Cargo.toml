@@ -16,3 +16,4 @@ gpt = { version = "2.0", git = "https://github.com/soerenmeier/gpt", branch = "t
 uuid = "0.8"
 # stdio-api = { version = "0.1", path = "./../stdio-api" }
 bootloader-api = { package = "service-bootloader-api", version = "0.1", path = "./../service-bootloader-api" }
+libc = "0.2"

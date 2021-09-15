@@ -9,7 +9,7 @@ use tokio::io::{AsyncWriteExt};
 
 use file_db::FileDb;
 
-use bootloader_api::{SystemdRestart};
+use bootloader_api::{SystemdRestart, MakeRoot};
 
 use packages::packages::PackageCfg;
 
@@ -43,7 +43,7 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 		.replace("URL", url)
 		.replace("EXTENSION", &extension_path);
 
-	// start script
+	// create start script
 	let mut script = OpenOptions::new()
 		.create(true)
 		.write(true)
@@ -58,42 +58,13 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	// this is done to free start.sh so the service can start chromium
 	drop(script);
 
+	// now make chrome-sandbox root
+	client.request(&MakeRoot {
+		path: format!("{}/chrome-sandbox", curr_path)
+	}).await?;
+
 	// now restart service
 	client.request(&SystemdRestart { name: "chromium".into() }).await?;
 
 	Ok(())
 }
-
-/*
-Imago | Pictura | 
-*/
-
-// async fn start_async(url: &str) -> io::Result<()> {
-
-
-
-// 	let status = Command::new(bin_path)
-// 		.current_dir(curr_path)
-// 		.env("XDG_RUNTIME_DIR", "/run/user/14")
-// 		.env("WAYLAND_DISPLAY", "wayland-0")
-// 		// just a security measure
-// 		.kill_on_drop(true)
-// 		.args(&[
-// 			// set all folders to the tmp
-// 			"--disk-cache-dir=/tmp/",
-// 			"--user-profile=/tmp/",
-// 			"--disable-infobars",
-// 			"--disable-rollback-option",
-// 			"--disable-speech-api",
-// 			"--disable-sync",
-// 			"--disable-pinch",
-// 			"--kiosk"
-// 			// --disable-restore-session-state --disable-session-storage
-// 		])
-// 		.arg(&format!("--app=\"{}\"", url))
-// 		// todo add extension loading
-// 		.status().await?;
-
-// 	status.success().then(|| ())
-// 		.ok_or_else(|| io::Error::new(io::ErrorKind::Other, "chromium: exit status non zero"))
-// }

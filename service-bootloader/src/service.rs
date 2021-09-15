@@ -3,13 +3,17 @@ use crate::command::Command;
 use crate::io_other;
 use crate::disks::{api_disks, install_on};
 use crate::version_info::version_info;
+use crate::util::chown;
 
 use std::io;
 use std::path::Path;
+use std::fs::File;
+use std::os::unix::fs::PermissionsExt;
 
 use bootloader_api::{
 	Server, request_handler, SystemdRestart, Disks,
-	Disk, InstallOn, VersionInfoReq, VersionInfo
+	Disk, InstallOn, VersionInfoReq, VersionInfo,
+	MakeRoot
 };
 use file_db::FileDb;
 
@@ -78,6 +82,24 @@ request_handler!{
 	}
 }
 
+request_handler!{
+	fn make_root(req: MakeRoot) -> io::Result<()> {
+		let MakeRoot { path } = req;
+
+		let file = File::open(&path)?;
+
+		// set root
+		chown(&file, 0, 0)?;
+
+		let mut perms = file.metadata()?.permissions();
+		perms.set_mode(0o4755);
+
+		file.set_permissions(perms)?;
+
+		Ok(())
+	}
+}
+
 pub fn start() -> io::Result<()> {
 
 	/*
@@ -120,6 +142,7 @@ pub fn start() -> io::Result<()> {
 	server.register(disks);
 	server.register(install_on_handler);
 	server.register(version_info_handle);
+	server.register(make_root);
 
 	server.run()?;
 

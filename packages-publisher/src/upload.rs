@@ -100,6 +100,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 	println!();
 	println!("do you really wan't to upload package:");
+	println!("channel: {}", cfg.channel);
 	print_package(&package);
 	println!();
 	println!("Enter YES to confirm");
