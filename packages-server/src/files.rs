@@ -42,7 +42,7 @@ impl Files {
 	pub async fn set(&self, hash: &Hash, data: &[u8]) -> io::Result<()> {
 		#[cfg(debug_assertions)]
 		{
-			let n_hash = Hasher::hash(data);
+			let n_hash = crypto::hash::Hasher::hash(data);
 			assert_eq!(hash, &n_hash);
 		}
 

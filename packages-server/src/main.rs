@@ -7,7 +7,7 @@ mod files;
 
 use config::Config;
 use files::Files;
-use error::{Result, Error};
+use error::Result;
 use crate::packages::PackagesDb;
 
 use std::env;
