@@ -106,10 +106,10 @@ pub async fn update_from_source(
 	channel: Channel,
 	image: &mut Option<VersionInfo>,
 	list: &mut Vec<PackageCfg>
-) -> io::Result<()> {
+) -> io::Result<Vec<String>> {
 
 	if image.is_none() && list.is_empty() {
-		return Ok(())
+		return Ok(vec![])
 	}
 
 	// build connection
@@ -117,6 +117,7 @@ pub async fn update_from_source(
 		.map_err(io_other)?;
 
 	let mut to_rem = vec![];
+	let mut updated = vec![];
 
 	for (id, cfg) in list.iter_mut().enumerate() {
 		let pack = cfg.package();
@@ -140,17 +141,24 @@ pub async fn update_from_source(
 		}
 
 		// validate signature
-		if !source.sign_key.verify(package.version.as_slice(), &package.signature) {
+		if !source.sign_key.verify(
+			package.version.as_slice(),
+			&package.signature
+		) {
 			return Err(io_other(format!("signature mismatch {:?}", package)))
 		}
 
 		// todo we got an update
 		update_package(cfg, package, &client).await?;
 
+		updated.push(cfg.package().name.clone());
+
 	}
 
-	todo!("check image for update")
+	eprintln!("check image for update {:?}", image);
+	// todo!("check image for update")
 
+	Ok(updated)
 }
 
 pub async fn update_package(
@@ -196,6 +204,8 @@ pub async fn update_package(
 	let extracted_path = format!("{}/{}", path, new.name);
 
 	fs::rename(extracted_path, other_path).await?;
+
+	fs::remove_file(&tar).await?;
 
 	// update cfg
 	cfg.switch(new);
