@@ -27,11 +27,11 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 
 	fs::copy(binaries_dir + "/service-bootloader", target_dir + "/usr/bin/");
 
-	// create version file
-	fs::copy(binaries_dir + "/version.fdb", target_dir + "/etc/");
-
 	// create empty data folder (needed for fresh build since else device_table.mk failes)
 	fs::create_dir(target_dir + "/data");
+
+	// create boot dir
+	fs::create_dir(target_dir + "/boot");
 
 	// make open ssh work without rw
 	let sshd_keygen = regex("ExecStartPre=.*");
@@ -113,6 +113,11 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/fstab", target_dir + "/etc/fstab.templ");
 	data_uuid_reg.replace_file(target_dir + "/etc/fstab", data_uuid);
 
+	let boot_uuid = uuid_v4();
+	let boot_uuid_reg = regex("EFI_UUID");
+	boot_uuid_reg.replace_file(target_dir + "/etc/fstab", boot_uuid);
+	fs::write(binaries_dir + "/boot_uuid", boot_uuid);
+
 	// remove getty
 	fs::delete(target_dir + "/usr/lib/systemd/system/multi-user.target.wants/getty.target");
 }
@@ -131,10 +136,24 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	fs::copy("./genimage-efi.cfg", binaries_dir + "/");
 	uuid_tmp_reg.replace_file(binaries_dir + "/genimage-efi.cfg", uuid);
 
+	// boot uuid
+	let boot_uuid = fs::read(binaries_dir + "/boot_uuid");
+	let boot_uuid_reg = regex("EFI_UUID");
+	boot_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", boot_uuid);
+
 	// data uuid
 	let data_uuid = fs_uuid(host_dir, binaries_dir + "/data.ext2");
 	let data_uuid_reg = regex("DATA_UUID");
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", data_uuid);
+
+	let publisher = cmd([
+		binaries_dir + "/publisher", "pack-image"
+	]);
+	publisher.dir(binaries_dir);
+	publisher.execute();
+	// now we need to create the image package +
+	// version.fdb file
+
 
 	// now run genimage
 	let genimage = cmd([

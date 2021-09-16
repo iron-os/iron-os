@@ -1,4 +1,5 @@
 /dev/root / auto ro 0 1
-PARTUUID=DATA_UUID /data ext4 rw,suid,exec,nouser,relatime 0 2
-/data/var /var none bind 0 2
-/data/home /home none bind 0 2
+PARTUUID=EFI_UUID /boot auto ro 0 2
+PARTUUID=DATA_UUID /data ext4 rw,suid,exec,nouser,relatime 0 3
+/data/var /var none bind 0 3
+/data/home /home none bind 0 3

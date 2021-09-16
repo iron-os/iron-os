@@ -24,7 +24,9 @@ pub struct PackageToml {
 	pub version: String,
 	pub binary: Option<String>,
 	/// Default is package.rhai
-	pub script: Option<String>
+	pub script: Option<String>,
+	#[serde(rename = "tar-file")]
+	pub tar_file: Option<String>
 }
 
 impl PackageToml {
@@ -60,19 +62,10 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	paint_act!("calling build");
 	script.build(&cfg.channel)?;
 
-	let dest_folder = format!("./package_tmp/{}", package.name);
-	create_dir(&dest_folder).await?;
-
-	// call package
-	paint_act!("calling pack");
-	script.pack(&dest_folder, &cfg.channel)?;
-
-	let tar_name = format!("{}.tar.gz", &package.name);
-
-	// now the folder should be compressed
-	// tar -zcvf name.tar.gz source
-	compress(&tar_name, "./package_tmp", &package.name)?;
-	remove_dir("./package_tmp").await?;
+	let tar_name = match package.tar_file {
+		Some(n) => n,
+		None => pack(&cfg, &package, &mut script).await?
+	};
 
 	let hash = hash_file(&tar_name).await?;
 
@@ -141,6 +134,25 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	println!("package uploaded");
 
 	Ok(())
+}
+
+pub async fn pack(cfg: &Upload, package: &PackageToml, script: &mut Script) -> Result<String> {
+
+	let dest_folder = format!("./package_tmp/{}", package.name);
+	create_dir(&dest_folder).await?;
+
+	// call package
+	paint_act!("calling pack");
+	script.pack(&dest_folder, &cfg.channel)?;
+
+	let tar_name = format!("{}.tar.gz", &package.name);
+
+	// now the folder should be compressed
+	// tar -zcvf name.tar.gz source
+	compress(&tar_name, "./package_tmp", &package.name)?;
+	remove_dir("./package_tmp").await?;
+
+	Ok(tar_name)
 }
 
 fn print_package(pack: &Package) {

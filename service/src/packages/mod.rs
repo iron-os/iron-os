@@ -70,37 +70,35 @@ pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 
 			sleep(time).await;
 
+			let mut updated = Updated::new();
+
 			// update every
-			match update(version_info).await {
-				Ok(updated) => {
-					eprintln!("updated: {:?}", updated);
+			if let Err(e) = update(version_info, &mut updated, &client).await {
+				eprintln!("update error {:?}", e);
+			}
 
-					// if image update
-					// restart pc
+			eprintln!("updated: {:?}", updated);
 
-					// if packages update
-					if !updated.packages.is_empty() {
-						client.request(&SystemdRestart {
-							name: "service-bootloader".into()
-						}).await
-							.expect("could not restart service-bootloader");
-					}
-
-				},
-				Err(e) => {
-					eprintln!("update error {:?}", e);
-				}
+			// if packages update
+			if !updated.packages.is_empty() {
+				client.request(&SystemdRestart {
+					name: "service-bootloader".into()
+				}).await
+					.expect("could not restart service-bootloader");
 			}
 
 		}
 	}))
 }
 
-pub async fn update(version: VersionInfo) -> io::Result<Updated> {
+pub async fn update(
+	version: VersionInfo,
+	updated: &mut Updated,,
+	bootloader: &Bootloader
+) -> io::Result<()> {
 
 	let mut packages = Packages::load().await?;
 	let mut image = Some(version);
-	let mut updated = Updated::new();
 
 	for source in packages.cfg.sources.into_iter().rev() {
 
@@ -109,12 +107,13 @@ pub async fn update(version: VersionInfo) -> io::Result<Updated> {
 			packages.cfg.channel,
 			&mut image,
 			&mut packages.list,
-			&mut updated
+			updated,
+			bootloader
 		).await?;
 
 	}
 
-	Ok(updated)
+	Ok(())
 }
 
 pub async fn update_from_source(
@@ -122,7 +121,8 @@ pub async fn update_from_source(
 	channel: Channel,
 	image: &mut Option<VersionInfo>,
 	list: &mut Vec<PackageCfg>,
-	updated: &mut Updated
+	updated: &mut Updated,
+	bootloader: &Bootloader
 ) -> io::Result<()> {
 
 	if image.is_none() && list.is_empty() {
@@ -171,8 +171,13 @@ pub async fn update_from_source(
 
 	}
 
-	eprintln!("check image for update {:?}", image);
-	// todo!("check image for update")
+	for rem in to_rem.iter().rev() {
+		list.swap_remove(rem);
+	}
+
+	if let Some(img) = image {
+		update_image(img, client, updated, bootloader).await;
+	}
 
 	Ok(())
 }
@@ -233,6 +238,12 @@ pub async fn update_package(
 
 	Ok(())
 }
+
+pub async fn update_image(
+	img: &VersionInfo,
+	client: &Client,
+	
+) -> io::Result<()>
 
 
 pub struct Packages {

@@ -27,6 +27,12 @@ pub async fn remove_dir(path: &str) -> Result<()> {
 		.map_err(|e| err!(e, "could not remove {:?}", path))
 }
 
+pub async fn copy(from: &str, to: &str) -> Result<()> {
+	fs::copy(from, to).await
+		.map(drop)
+		.map_err(|e| err!(e, "could not copy {:?} to {:?}", from, to))
+}
+
 pub fn compress(name: &str, path: &str, inner: &str) -> Result<()> {
 	// tar -zcvf name.tar.gz -C source name
 	let stat = Command::new("tar")

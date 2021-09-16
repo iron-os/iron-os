@@ -486,9 +486,6 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	let fstab = fstab.replace("DATA_UUID", &data_uuid);
 	fs::write("/mnt/etc/fstab", fstab)?;
 
-	// update version info
-	update_version_info()?;
-
 	umount(&root_path)?;
 
 	// update grub
@@ -505,6 +502,9 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	let grub = grub.replace("ROOTFS_UUID", &root_uuid);
 	fs::write("/mnt/EFI/BOOT/grub.tmp", grub)?;
 	fs::rename("/mnt/EFI/BOOT/grub.tmp", "/mnt/EFI/BOOT/grub.cfg")?;
+
+	// update version info
+	update_version_info()?;
 
 	Ok(())
 }

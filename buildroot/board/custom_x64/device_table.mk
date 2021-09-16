@@ -16,4 +16,5 @@
 /etc/network/if-post-down.d		d	755	0	0	-	-	-	-	-
 # uncomment this to allow starting x as non-root
 #/usr/X11R6/bin/Xfbdev		     	f	4755	0	0	-	-	-	-	-
-/data					r	644 	user 	user - - - - -
+/data					d	644 	user 	user - - - - -
+/boot					d	700		0		0 -	-	-	-	-

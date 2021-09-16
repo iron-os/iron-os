@@ -22,7 +22,7 @@ mod macros;
 
 use crate::error::{Error, Result};
 use crate::message::{Action, Message};
-use crate::packages::{Channel, Package, Image};
+use crate::packages::{Channel, Package};
 
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -92,24 +92,6 @@ impl Response<Action, EncryptedBytes> for SetPackageInfo {
 		Ok(Self)
 	}
 }
-
-// Image Info
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ImageInfoReq {
-	// only Debug and Release are supported
-	pub channel: Channel
-}
-
-serde_req!(Action::ImageInfo, ImageInfoReq, ImageInfo);
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ImageInfo {
-	pub image: Option<Image>
-}
-
-serde_res!(ImageInfo);
-
 
 // Get File
 

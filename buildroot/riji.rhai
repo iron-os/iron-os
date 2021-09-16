@@ -1,9 +1,8 @@
 
 const BUILDROOT = "./buildroot";
 const STABLE = "2021.02.4";
-const VERSION = "1";
-const CHANNEL = "Debug";// Debug | Release
 const PACK_PUB = "./../packages-publisher/target/release/packages-publisher";
+const IMAGES = "./buildroot/output/images";
 
 fn help() {
 	print([
@@ -40,58 +39,55 @@ fn linux_config() {
 }
 
 fn build() {
-	print("build");
-
-	fs::create_dir("./buildroot/output/images");
+	fs::create_dir(IMAGES);
 
 	// build service-bootloader
 	let cargo = cmd([
 		"cargo", "build", "--release"
 	]);
 	cargo.dir("./../service-bootloader");
+	print("build service bootloader");
 	cargo.execute();
 
 	// copy service-bootloader
 	fs::copy(
 		"./../service-bootloader/target/release/service_bootloader",
-		"./buildroot/output/images/service-bootloader"
+		IMAGES + "/service-bootloader"
 	);
 
-	// create version.fdb
-	// this file is defined in service-bootloader-api as VersionInfo
-	fs::write(
-		"./buildroot/output/images/version.fdb",
-		"{\"buildroot_version\":\"" + STABLE + "\"," + 
-		"\"version\":" + VERSION + "," +
-		"\"installed\":false," +
-		"\"channel\":\"" + CHANNEL + "\"}"
-	);
+	fs::copy("./package.toml", IMAGES + "/package.toml");
 
 	// build packages-publisher
 	let cargo = cmd([
 		"cargo", "build", "--release"
 	]);
 	cargo.dir("./../packages-publisher");
+	print("build packages-publisher");
 	cargo.execute();
+
+	fs::copy(PACK_PUB, IMAGES + "/publisher");
 
 	// download packages
 	let publish = cmd([
 		PACK_PUB, "download"
 	]);
+	print("download packages");
 	publish.execute();
 
-	fs::delete("./buildroot/output/images/packages");
-	fs::move("./packages", "./buildroot/output/images/packages");
+	fs::delete(IMAGES + "/packages");
+	fs::move("./packages", IMAGES + "/packages");
 
 	let make = cmd("make");
 	make.dir(BUILDROOT);
+	print("build buildroot");
 	make.execute();
 
 	// create output
 	fs::create_dir("./output");
 
 	// now copy the image
-	fs::copy("./buildroot/output/images/disk.img", "./output");
+	fs::copy(IMAGES + "/disk.img", "./output");
+	fs::copy(IMAGES + "/image.tar.gz", "./output");
 
 	if fs::is_prog("VBoxManage") {
 		fs::delete("./output/disk.vdi");

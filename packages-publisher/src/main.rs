@@ -14,9 +14,11 @@ mod util;
 mod script;
 mod upload;
 mod download;
+mod pack_image;
 
 use upload::Upload;
 use download::Download;
+use pack_image::PackImage;
 
 use std::process;
 
@@ -36,7 +38,8 @@ struct Opts {
 #[derive(Clap)]
 enum SubCommand {
 	Upload(Upload),
-	Download(Download)
+	Download(Download),
+	PackImage(PackImage)
 }
 
 #[tokio::main]
@@ -50,6 +53,9 @@ async fn main() {
 		},
 		SubCommand::Download(d) => {
 			download::download(d).await
+		},
+		SubCommand::PackImage(p) => {
+			pack_image::pack_image(p).await
 		}
 	};
 

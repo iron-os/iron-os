@@ -38,9 +38,10 @@ class VersionInfo extends Data {
 	constructor(d) {
 		super({
 			buildroot_version: 'str',
-			version: 'int',
-			installed: 'bool',
-			channel: 'str'
+			version_str: 'str',
+			version: 'str',
+			signature: 'str',
+			installed: 'bool'
 		}, d);
 	}
 }

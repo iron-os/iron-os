@@ -6,7 +6,7 @@ use crate::error::{Result, Error};
 
 use packages::{request_handler};
 use packages::requests::{
-	PackageInfoReq, PackageInfo, ImageInfoReq, ImageInfo, GetFileReq, GetFile,
+	PackageInfoReq, PackageInfo, GetFileReq, GetFile,
 	SetFileReq, SetFile, SetPackageInfoReq, SetPackageInfo
 };
 use packages::stream::packet::PacketError;
@@ -52,7 +52,6 @@ pub async fn serve() -> Result<()> {
 	server.register_data(cfg);
 	// server.register_request(all_packages);
 	server.register_request(package_info);
-	server.register_request(image_info);
 	server.register_request(get_file);
 	server.register_request(set_file);
 	server.register_request(set_package_info);
@@ -71,14 +70,6 @@ request_handler!(
 	async fn package_info(req: PackageInfoReq, packages: PackagesDb) -> ApiResult<PackageInfo> {
 		Ok(PackageInfo {
 			package: packages.get_package(&req.channel, &req.name).await
-		})
-	}
-);
-
-request_handler!(
-	async fn image_info(req: ImageInfoReq, packages: PackagesDb) -> ApiResult<ImageInfo> {
-		Ok(ImageInfo {
-			image: packages.get_image(&req.channel).await
 		})
 	}
 );

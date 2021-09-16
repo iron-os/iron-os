@@ -14,6 +14,9 @@ use stdio_api::{Stdio, Kind as LineKind, SerdeError};
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 
+use crypto::hash::Hash;
+use crypto::signature::Signature;
+
 
 #[doc(hidden)]
 pub use stdio_api::{serialize, deserialize, Line};
@@ -319,31 +322,13 @@ impl Request for VersionInfoReq {
 	fn kind() -> Kind { Kind::VersionInfo }
 }
 
-// version info stored in /buildroot/riji.rhai
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionInfo {
-	// in the format 20.03.20
-	pub buildroot_version: String,
-	pub version: u64,
-	pub channel: VersionChannel,
+	pub version_str: String,
+	pub version: Hash,
+	pub signature: Option<Signature>,
 	pub installed: bool
-	// add partial installed or full install
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum VersionChannel {
-	Debug,
-	Release
-}
-
-impl VersionChannel {
-	pub fn is_debug(&self) -> bool {
-		matches!(self, VersionChannel::Debug)
-	}
-
-	pub fn is_release(&self) -> bool {
-		matches!(self, VersionChannel::Release)
-	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

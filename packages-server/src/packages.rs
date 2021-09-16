@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tokio::fs;
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
-use packages::packages::{Package, Channel, Image};
+use packages::packages::{Package, Channel};
 use file_db::FileDb;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,25 +35,19 @@ impl PackagesDbFile {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesIndex {
-	list: HashMap<String, Package>,
-	image: Option<Image>
+	list: HashMap<String, Package>
 }
 
 impl PackagesIndex {
 
 	fn new() -> Self {
 		Self {
-			list: HashMap::new(),
-			image: None
+			list: HashMap::new()
 		}
 	}
 
 	fn get(&self, name: &str) -> Option<&Package> {
 		self.list.get(name)
-	}
-
-	fn image(&self) -> Option<&Image> {
-		self.image.as_ref()
 	}
 
 	fn set(&mut self, package: Package) {
@@ -97,14 +91,6 @@ impl PackagesDb {
 		let db = lock.data();
 		let index = db.get(channel)?;
 		index.get(name)
-			.map(Clone::clone)
-	}
-
-	pub async fn get_image(&self, channel: &Channel) -> Option<Image> {
-		let lock = self.inner.read().await;
-		let db = lock.data();
-		let index = db.get(channel)?;
-		index.image()
 			.map(Clone::clone)
 	}
 

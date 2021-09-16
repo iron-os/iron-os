@@ -112,12 +112,3 @@ impl PackageCfg {
 		let _ = mem::replace(self, new);
 	}
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Image {
-	pub buildroot_version: String,
-	pub version: u64,
-	pub hash: Hash,
-	pub signature: Signature,
-	// pub size: u64
-}
