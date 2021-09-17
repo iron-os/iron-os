@@ -32,6 +32,13 @@ impl fmt::Display for Channel {
 	}
 }
 
+impl Channel {
+
+	pub fn is_debug(&self) -> bool {
+		matches!(self, Self::Debug)
+	}
+
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {

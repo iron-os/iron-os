@@ -34,6 +34,8 @@ use packages::client::Client;
 use packages::requests::{PackageInfoReq, GetFileReq};
 use file_db::FileDb;
 
+use bootloader_api::{UpdateReq, RestartReq};
+
 const PACKAGES_DIR: &str = "/data/packages";
 
 fn path(s: &str) -> PathBuf {
@@ -44,23 +46,29 @@ fn path(s: &str) -> PathBuf {
 pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 
 	Ok(tokio::spawn(async move {
+		// get version info so we know if we should update alot or not
+		let version_info = client.request(&VersionInfoReq).await
+			.expect("fetching version failed");
+
+		if !version_info.installed {
+			// not installed
+
+			// for an installation to be finished
+			// a restart is required so we don't need to check it in the loop
+			eprintln!("not installed, only update when installed");
+			return
+		}
+
 		loop {
 
-			// get version info so we know if we should update alot or not
-			let version_info = client.request(&VersionInfoReq).await
-				.expect("fetching version failed");
-
-				if !version_info.installed {
-					// not installed
-					eprintln!("not installed, only update when installed");
-					return
-				}
+			let packages = Packages::load().await
+				.expect("could not load packages");
 
 			// we do this step on every iteration to
 			// always get a new random value
-			let time = match version_info.channel.is_debug() {
-				// check version every minute
-				true => Duration::from_secs(60),
+			let time = match packages.cfg.channel.is_debug() {
+				// check version 30 seconds
+				true => Duration::from_secs(30),
 				false => Duration::from_secs(
 					// check version every 5-15 minutes
 					thread_rng()
@@ -73,14 +81,23 @@ pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 			let mut updated = Updated::new();
 
 			// update every
-			if let Err(e) = update(version_info, &mut updated, &client).await {
+			if let Err(e) = update(
+				&version_info,
+				packages,
+				&mut updated,
+				&client
+			).await {
 				eprintln!("update error {:?}", e);
 			}
 
 			eprintln!("updated: {:?}", updated);
 
-			// if packages update
-			if !updated.packages.is_empty() {
+			// if image was updated
+			if updated.image.is_some() {
+				client.request(&RestartReq).await
+					.expect("could not restart the system");
+			// if packages updated
+			} else if !updated.packages.is_empty() {
 				client.request(&SystemdRestart {
 					name: "service-bootloader".into()
 				}).await
@@ -92,12 +109,12 @@ pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 }
 
 pub async fn update(
-	version: VersionInfo,
-	updated: &mut Updated,,
+	version: &VersionInfo,
+	mut packages: Packages,
+	updated: &mut Updated,
 	bootloader: &Bootloader
 ) -> io::Result<()> {
 
-	let mut packages = Packages::load().await?;
 	let mut image = Some(version);
 
 	for source in packages.cfg.sources.into_iter().rev() {
@@ -119,7 +136,7 @@ pub async fn update(
 pub async fn update_from_source(
 	source: Source,
 	channel: Channel,
-	image: &mut Option<VersionInfo>,
+	image: &mut Option<&VersionInfo>,
 	list: &mut Vec<PackageCfg>,
 	updated: &mut Updated,
 	bootloader: &Bootloader
@@ -130,7 +147,7 @@ pub async fn update_from_source(
 	}
 
 	// build connection
-	let client = Client::connect(source.addr, source.public_key).await
+	let client = Client::connect(&source.addr, source.public_key.clone()).await
 		.map_err(io_other)?;
 
 	let mut to_rem = vec![];
@@ -172,11 +189,18 @@ pub async fn update_from_source(
 	}
 
 	for rem in to_rem.iter().rev() {
-		list.swap_remove(rem);
+		list.swap_remove(*rem);
 	}
 
-	if let Some(img) = image {
-		update_image(img, client, updated, bootloader).await;
+	if image.is_some() {
+		update_image(
+			&source,
+			channel,
+			image,
+			&client,
+			updated,
+			bootloader
+		).await?;
 	}
 
 	Ok(())
@@ -188,34 +212,13 @@ pub async fn update_package(
 	client: &Client
 ) -> io::Result<()> {
 
-	// download new file
-	let req = GetFileReq {
-		hash: new.version.clone()
-	};
-	let file = client.request(req).await
-		.map_err(io_other)?;
-
-	if file.is_empty() {
-		return Err(io_other(format!("file empty {:?}", new)));
-	}
-
-	// validate hash
-	if file.hash() != new.version {
-		return Err(io_other(format!("hash mismatch {:?}", new)))
-	}
-
 	// extract
 	let path = format!("{}/{}", PACKAGES_DIR, new.name);
-
 	let tar = format!("{}/{}.tar.gz", path, new.name);
 
-	// remove tar if it exists
-	let _ = fs::remove_file(&tar).await;
-
-	fs::write(&tar, file.file()).await?;
+	download_file(&new, &client, &tar).await?;
 
 	let other_path = format!("{}/{}", path, cfg.other());
-
 	// remove other folder
 	let _ = fs::remove_dir_all(&other_path).await;
 
@@ -239,11 +242,103 @@ pub async fn update_package(
 	Ok(())
 }
 
-pub async fn update_image(
-	img: &VersionInfo,
+async fn download_file(
+	package: &Package,
 	client: &Client,
-	
-) -> io::Result<()>
+	path: &str
+) -> io::Result<()> {
+
+	// download new file
+	let req = GetFileReq {
+		hash: package.version.clone()
+	};
+	let file = client.request(req).await
+		.map_err(io_other)?;
+
+	if file.is_empty() {
+		return Err(io_other(format!("file empty {:?}", package)));
+	}
+
+	// validate hash
+	if file.hash() != package.version {
+		return Err(io_other(format!("hash mismatch {:?}", package)))
+	}
+
+	// remove file if it exists
+	let _ = fs::remove_file(&path).await;
+
+	fs::write(&path, file.file()).await?;
+
+	Ok(())
+}
+
+pub async fn update_image(
+	source: &Source,
+	channel: Channel,
+	version: &mut Option<&VersionInfo>,
+	client: &Client,
+	updated: &mut Updated,
+	bootloader: &Bootloader
+) -> io::Result<()> {
+	if version.is_none() {
+		return Ok(())
+	}
+
+	// check for new version
+	let req = PackageInfoReq {
+		channel, name: "image".into()
+	};
+	let info = client.request(req).await
+		.map_err(io_other)?;
+
+	let package = match info.package {
+		Some(p) => p,
+		// package not found
+		None => return Ok(())
+	};
+
+	let version = version.take().unwrap();
+
+	if version.version == package.version {
+		return Ok(())
+	}
+
+	// validate signature
+	if !source.sign_key.verify(
+		package.version.as_slice(),
+		&package.signature
+	) {
+		return Err(io_other(format!("signature mismatch {:?}", package)))
+	}
+
+	// /data/packages/image
+	let path = format!("{}/{}", PACKAGES_DIR, package.name);
+	let _ = fs::create_dir(&path).await;
+	let tar = format!("{}/{}.tar.gz", path, package.name);
+	download_file(&package, &client, &path).await?;
+
+	let img_path = format!("{}/{}", path, package.name);
+	let _ = fs::remove_dir_all(&img_path).await;
+
+	// extract
+	extract(&tar, &path).await?;
+	let _ = fs::remove_file(&tar).await;
+
+	// version info
+	let req = UpdateReq {
+		version_str: package.version_str.clone(),
+		version: package.version.clone(),
+		signature: package.signature.clone(),
+		path: img_path.clone()
+	};
+	let version = bootloader.request(&req).await?;
+
+	// remove the folder
+	let _ = fs::remove_dir_all(&img_path).await;
+	updated.image = Some(version);
+
+	Ok(())
+}
 
 
 pub struct Packages {
@@ -294,14 +389,15 @@ async fn extract(path: &str, to: &str) -> io::Result<()> {
 #[derive(Debug)]
 pub struct Updated {
 	packages: Vec<Package>,
-	// image: Image
+	image: Option<VersionInfo>
 }
 
 impl Updated {
 
 	fn new() -> Self {
 		Self {
-			packages: vec![]
+			packages: vec![],
+			image: None
 		}
 	}
 

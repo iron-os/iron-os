@@ -263,10 +263,12 @@ macro_rules! kind {
 
 kind!{
 	SystemdRestart,
+	Restart,
 	Disks,
 	InstallOn,
 	VersionInfo,
-	MakeRoot
+	MakeRoot,
+	Update
 }
 
 
@@ -339,4 +341,29 @@ pub struct MakeRoot {
 impl Request for MakeRoot {
 	type Response = ();
 	fn kind() -> Kind { Kind::MakeRoot }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateReq {
+	pub version_str: String,
+	pub version: Hash,
+	pub signature: Signature,
+	// path to folder where are located
+	// - bzImage
+	// - rootfs.ext2
+	pub path: String
+}
+
+impl Request for UpdateReq {
+	type Response = VersionInfo;
+	fn kind() -> Kind { Kind::Update }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct RestartReq;
+
+impl Request for RestartReq {
+	type Response = ();
+	fn kind() -> Kind { Kind::Restart }
 }

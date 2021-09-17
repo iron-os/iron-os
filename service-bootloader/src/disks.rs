@@ -2,6 +2,7 @@
 use crate::io_other;
 use crate::command::Command;
 use crate::version_info::update_version_info;
+use crate::util::{list_files, root_uuid, mount, cp, umount};
 
 use std::path::{Path, PathBuf};
 use std::fs::{self, File, read_to_string, create_dir_all};
@@ -507,66 +508,4 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	update_version_info()?;
 
 	Ok(())
-}
-
-fn mount(path: impl AsRef<Path>, dest: impl AsRef<Path>) -> io::Result<()> {
-	let dest = dest.as_ref();
-	// first unmount
-	// but ignore the result since it returns an error of nothing is mounted
-	let _ = umount(dest);
-	Command::new("mount")
-		.arg(path.as_ref())
-		.arg(dest)
-		.exec()
-}
-
-fn umount(path: impl AsRef<Path>) -> io::Result<()> {
-	Command::new("umount")
-		.arg("-f")
-		.arg(path.as_ref())
-		.exec()
-}
-
-fn cp(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
-	Command::new("cp")
-		.args(&["-r", "-p"])
-		.arg(from.as_ref())
-		.arg(to.as_ref())
-		.exec()
-}
-
-// returns the file name
-fn list_files(dir: impl AsRef<Path>) -> io::Result<Vec<PathBuf>> {
-	let mut v = vec![];
-
-	for entry in fs::read_dir(dir)? {
-		let e = entry?;
-		if e.file_type()?.is_dir() {
-			continue
-		}
-
-		// so we have a file
-		v.push(e.path());
-	}
-
-	Ok(v)
-}
-
-fn root_uuid() -> io::Result<Uuid> {
-	// read the cmdline and get the root parameter
-	let cmd = fs::read_to_string("/proc/cmdline")?;
-	cmd.split_ascii_whitespace()
-		.find_map(|p| {
-			p.split_once('=')
-				.filter(|(a, _)| a == &"root")
-				.map(|(_, b)| b)
-		})
-		.and_then(|v| {
-			v.split_once('=')
-				.filter(|(a, _)| matches!(*a, "UUID" | "PARTUUID"))
-				.map(|(_, b)| b)
-		})
-		.map(Uuid::parse_str)
-		.ok_or_else(|| io_other("no root or uuid"))
-		.and_then(|o| o.map_err(io_other))
 }
