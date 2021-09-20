@@ -63,8 +63,6 @@ pub struct PackagesCfg {
 	pub sources: Vec<Source>,
 	/// if this is true that last source will return realtime updates
 	pub fetch_realtime: bool,
-	/// the package that should be run when installing
-	pub on_install: String,
 	/// the package that should be run normally
 	pub on_run: String,
 	/// this information get's overriden if the image is in Debug

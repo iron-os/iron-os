@@ -35,10 +35,7 @@ pub struct PackagesToml {
 	list: Vec<String>,
 	/// the channel from which it should be downloaded
 	channel: Channel,
-	/// what package to execute on installation
-	#[serde(rename = "on-install")]
-	on_install: String,
-	/// what package to execute on running
+	/// what package to execute on running (the first parameter will be the state)
 	#[serde(rename = "on-run")]
 	on_run: String,
 	#[serde(rename = "source")]
@@ -116,7 +113,6 @@ pub async fn download(_: Download) -> Result<()> {
 	let packs_cfg = PackagesCfg {
 		sources,
 		fetch_realtime: false,
-		on_install: cfg.on_install.clone(),
 		on_run: cfg.on_run.clone(),
 		channel: cfg.channel
 	};
