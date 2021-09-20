@@ -311,9 +311,9 @@ pub async fn update_image(
 		return Err(io_other(format!("signature mismatch {:?}", package)))
 	}
 
-	// /data/packages/image
-	let path = format!("{}/{}", PACKAGES_DIR, package.name);
-	let _ = fs::create_dir(&path).await;
+	// /data/tmp/image
+	let path = "/data/tmp/image";
+	let _ = fs::create_dir_all(&path).await;
 	let tar = format!("{}/{}.tar.gz", path, package.name);
 	download_file(&package, &client, &path).await?;
 
