@@ -174,6 +174,8 @@ pub fn start() -> io::Result<()> {
 	server.register(install_on_handler);
 	server.register(version_info_handle);
 	server.register(make_root);
+	server.register(restart);
+	server.register(update);
 
 	server.run()?;
 

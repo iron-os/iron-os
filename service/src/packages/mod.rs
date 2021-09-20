@@ -315,7 +315,7 @@ pub async fn update_image(
 	let path = "/data/tmp/image";
 	let _ = fs::create_dir_all(&path).await;
 	let tar = format!("{}/{}.tar.gz", path, package.name);
-	download_file(&package, &client, &path).await?;
+	download_file(&package, &client, &tar).await?;
 
 	let img_path = format!("{}/{}", path, package.name);
 	let _ = fs::remove_dir_all(&img_path).await;

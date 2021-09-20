@@ -488,12 +488,18 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 		.ok_or_else(|| io_other("could not get root path"))?;
 
 	// now replace DATA_UUID with the uuid
+	let boot_uuid = disk.get_part("boot")
+		.ok_or_else(|| io_other("could not get boot partition"))?
+		.part_guid.to_string();
+
+	// now replace DATA_UUID with the uuid
 	let data_uuid = disk.get_part("data")
 		.ok_or_else(|| io_other("could not get data partition"))?
 		.part_guid.to_string();
 
 	mount(&root_path, "/mnt")?;
 	let fstab = read_to_string("/mnt/etc/fstab.templ")?;
+	let fstab = fstab.replace("EFI_UUID", &boot_uuid);
 	let fstab = fstab.replace("DATA_UUID", &data_uuid);
 	fs::write("/mnt/etc/fstab", fstab)?;
 
@@ -529,10 +535,18 @@ pub fn update(path: &str) -> io::Result<()> {
 
 	let disk = Disks::root_disk()?;
 
+	let boot_uuid = disk.get_part("boot")
+		.ok_or_else(|| io_other("boot partition not found"))?
+		.part_guid.to_string();
+
 	let part_a = disk.get_part("root a")
 		.ok_or_else(|| io_other("root a partition not found"))?;
 	let part_b = disk.get_part("root b")
 		.ok_or_else(|| io_other("root b partition not found"))?;
+
+	let data_uuid = disk.get_part("data")
+		.ok_or_else(|| io_other("data partition not found"))?
+		.part_guid.to_string();
 
 	let (other_uuid, other) = if part_a.part_guid == part_uuid {
 		(part_b.part_guid, "root b")
@@ -554,14 +568,13 @@ pub fn update(path: &str) -> io::Result<()> {
 
 	// rootfs copied
 
-	/*
-	mount(&root_path, "/mnt")?;
+	mount(&part_path, "/mnt")?;
 	let fstab = read_to_string("/mnt/etc/fstab.templ")?;
+	let fstab = fstab.replace("EFI_UUID", &boot_uuid);
 	let fstab = fstab.replace("DATA_UUID", &data_uuid);
 	fs::write("/mnt/etc/fstab", fstab)?;
 
-	umount(&root_path)?;
-	*/
+	umount(&part_path)?;
 
 	let bz_image_path = format!("{}/bzImage", path);
 
