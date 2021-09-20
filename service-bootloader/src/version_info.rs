@@ -9,6 +9,10 @@ pub fn version_info() -> io::Result<VersionInfo> {
 		.map(FileDb::into_data)
 }
 
+pub fn version_info_db() -> io::Result<FileDb<VersionInfo>> {
+	FileDb::open_sync("/boot/version.fdb")
+}
+
 /// updates the version info at the mount location
 /// under /mnt
 pub fn update_version_info() -> io::Result<()> {

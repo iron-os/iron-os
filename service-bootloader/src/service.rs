@@ -2,7 +2,7 @@
 use crate::command::Command;
 use crate::io_other;
 use crate::disks::{api_disks, install_on};
-use crate::version_info::version_info;
+use crate::version_info::{version_info, version_info_db};
 use crate::util::chown;
 
 use std::io;
@@ -13,7 +13,7 @@ use std::os::unix::fs::PermissionsExt;
 use bootloader_api::{
 	Server, request_handler, SystemdRestart, Disks,
 	Disk, InstallOn, VersionInfoReq, VersionInfo,
-	MakeRoot
+	MakeRoot, RestartReq, UpdateReq
 };
 use file_db::FileDb;
 
@@ -100,6 +100,39 @@ request_handler!{
 	}
 }
 
+request_handler!{
+	fn restart(_req: RestartReq) -> io::Result<()> {
+		Command::new("shutdown")
+			.args(&["-r", "now"])
+			.exec()?;
+		Ok(())
+	}
+}
+
+request_handler!{
+	fn update(req: UpdateReq) -> io::Result<VersionInfo> {
+		let version = version_info()?;
+		if version.version == req.version {
+			return Err(io_other("already updated"));
+		}
+
+		if !version.installed {
+			return Err(io_other("before updating you need to install"))
+		}
+
+		crate::disks::update(&req.path)?;
+
+		let mut db = version_info_db()?;
+		let data = db.data_mut();
+		data.version_str = req.version_str;
+		data.version = req.version;
+		data.signature = Some(req.signature);
+		db.write_sync()?;
+
+		Ok(db.into_data())
+	}
+}
+
 pub fn start() -> io::Result<()> {
 
 	/*
@@ -115,8 +148,6 @@ pub fn start() -> io::Result<()> {
  - watchdog for chnobli service
 	 restart if chnobli service does not send
 	 connected for a given period
- - start weston service
- - api for setuid root
 */
 
 	let service_package = Path::new("/data/packages/service");

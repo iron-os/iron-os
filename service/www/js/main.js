@@ -37,10 +37,9 @@ async function main() {
 class VersionInfo extends Data {
 	constructor(d) {
 		super({
-			buildroot_version: 'str',
 			version_str: 'str',
 			version: 'str',
-			signature: 'str',
+			signature: 'optstr',
 			installed: 'bool'
 		}, d);
 	}

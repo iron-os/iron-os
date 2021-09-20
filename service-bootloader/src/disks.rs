@@ -2,10 +2,10 @@
 use crate::io_other;
 use crate::command::Command;
 use crate::version_info::update_version_info;
-use crate::util::{list_files, root_uuid, mount, cp, umount};
+use crate::util::{list_files, root_uuid, mount, cp, umount, boot_image};
 
 use std::path::{Path, PathBuf};
-use std::fs::{self, File, read_to_string, create_dir_all};
+use std::fs::{self, File, read_to_string, create_dir_all, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
@@ -139,6 +139,16 @@ impl Disks {
 				println!("disk {:?} became root", name);
 			}
 		}
+	}
+
+	fn root_disk() -> io::Result<Disk> {
+		let disks = Disks::read()?;
+		disks.inner.into_iter()
+			.find_map(|(_, disk)|
+				disk.is_root
+					.then(|| disk)
+			)
+			.ok_or_else(|| io_other("root disk not found"))
 	}
 
 }
@@ -501,11 +511,79 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	mount(&boot_path, "/mnt")?;
 	let grub = read_to_string("/mnt/EFI/BOOT/grub.templ")?;
 	let grub = grub.replace("ROOTFS_UUID", &root_uuid);
+	let grub = grub.replace("KERNEL_NAME", "bzImage");
 	fs::write("/mnt/EFI/BOOT/grub.tmp", grub)?;
 	fs::rename("/mnt/EFI/BOOT/grub.tmp", "/mnt/EFI/BOOT/grub.cfg")?;
 
 	// update version info
 	update_version_info()?;
+
+	Ok(())
+}
+
+// path to the folder 
+// ## Expects the current disk to be an installed disk
+pub fn update(path: &str) -> io::Result<()> {
+	let boot_img = boot_image()?;
+	let part_uuid = root_uuid()?;
+
+	let disk = Disks::root_disk()?;
+
+	let part_a = disk.get_part("root a")
+		.ok_or_else(|| io_other("root a partition not found"))?;
+	let part_b = disk.get_part("root b")
+		.ok_or_else(|| io_other("root b partition not found"))?;
+
+	let (other_uuid, other) = if part_a.part_guid == part_uuid {
+		(part_b.part_guid, "root b")
+	} else if part_b.part_guid == part_uuid {
+		(part_a.part_guid, "root a")
+	} else {
+		return Err(io_other("root partition not found"))
+	};
+
+	let part_path = disk.part_path(other).unwrap();
+	let mut part_file = OpenOptions::new()
+		.write(true)
+		.open(&part_path)?;
+
+	let rootfs_path = format!("{}/rootfs.ext2", path);
+	let mut rootfs_file = File::open(&rootfs_path)?;
+
+	io::copy(&mut rootfs_file, &mut part_file)?;
+
+	// rootfs copied
+
+	/*
+	mount(&root_path, "/mnt")?;
+	let fstab = read_to_string("/mnt/etc/fstab.templ")?;
+	let fstab = fstab.replace("DATA_UUID", &data_uuid);
+	fs::write("/mnt/etc/fstab", fstab)?;
+
+	umount(&root_path)?;
+	*/
+
+	let bz_image_path = format!("{}/bzImage", path);
+
+	let other_kernel = if boot_img == "/bzImage" {
+		"bzImageB"
+	} else if boot_img == "/bzImageB" {
+		"bzImage"
+	} else {
+		return Err(io_other("kernel image not found"))
+	};
+
+	let other_path = format!("/boot/{}", other_kernel);
+	let _ = fs::remove_file(&other_path);
+
+	fs::copy(&bz_image_path, &other_path)?;
+
+	// now change the grub settings
+	let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
+	let grub = grub.replace("KERNEL_NAME", other_kernel);
+	let grub = grub.replace("ROOTFS_UUID", &other_uuid.to_string());
+	fs::write("/boot/EFI/BOOT/grub.tmp", grub)?;
+	fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
 
 	Ok(())
 }

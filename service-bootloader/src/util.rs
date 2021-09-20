@@ -84,3 +84,17 @@ pub fn root_uuid() -> io::Result<Uuid> {
 		.ok_or_else(|| io_other("no root or uuid"))
 		.and_then(|o| o.map_err(io_other))
 }
+
+// BOOT_IMAGE=/bzImage
+pub fn boot_image() -> io::Result<String> {
+	// read the cmdline and get the root parameter
+	let cmd = fs::read_to_string("/proc/cmdline")?;
+	cmd.split_ascii_whitespace()
+		.find_map(|p| {
+			p.split_once('=')
+				.filter(|(a, _)| a == &"BOOT_IMAGE")
+				.map(|(_, b)| b)
+		})
+		.map(Into::into)
+		.ok_or_else(|| io_other("no boot_image"))
+}

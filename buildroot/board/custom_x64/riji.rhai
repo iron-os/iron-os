@@ -132,6 +132,8 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	fs::copy("./grub-efi.cfg", efi_dir + "/grub.templ");
 	let uuid_tmp_reg = regex("ROOTFS_UUID");
 	uuid_tmp_reg.replace_file(grub_cfg, uuid);
+	let kernel_reg = regex("KERNEL_NAME");
+	kernel_reg.replace_file(grub_cfg, "bzImage");
 	// fill genimage-efi.cfg
 	fs::copy("./genimage-efi.cfg", binaries_dir + "/");
 	uuid_tmp_reg.replace_file(binaries_dir + "/genimage-efi.cfg", uuid);
