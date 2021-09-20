@@ -7,7 +7,7 @@ mod util;
 
 use command::Command;
 
-use std::io;
+use std::{io, fs};
 use std::error::Error as StdError;
 use std::thread;
 use std::time::Duration;
@@ -19,6 +19,11 @@ fn main() {
 		.args(&["start", "weston"])
 		.exec()
 		.expect("could not start weston");
+
+	// make sure /data is owned by the user
+	if let Ok(f) = fs::File::open("/data") {
+		let _ = util::chown(&f, 14, 15);
+	}
 
 	// let weston startup
 	thread::sleep(Duration::from_millis(200));
