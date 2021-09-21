@@ -41,6 +41,12 @@ fn linux_config() {
 fn build() {
 	fs::create_dir(IMAGES);
 
+	// patch
+	// copy board/custom_x64
+	fs::copy("./board/custom_x64", "./buildroot/board/");
+	// copy .config
+	fs::copy("./.config", "./buildroot/");
+
 	// build service-bootloader
 	let cargo = cmd([
 		"cargo", "build", "--release"
@@ -77,6 +83,7 @@ fn build() {
 	fs::delete(IMAGES + "/packages");
 	fs::move("./packages", IMAGES + "/packages");
 
+	// build buildroot
 	let make = cmd("make");
 	make.dir(BUILDROOT);
 	print("build buildroot");
@@ -89,6 +96,7 @@ fn build() {
 	fs::copy(IMAGES + "/disk.img", "./output");
 	fs::copy(IMAGES + "/image.tar.gz", "./output");
 
+	// create vdi file if vbox is installed
 	if fs::is_prog("VBoxManage") {
 		fs::delete("./output/disk.vdi");
 		let vbox = cmd([
@@ -109,22 +117,6 @@ fn save() {
 	// copy .config
 	fs::copy("./buildroot/.config", "./");
 	//fs::copy("./buildroot/output/build/linux-5.10.43/.config", "./board/linux.config");
-}
-
-// apply the patch
-fn patch() {
-	print("patch");
-
-	// copy board/custom_x64
-	fs::copy("./board/custom_x64", "./buildroot/board/");
-	// copy .config
-	fs::copy("./.config", "./buildroot/");
-
-	// let git = git(BUILDROOT);
-
-	// get psplash patch
-	// let psplash = diff_from_file("./patches/psplash.patch");
-	// git.apply_diff(psplash);
 }
 
 // removes all unchached files in main
