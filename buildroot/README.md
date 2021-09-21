@@ -11,18 +11,13 @@ Then run:
 ```
 riji patch
 ```
-Which will copy all needed files.
 
-*Todo Prepare packages*
+To build correctly u need a `packages.toml` file containing at least the packages
+`chromium` and `service`.
 
 ## Changes
 
-When changes are done not in the buildroot folder you should
-call `riji patch`. If changes are done in the buildroot or
-with `riji config` call `riji save`.
-
-## TODO
-- remove audit since we it produces to many logs
+If changes are done with `riji config` call `riji save`.
 
 ## Boot process
 
@@ -30,22 +25,20 @@ with `riji config` call `riji save`.
 2. Linux
 3. Systemd
 4. psplash
-5. kiosk_bootloader
-6. debug ? getty : kiosk_web(weston, chromium)
-7. kiosk_kernel
-8. > custom process
+5. service_bootloader
+6. > weston
+7. service
+8. > chromium
+9. $on_run
 
 ## Partitions
 
 Should have four partitions:
 
-- efi
-- boot 1
-- boot 2
+- boot
+- root a
+- root b
 - data
-
-## Compression (for updates)
-brotli + tar
 
 ## Users syntax see
 http://underpop.online.fr/b/buildroot/en/makeuser-syntax.htm.gz
@@ -53,6 +46,8 @@ http://underpop.online.fr/b/buildroot/en/makeuser-syntax.htm.gz
 ## chromium
 // To launch chromium the XDG_RUNTIME_DIR and WAYLAND_DISPLAY need to be defined.l
 // XDG_RUNTIME_DIR=/run/user/14 WAYLAND_DISPLAY=wayland-0 ./chrome --cache-dir=/tmp/ --user-profile=/tmp/ --disable-infobars --disable-rollback-option --disable-speech-api --disable-sync --disable-pinch --kiosk --app="https://youtube.com"
+
+### Todo this should be improved
 
 ## external disk
 Create a partition with:
@@ -81,18 +76,14 @@ target remote <ip>:<port>
 
 ## Data partition
 - var
+- etc (for configs)
+- home
+- packages
 - storage
   // folder used for secure storage (namely the web api will store data here)
 
-### Todo
-- check what happens if weston crashes
-  do we need to restart chromium?
-
-- add /usr/lib/dri/i965_dri.so
-
-## Package Server
-The package server only stores package.fdb data and a hash of the specific version
-which then can be downloaded only by providing the hash.
+### Important
+files in `board/*/data` are not automatically updated and should only be changed with care.
 
 ## Install to usb stick
 ```

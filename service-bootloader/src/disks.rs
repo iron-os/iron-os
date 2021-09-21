@@ -133,11 +133,8 @@ impl Disks {
 	}
 
 	fn set_root(&mut self, uuid: &Uuid) {
-		for (name, disk) in &mut self.inner {
-			let r = disk.set_root(uuid);
-			if r {
-				println!("disk {:?} became root", name);
-			}
+		for (_, disk) in &mut self.inner {
+			disk.set_root(uuid);
 		}
 	}
 

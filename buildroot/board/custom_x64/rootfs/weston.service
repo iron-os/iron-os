@@ -7,6 +7,7 @@ Description=Run weston
 
 [Service]
 Type=simple
+WorkingDirectory=/etc/weston
 ExecStart=/usr/bin/weston
 Environment=WAYLAND_SERVER_SOCKET=wayland-0
 Restart=always
