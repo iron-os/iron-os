@@ -7,9 +7,8 @@ Description=Run weston
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/weston
+ExecStart=/usr/bin/weston -c /etc/weston/weston.ini
 Environment=WAYLAND_SERVER_SOCKET=wayland-0
-Environment=XDG_CONFIG_DIR=/etc/weston
 Restart=always
 RestartSec=2
 User=user
