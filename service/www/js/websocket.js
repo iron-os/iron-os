@@ -1,7 +1,7 @@
 
 import { timeout } from '/fire-html/util.js';
 
-export default class Connection {
+export default class Websocket {
 
 	// if you create a new connection
 	// it will automatically connect
@@ -50,8 +50,8 @@ export default class Connection {
 
 	// TODO check if error is handled correctly
 	async connect() {
-		const prot = window.location.protocol.startsWith('https') ? 'wss' : 'ws';
-		this.ws = new WebSocket(`${ prot }://127.0.0.1:8888/websocket`);
+		// const prot = window.location.protocol.startsWith('https') ? 'wss' : 'ws';
+		this.ws = new WebSocket(`ws://127.0.0.1:8888/websocket`);
 
 		this.ws.addEventListener('close', async e => {
 			this.ws = null;

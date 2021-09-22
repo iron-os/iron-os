@@ -1,5 +1,6 @@
 
 import { timeout, randomToken } from '/fire-html/util.js';
+import Websocket from './websocket.js';
 
 /*
 struct Message {
@@ -21,88 +22,14 @@ export default class Connection {
 		this.requests = {};
 		// contains {id: fn(data)}
 		this.streams = {};
-	}
 
-	// on(fn) {
-	// 	this.onFn = fn;
-	// }
+		this.ws = new Websocket;
+	}
 
 	async connect() {
-		// waits until a connection could be established
-		const prom = new Promise(resolve => {
-			const firstEv = ev => {
-				// we received a first message
-				window.removeEventListener('message', firstEv);
-				resolve(ev);
-			};
-			window.addEventListener('message', firstEv);
+		await this.ws.connect();
 
-		});
-
-		const ev = await prom;
-		console.log('received first ev', ev);
-
-		this.connectRaw();
-	}
-
-	async request(name, data) {
-		return new Promise(resolve => {
-			const id = randomToken(12);
-			const msg = {
-				id,
-				kind: 'Request',
-				name,
-				data
-			};
-
-			this.requests[id] = resolve;
-
-			this.sendRaw(msg);
-		});
-	}
-
-	requestStream(name, fn) {
-		const id = randomToken(12);
-		const msg = {
-			id,
-			kind: 'RequestStream',
-			name,
-			data
-		};
-
-		this.streams[id] = fn;
-
-		this.sendRaw(msg);
-	}
-
-	// send(name, data) {
-	// 	const msg = {
-	// 		id: randomToken(12),
-	// 		kind: 'Push',
-	// 		name,
-	// 		data
-	// 	};
-	// 	this.sendRaw(msg);
-	// }
-
-
-	//------ Private
-	connectRaw() {
-		window.addEventListener('message', ev => {
-
-			// only accept messages from the same frame
-			if (ev.source !== window)
-				return;
-
-			let msg = ev.data;
-			if (!('origin' in msg))
-				return;
-
-			if (msg.origin !== 'Extension')
-				return;
-
-			msg = msg.data;
-
+		this.ws.on(msg => {
 			console.log('client: receive data: ', msg);
 
 			// let's just fail if the give values are not found
@@ -128,10 +55,33 @@ export default class Connection {
 		});
 	}
 
-	sendRaw(data) {
-		window.postMessage({
-			origin: 'Client',
-			data
+	async request(name, data) {
+		return new Promise(resolve => {
+			const id = randomToken(12);
+			const msg = {
+				id,
+				kind: 'Request',
+				name,
+				data
+			};
+
+			this.requests[id] = resolve;
+
+			this.ws.send(msg);
 		});
+	}
+
+	requestStream(name, fn) {
+		const id = randomToken(12);
+		const msg = {
+			id,
+			kind: 'RequestStream',
+			name,
+			data
+		};
+
+		this.streams[id] = fn;
+
+		this.ws.send(msg);
 	}
 }

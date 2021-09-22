@@ -21,9 +21,11 @@
 - detect which channel we are in
 
 ## Todo
-make sure no client can connect to `/websocket`
 
-Improve error reporting
+- remove background extension api (to websocket)
+- improve error reporting
+- make the websocket connection local (and secure it against cross origin)
+
 
 ## Responses
 ```

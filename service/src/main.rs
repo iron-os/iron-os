@@ -49,8 +49,7 @@ async fn main() {
 	let ui_bg_task = ui::start(bootloader.clone()).await
 		.expect("ui start failed");
 
-	// ui_bg_task.await.expect("ui task failed");
-
+	// start packages api
 	let packages_bg_task = packages::start(bootloader.clone()).await
 		.expect("packages failed");
 
@@ -60,7 +59,7 @@ async fn main() {
 	// detect what package should be run
 	// and run it
 
-	// now wait until some task fail and restart
+	// now wait until some task fails and restart
 	let (_ui, _packages) = tokio::try_join!(
 		ui_bg_task,
 		packages_bg_task

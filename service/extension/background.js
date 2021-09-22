@@ -1,10 +1,8 @@
 
-import Connection from './ws.js';
-
 function main() {
 	allowIframes();
 	blockRequests();
-	handleConnection();
+	// handleConnection();
 }
 
 // remove disable iframe headers
@@ -99,37 +97,37 @@ chrome.tabs.onZoomChange.addListener(({ newZoomFactor, oldZoomFactor, tabId, zoo
 
 */
 
-function handleConnection() {
-	let port = null;
-	const con = new Connection;
+// function handleConnection() {
+// 	let port = null;
+// 	const con = new Connection;
 
-	// this seems nice
-	con.on(msg => {
-		console.log('bg: received msg from con: ', msg);
-		// todo need to check if we should handle the message
-		// or if we should pass it to the client
-		if (port) {
-			port.postMessage(msg);
-		}
-	});
+// 	// this seems nice
+// 	con.on(msg => {
+// 		console.log('bg: received msg from con: ', msg);
+// 		// todo need to check if we should handle the message
+// 		// or if we should pass it to the client
+// 		if (port) {
+// 			port.postMessage(msg);
+// 		}
+// 	});
 
-	chrome.runtime.onConnect.addListener(p => {
-		port = p;
+// 	chrome.runtime.onConnect.addListener(p => {
+// 		port = p;
 
-		// port.name
-		port.onMessage.addListener(msg => {
-			// port.postMessage
-			console.log('bg: received msg: ', msg);
+// 		// port.name
+// 		port.onMessage.addListener(msg => {
+// 			// port.postMessage
+// 			console.log('bg: received msg: ', msg);
 
-			// todo need to check if we should handle the message
-			// or if we should pass it to the client
-			con.send(msg);
-		});
+// 			// todo need to check if we should handle the message
+// 			// or if we should pass it to the client
+// 			con.send(msg);
+// 		});
 
-		port.onDisconnect.addListener(() => {
-			console.log('port disconnected');
-		});
-	});
-}
+// 		port.onDisconnect.addListener(() => {
+// 			console.log('port disconnected');
+// 		});
+// 	});
+// }
 
 main();
