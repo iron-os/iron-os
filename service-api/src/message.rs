@@ -33,7 +33,11 @@ macro_rules! action {
 }
 
 action!{
-	Empty = 0
+	Empty = 0,
+	SystemInfo = 4,
+	DeviceInfo = 7,
+	OpenPage = 10,
+	SetDisplayState = 13
 }
 
 pub type Message = message::Message<Action, PlainBytes>;
