@@ -49,6 +49,8 @@ const whitelist = [
 	'127.0.0.1:8888',
 	// to test speed in debug view
 	'www.speedtest.net', 'speedtest.net',
+	'livgood.ch', 'fonts.googleapis.com',
+	'fonts.gstatic.com'
 ];
 
 const speedtestBlacklist = [

@@ -18,3 +18,4 @@ serde_json = "1.0"
 file-db = { version = "0.1", features = ["async"], path = "./../file-db" }
 packages = { package = "packages-api", version = "0.1", path = "./../packages-api" }
 rand = "0.8"
+api = { package = "service-api", version = "0.1", path = "./../service-api" }

@@ -729,7 +729,18 @@ dependencies = [
  "rand 0.8.4",
  "serde",
  "serde_json",
+ "service-api",
  "service-bootloader-api",
+ "tokio",
+]
+
+[[package]]
+name = "service-api"
+version = "0.1.0"
+dependencies = [
+ "fire-stream",
+ "serde",
+ "simple-bytes",
  "tokio",
 ]
 

@@ -71,7 +71,7 @@ export default class Connection {
 		});
 	}
 
-	requestStream(name, fn) {
+	requestStream(name, data, fn) {
 		const id = randomToken(12);
 		const msg = {
 			id,

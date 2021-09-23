@@ -205,7 +205,8 @@ impl Sender {
 pub enum Name {
 	VersionInfo,
 	Disks,
-	InstallOn
+	InstallOn,
+	OpenPageStream
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

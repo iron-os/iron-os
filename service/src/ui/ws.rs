@@ -47,11 +47,21 @@ msg_handler!( for Name::InstallOn,
 	}
 );
 
+msg_handler!( for Name::OpenPageStream,
+	async fn open_page_stream<WsData>(_r: String, sender, api) -> Result<()> {
+		loop {
+			let url = api.on_open_page().await;
+			sender.send(url).await?;
+		}
+	}
+);
+
 pub fn build() -> Connection<WsData> {
 	let mut builder = ConnectionBuilder::new();
 	builder.register(version_info);
 	builder.register(disks);
 	builder.register(install_on);
+	builder.register(open_page_stream);
 	builder.build()
 }
 

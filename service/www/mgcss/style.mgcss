@@ -7,6 +7,16 @@ pre
 	background-color: #eee
 	padding: 10px
 
+@full
+	@absolute
+	top: 0
+	left: 0
+	width: 100%
+	height: 100%
+
+main
+	@full
+
 // install page
 #install-page
 	padding: 10px
@@ -20,3 +30,16 @@ pre
 		color: #fff
 		background-color: #fd4141
 		text-decoration: none
+
+#landing-page
+	@full
+
+	+.loading p
+		@absolute
+		bottom: 10px
+		right: 10px
+
+	iframe
+		@full
+		outline: none
+		border: none
