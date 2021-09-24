@@ -4,7 +4,7 @@ use crate::Bootloader;
 use std::{io, env};
 use std::os::unix::fs::PermissionsExt;
 
-use tokio::fs::OpenOptions;
+use tokio::fs::File;
 use tokio::io::{AsyncWriteExt};
 
 use file_db::FileDb;
@@ -44,12 +44,7 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 		.replace("EXTENSION", &extension_path);
 
 	// create start script
-	let mut script = OpenOptions::new()
-		.create(true)
-		.write(true)
-		.truncate(true)
-		.open(format!("{}/start.sh", CHROME_PACKAGE))
-		.await?;
+	let mut script = File::create(format!("{}/start.sh", CHROME_PACKAGE)).await?;
 	script.write_all(cmd.as_bytes()).await?;
 	script.flush().await?;
 	let mut permission = script.metadata().await?.permissions();

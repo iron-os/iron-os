@@ -5,6 +5,7 @@ mod bootloader;
 mod packages;
 mod api;
 mod util;
+mod subprocess;
 
 use context::Context;
 use bootloader::Bootloader;
@@ -64,6 +65,8 @@ async fn main() {
 
 	// detect what package should be run
 	// and run it
+	subprocess::start(bootloader).await
+		.expect("failed to start subprocess");
 
 	// now wait until some task fails and restart
 	let (_ui, _packages, _api) = tokio::try_join!(

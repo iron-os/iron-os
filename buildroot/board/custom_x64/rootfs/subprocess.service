@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Sub Process
+Requires=chromium.service
+
+[Service]
+ExecStart=/data/packages/service/start-subprocess.sh
+User=user
+Restart=always
+RestartSec=2

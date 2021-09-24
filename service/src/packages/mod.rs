@@ -373,6 +373,23 @@ impl Packages {
 		Ok(Self { cfg, list })
 	}
 
+	pub fn on_run_binary(&self) -> Option<(String, String)> {
+		let on_run = &self.cfg.on_run;
+		let package = self.list.iter().find(|p| &p.package().name == on_run)?;
+		let binary = package.package().binary.as_ref()?;
+
+		let dir = format!(
+			"{}/{}/{}",
+			PACKAGES_DIR,
+			on_run,
+			package.current()
+		);
+
+		let bin = format!("{}/{}", dir, binary);
+
+		Some((dir, bin))
+	}
+
 }
 
 async fn extract(path: &str, to: &str) -> io::Result<()> {

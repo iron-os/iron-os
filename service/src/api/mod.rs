@@ -12,11 +12,16 @@ use api::error::{Result as ApiResult};
 
 use tokio::task::JoinHandle;
 
+use tokio::fs;
+
 
 pub async fn start(
 	client: Bootloader,
 	ui_api: ApiSender
 ) -> io::Result<JoinHandle<()>> {
+
+	// since there is only one instance of service running this is fine
+	let _ = fs::remove_file("/data/service-api").await;
 
 	let mut server = Server::new("/data/service-api").await
 		.map_err(io_other)?;

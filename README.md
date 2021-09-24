@@ -93,3 +93,4 @@ package.fdb
 
 ## Todo
 probably update psplash https://git.yoctoproject.org/cgit/cgit.cgi/psplash/
+- reload on no internet (chrome)
