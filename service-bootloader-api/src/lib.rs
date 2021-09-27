@@ -40,9 +40,15 @@ macro_rules! request_handler {
 		impl $crate::RequestHandler for $name {
 			fn kind() -> $crate::Kind { <$req_ty as $crate::Request>::kind() }
 			fn handle(&self, line: $crate::Line) -> std::io::Result<String> {
-				let req: $req_ty = $crate::deserialize(line.data())
-					.map_err($crate::io_other)?;
 				$crate::assert_ty!(std::io::Result<<$req_ty as $crate::Request>::Response>, $ret_ty);
+				let req = $crate::deserialize(line.data());
+				let req: $req_ty = match req {
+					Ok(r) => r,
+					Err(e) => {
+						eprintln!("received {:?}", line);
+						return Err($crate::io_other(e))
+					}
+				};
 				fn inner($req: $req_ty) -> $ret_ty {
 					$block
 				}

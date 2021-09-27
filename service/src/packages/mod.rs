@@ -342,8 +342,8 @@ pub async fn update_image(
 
 
 pub struct Packages {
-	cfg: PackagesCfg,
-	list: Vec<PackageCfg>
+	pub cfg: PackagesCfg,
+	pub list: Vec<PackageCfg>
 }
 
 impl Packages {
