@@ -22,12 +22,16 @@ pub async fn start(
 	receiver: ApiReceiver
 ) -> io::Result<JoinHandle<()>> {
 
+	// let's first start the server and then chromium
+	// so when chromes loads the page already exists
+	let server = start_server(8888, client.clone(), receiver);
+
 	// only start chromium if we have a context
 	if context::get().is_release() {
 		chromium::start("http://127.0.0.1:8888", &client).await?;
 	}
 
-	Ok(start_server(8888, client, receiver))
+	Ok(server)
 }
 
 
@@ -144,11 +148,6 @@ pub fn start_server(
 	server.add_route(FireHtml::new());
 	server.add_route(Mgcss::new());
 	server.add_raw_route(ws::MainWs);
-
-	// tokio::spawn(async move {
-	// 	ws::handle_ws_messages(con_listener).await
-	// 		.expect("todo should this be retried");
-	// });
 
 	tokio::spawn(async move {
 		server.light().await

@@ -26,7 +26,7 @@ fn main() {
 	}
 
 	// let weston startup
-	thread::sleep(Duration::from_millis(200));
+	thread::sleep(Duration::from_millis(400));
 
 	// now we need to get the service binary
 	loop {

@@ -34,6 +34,7 @@ export default class Landing {
 		con.requestStream('OpenPageStream', '', url => {
 			if (url === '')
 				return;
+			// todo maybe check if that page really could be opened
 			this.openPage(url);
 		});
 

@@ -187,6 +187,7 @@ fn sender(
 	kiosk.set_state(State::On.to_raw());
 
 	loop {
+		eprintln!("Display: waiting on message");
 		runtime.block_on(rx.changed()).expect("channel closed");
 		let msg = rx.borrow().clone();
 		eprintln!("Display received Message: {:?}", msg);

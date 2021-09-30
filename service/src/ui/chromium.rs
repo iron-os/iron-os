@@ -6,6 +6,7 @@ use std::os::unix::fs::PermissionsExt;
 
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt};
+use tokio::time::{sleep, Duration};
 
 use file_db::FileDb;
 
@@ -60,6 +61,9 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 
 	// now restart service
 	client.request(&SystemdRestart { name: "chromium".into() }).await?;
+
+	// wait until chromium is loaded (does probably not take that long)
+	sleep(Duration::from_millis(400)).await;
 
 	Ok(())
 }

@@ -37,7 +37,9 @@ action!{
 	SystemInfo = 4,
 	DeviceInfo = 7,
 	OpenPage = 10,
-	SetDisplayState = 13
+	SetDisplayState = 13,
+	Disks = 16,
+	InstallOn = 17
 }
 
 pub type Message = message::Message<Action, PlainBytes>;
