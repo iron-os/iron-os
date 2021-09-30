@@ -6,6 +6,7 @@ mod packages;
 mod api;
 mod util;
 mod subprocess;
+mod display;
 
 use context::Context;
 use bootloader::Bootloader;
@@ -29,6 +30,8 @@ async fn main() {
 	let bootloader = Bootloader::new();
 
 	let (ui_api_tx, ui_api_rx) = ui::api_new();
+
+	let display = display::Display::new();
 
 	// if we are in debug only start the ui
 	if context::get().is_debug() {
@@ -60,8 +63,14 @@ async fn main() {
 		.expect("packages failed");
 
 	// start service api
-	let service_bg_task = crate::api::start(bootloader.clone(), ui_api_tx).await
-		.expect("service api failed");
+	let service_bg_task = crate::api::start(
+		bootloader.clone(),
+		ui_api_tx,
+		display.clone()
+	).await.expect("service api failed");
+
+	// start display api
+	let display_bg_task = display::start(display).await;
 
 	// detect what package should be run
 	// and run it
@@ -69,10 +78,11 @@ async fn main() {
 		.expect("failed to start subprocess");
 
 	// now wait until some task fails and restart
-	let (_ui, _packages, _api) = tokio::try_join!(
+	let (_ui, _packages, _api, _display) = tokio::try_join!(
 		ui_bg_task,
 		packages_bg_task,
-		service_bg_task
+		service_bg_task,
+		display_bg_task
 	).expect("some task failed");
 
 

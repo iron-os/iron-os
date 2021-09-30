@@ -3,11 +3,15 @@ use crate::Bootloader;
 use crate::ui::{ApiSender};
 use crate::util::io_other;
 use crate::packages::Packages;
+use crate::display::{Display, State};
 
 use std::io;
 
 use api::server::Server;
-use api::requests::{OpenPageReq, OpenPage, SystemInfoReq, SystemInfo, Package};
+use api::requests::{
+	OpenPageReq, OpenPage, SystemInfoReq, SystemInfo, Package,
+	SetDisplayStateReq, SetDisplayState
+};
 use api::request_handler;
 use api::error::{Result as ApiResult, Error as ApiError};
 
@@ -18,7 +22,8 @@ use bootloader_api::VersionInfoReq;
 
 pub async fn start(
 	client: Bootloader,
-	ui_api: ApiSender
+	ui_api: ApiSender,
+	display: Display
 ) -> io::Result<JoinHandle<()>> {
 
 	// since there is only one instance of service running this is fine
@@ -28,7 +33,10 @@ pub async fn start(
 		.map_err(io_other)?;
 	server.register_data(ui_api);
 	server.register_data(client);
+	server.register_data(display);
 	server.register_request(open_page);
+	server.register_request(system_info);
+	server.register_request(set_display_state);
 
 	Ok(tokio::spawn(async move {
 		server.run().await
@@ -82,5 +90,30 @@ request_handler!(
 			installed: version_info.installed,
 			packages
 		})
+	}
+);
+
+/*
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SetDisplayStateReq {
+	// 0-1
+	pub brightness: f32,
+	pub on: bool
+}
+*/
+request_handler!(
+	async fn set_display_state(
+		req: SetDisplayStateReq,
+		display: Display
+	) -> ApiResult<SetDisplayState> {
+		let SetDisplayStateReq { brightness: _, on } = req;
+		display.set_state(match on {
+			true => State::On,
+			false => State::Off
+		})
+			.map(|_| SetDisplayState)
+			.ok_or_else(|| {
+				ApiError::io_other("could not set display state")
+			})
 	}
 );

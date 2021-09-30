@@ -32,6 +32,15 @@ impl Command {
 		self
 	}
 
+	pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Self
+	where
+		K: AsRef<OsStr>,
+		V: AsRef<OsStr>
+	{
+		self.0.env(key, val);
+		self
+	}
+
 	/// executes this command as a non root user
 	pub fn as_user(&mut self) -> &mut Self {
 		self.0.uid(14);

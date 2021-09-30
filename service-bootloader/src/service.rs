@@ -159,6 +159,8 @@ pub fn start() -> io::Result<()> {
 	let mut child = Command::new(bin_path)
 		.current_dir(curr_path)
 		.as_user()
+		.env("XDG_RUNTIME_DIR", "/run/user/14")
+		.env("WAYLAND_DISPLAY", "wayland-0")
 		.stdin_piped()
 		.stdout_piped()
 		.spawn()?;

@@ -19,3 +19,9 @@ file-db = { version = "0.1", features = ["async"], path = "./../file-db" }
 packages = { package = "packages-api", version = "0.1", path = "./../packages-api" }
 rand = "0.8"
 api = { package = "service-api", version = "0.1", path = "./../service-api" }
+# display
+wayland-client = "0.29"
+wayland-commons = "0.29"
+
+[build-dependencies]
+wayland-scanner = "0.29"

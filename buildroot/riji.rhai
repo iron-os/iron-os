@@ -47,6 +47,10 @@ fn build() {
 	// copy .config
 	fs::copy("./.config", "./buildroot/");
 
+	// patch weston
+	fs::delete(BUILDROOT + "/package/weston");
+	fs::copy("./board/custom_x64/package/weston", BUILDROOT + "/package/");
+
 	// build service-bootloader
 	let cargo = cmd([
 		"cargo", "build", "--release"
