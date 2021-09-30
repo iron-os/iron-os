@@ -5,7 +5,7 @@
 ################################################################################
 
 WESTON_VERSION = 10.0.0-alpha.1
-WESTON_SITE = https://gitlab.freedesktop.org/soerenmeier/weston/uploads/7e3e1e000ca44144b6f8eaa153f78a92
+WESTON_SITE = https://gitlab.freedesktop.org/soerenmeier/weston/uploads/8a2c9141f3dd698346166162e4b35550
 WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
 WESTON_LICENSE = MIT
 WESTON_LICENSE_FILES = COPYING
