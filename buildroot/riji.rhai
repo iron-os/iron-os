@@ -36,6 +36,7 @@ fn linux_config() {
 	make.execute();
 
 	// output in output/build/linux-<>/.config
+	// make linux-savedefconfig
 }
 
 fn build() {
