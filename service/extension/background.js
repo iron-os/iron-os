@@ -47,6 +47,8 @@ only allow whitelisted urls
 const whitelist = [
 	// main 
 	'127.0.0.1:8888',
+	// client
+	'127.0.0.1:8080',
 	// to test speed in debug view
 	'www.speedtest.net', 'speedtest.net',
 	'livgood.ch', 'fonts.googleapis.com',
