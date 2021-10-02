@@ -1,4 +1,4 @@
 name = "image"
 # buildroot.mine
-version = "2021.02.4-debug.7"
+version = "2021.02.4-alpha.1"
 tar-file = "./image.tar.gz"

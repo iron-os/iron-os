@@ -43,14 +43,7 @@ fn build() {
 	fs::create_dir(IMAGES);
 
 	// patch
-	// copy board/custom_x64
-	fs::copy("./board/custom_x64", "./buildroot/board/");
-	// copy .config
-	fs::copy("./.config", "./buildroot/");
-
-	// patch weston
-	fs::delete(BUILDROOT + "/package/weston");
-	fs::copy("./board/custom_x64/package/weston", BUILDROOT + "/package/");
+	patch_internal(BUILDROOT);
 
 	// build service-bootloader
 	let cargo = cmd([
@@ -111,6 +104,23 @@ fn build() {
 		vbox.execute();
 		// the reverse is VBoxManage clonemedium --format RAW debian.vdi debian.img
 	}
+}
+
+fn patch() {
+	patch_internal(BUILDROOT);
+}
+
+fn patch_internal(buildroot) {
+
+	// patch
+	// copy board/custom_x64
+	fs::copy("./board/custom_x64", "./buildroot/board/");
+	// copy .config
+	fs::copy("./.config", "./buildroot/");
+
+	// patch weston
+	fs::delete(buildroot + "/package/weston");
+	fs::copy("./board/custom_x64/package/weston", buildroot + "/package/");
 }
 
 // creates the patch

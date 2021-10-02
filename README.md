@@ -94,3 +94,5 @@ package.fdb
 ## Todo
 probably update psplash https://git.yoctoproject.org/cgit/cgit.cgi/psplash/
 - reload on no internet (chrome) (or extension)
+- pulseaudio in system mode
+- unable to load firmware rtl_nic/rtl8168g-2.fw

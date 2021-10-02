@@ -85,7 +85,7 @@ pub fn install_on(name: String) -> io::Result<()> {
 			install_to_new_disk(&mut active, &mut disk)?;
 			Ok(())
 		},
-		NewDisk::Active => todo!("not installed")
+		NewDisk::Active => todo!("not allowed")
 	}
 }
 

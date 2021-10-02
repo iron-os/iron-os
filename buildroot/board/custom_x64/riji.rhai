@@ -31,6 +31,9 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 
 	fs::copy(binaries_dir + "/service-bootloader", target_dir + "/usr/bin/");
 
+	// copy network
+	fs::copy("./rootfs/network/gsm-connection.mconnection", target_dir + "/etc/NetworkManager/system-connections/");
+
 	// create empty data folder (needed for fresh build since else device_table.mk failes)
 	fs::create_dir(target_dir + "/data");
 
@@ -58,6 +61,15 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 		fs::append(logind, [
 			"NAutoVTs=0",
 			"ReserveVT=0"
+		]);
+	}
+
+	// patch journald
+	let journald = target_dir + "/etc/systemd/journald.conf";
+	if fs::contains(journald, "SystemMaxUse=40M") == false {
+		fs::append(journald, [
+			"SystemMaxUse=40M",
+			"Compress=yes"
 		]);
 	}
 
@@ -89,6 +101,8 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	chown("0:0", target_dir + "/data/etc");
 	chown("14:15", target_dir + "/data/packages");
 
+	chmod("700", target_dir + "/etc/NetworkManager/system-connections");
+
 	// execute gen_image
 	fs::delete(binaries_dir + "/data.ext2");
 	let mkfs = cmd([
@@ -99,10 +113,15 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 		"-m", "5",
 		"-L", "data",
 		binaries_dir + "/data.ext2",
-		"350M"
+		"400M"
 	]);
 	mkfs.dir(binaries_dir);
 	mkfs.execute();
+
+	// check that lvm2-monitor.service does not exist
+	if fs::is_file(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service") == true {
+		panic("lvm2 exists");
+	}
 
 	// cleanup
 	fs::delete(target_dir + "/data");
