@@ -1,0 +1,12 @@
+diff -Naur a/grub-core/normal/menu.c b/grub-core/normal/menu.c
+--- a/grub-core/normal/menu.c	2021-10-01 23:25:39.965419388 +0200
++++ b/grub-core/normal/menu.c	2021-10-01 23:25:23.618211318 +0200
+@@ -342,7 +342,8 @@
+ {
+   int fallback_entry;
+ 
+-  callback->notify_booting (entry, callback_data);
++  // remove booting text
++  // callback->notify_booting (entry, callback_data);
+ 
+   grub_menu_execute_entry (entry, 1);
