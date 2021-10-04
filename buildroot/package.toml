@@ -1,4 +1,4 @@
 name = "image"
-# buildroot.mine
-version = "2021.02.5-alpha.1"
+# release-year.release-month.patch
+version = "2021.10.1"
 tar-file = "./image.tar.gz"
