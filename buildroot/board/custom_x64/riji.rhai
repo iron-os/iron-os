@@ -40,20 +40,24 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	// create boot dir
 	fs::create_dir(target_dir + "/boot");
 
-	// make open ssh work without rw
-	let sshd_keygen = regex("ExecStartPre=.*");
-	sshd_keygen.replace_file(
-		target_dir + "/usr/lib/systemd/system/sshd.service",
-		"ExecStartPre=/usr/bin/ssh-keygen -A -f /data"
-	);
+	if fs::is_dir(target_dir + "/etc/ssh") == true {
 
-	let sshd_config = target_dir + "/etc/ssh/sshd_config";
-	if fs::contains(sshd_config, "/data/etc") == false {
-		fs::append(sshd_config, [
-			"HostKey /data/etc/ssh/ssh_host_rsa_key",
-			"HostKey /data/etc/ssh/ssh_host_ecdsa_key",
-			"HostKey /data/etc/ssh/ssh_host_ed25519_key"
-		]);
+		// make open ssh work without rw
+		let sshd_keygen = regex("ExecStartPre=.*");
+		sshd_keygen.replace_file(
+			target_dir + "/usr/lib/systemd/system/sshd.service",
+			"ExecStartPre=/usr/bin/ssh-keygen -A -f /data"
+		);
+
+		let sshd_config = target_dir + "/etc/ssh/sshd_config";
+		if fs::contains(sshd_config, "/data/etc") == false {
+			fs::append(sshd_config, [
+				"HostKey /data/etc/ssh/ssh_host_rsa_key",
+				"HostKey /data/etc/ssh/ssh_host_ecdsa_key",
+				"HostKey /data/etc/ssh/ssh_host_ed25519_key"
+			]);
+		}
+
 	}
 
 	let logind = target_dir + "/etc/systemd/logind.conf";

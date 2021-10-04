@@ -22,27 +22,52 @@ fn download() {
 
 }
 
-fn config() {
-	//print("call with build release or build debug");
-
-	let make = cmd(["make", "menuconfig"]);
-	make.dir(BUILDROOT);
-	make.execute();
-}
-
-fn linux_config() {
-	let make = cmd(["make", "linux-menuconfig"]);
-	make.dir(BUILDROOT);
-	make.execute();
-
-	// output in output/build/linux-<>/.config
-	// make linux-savedefconfig
-}
-
 fn validate_channel(channel) {
 	if channel != "Debug" && channel != "Release" {
 		panic!("channel not recognized only Debug | Release");
 	}
+}
+
+fn patch() {
+	patch_internal(BUILDROOT, "Debug");
+	patch_internal(BUILDROOT, "Release");
+}
+
+fn patch(channel) {
+	validate_channel(channel);
+	patch_internal(BUILDROOT, channel);
+}
+
+fn patch_internal(buildroot, channel) {
+	let br_out_dir = new_br_out_dir(buildroot, channel);
+	print("patching: " + br_out_dir);
+
+	fs::create_dir(br_out_dir);
+	let full_br_out_dir = fs::full_path(br_out_dir);
+
+	// patch
+	// copy board/custom_x64
+	fs::copy("./board/custom_x64", buildroot + "/board/");
+	// copy .config
+	fs::copy("./board/custom_x64/buildroot.config", br_out_dir + "/defconfig");
+
+	if channel == "Debug" {
+		// append
+		let defconfig = fs::read("./board/custom_x64/debug-buildroot.config");
+		fs::append(br_out_dir + "/defconfig", defconfig);
+	}
+
+	// patch weston
+	fs::delete(buildroot + "/package/weston");
+	fs::copy("./board/custom_x64/package/weston", buildroot + "/package/");
+
+	// create .config file
+	let make_config = cmd([
+		"make", "O=" + full_br_out_dir, "defconfig", "BR2_DEFCONFIG=" + full_br_out_dir + "/defconfig"
+	]);
+	make_config.dir(buildroot);
+	print("build config");
+	make_config.execute();
 }
 
 fn build(channel) {
@@ -112,14 +137,6 @@ fn build_internal(channel, buildroot, pack_pub) {
 	fs::delete(images + "/packages");
 	fs::move("./packages", images + "/packages");
 
-	// first create .config file
-	let make_config = cmd([
-		"make", "O=" + full_br_out_dir, "defconfig", "BR2_DEFCONFIG=" + full_br_out_dir + "/defconfig"
-	]);
-	make_config.dir(buildroot);
-	print("build config");
-	make_config.execute();
-
 	// build buildroot
 	let make = cmd("make");
 	make.dir(br_out_dir);
@@ -145,42 +162,78 @@ fn build_internal(channel, buildroot, pack_pub) {
 	}
 }
 
-fn patch() {
-	patch_internal(BUILDROOT, BUILDROOT + "/output/Debug");
-	patch_internal(BUILDROOT, BUILDROOT + "/output/Release");
+fn build_service_bootloader() {
+	// RUSTC_TARGET
+	// x86_64-unknown-linux-gnu
+
+	// first we need to build
+
+	// build service-bootloader
+	let cargo = cmd([
+		"cargo", "build", "--release"
+	]);
+	cargo.dir("./../service-bootloader");
+	print("build service bootloader");
+	cargo.execute();
+
 }
 
-fn patch_internal(buildroot, br_out_dir) {
-	print("patching: " + br_out_dir);
+fn config() {
+	print("use config <channel>");
+}
 
-	fs::create_dir(br_out_dir);
+fn config(channel) {
+	validate_channel(channel);
+	config_internal(BUILDROOT, channel);
+}
 
-	// patch
-	// copy board/custom_x64
-	fs::copy("./board/custom_x64", buildroot + "/board/");
-	// copy .config
-	fs::copy("./board/custom_x64/buildroot.config", br_out_dir + "/defconfig");
+fn config_internal(buildroot, channel) {
+	patch_internal(buildroot, channel);
+	let br_out_dir = new_br_out_dir(buildroot, channel);
 
-	// patch weston
-	fs::delete(buildroot + "/package/weston");
-	fs::copy("./board/custom_x64/package/weston", buildroot + "/package/");
+	let make = cmd(["make", "menuconfig"]);
+	make.dir(br_out_dir);
+	make.execute();
+}
+
+// TODO
+fn linux_config() {
+	let make = cmd(["make", "linux-menuconfig"]);
+	make.dir(BUILDROOT);
+	make.execute();
+
+	// output in output/build/linux-<>/.config
+	// make linux-savedefconfig
 }
 
 // creates the patch
 fn save() {
-	print("save");
+	print("use save <channel>");
+}
+
+fn save(channel) {
+	validate_channel(channel);
+	save_internal(BUILDROOT, channel);
+}
+
+fn save_internal(buildroot, channel) {
+	let br_out_dir = new_br_out_dir(buildroot, channel);
+	print("save to " + br_out_dir + "/defconfig");
+
+	let make = cmd(["make", "savedefconfig"]);
+	make.dir(br_out_dir);
+	make.execute();
 
 	// copy board/custom_x64
 	//fs::copy("./buildroot/board/custom_x64", "./board/");
 	// copy .config
-	fs::copy("./buildroot/output/Debug/.config", "./");
+	// fs::copy("./buildroot/output/Debug/.config", "./");
 	//fs::copy("./buildroot/output/build/linux-5.10.43/.config", "./board/linux.config");
 }
 
 // removes all unchached files in main
 fn clean() {
-	clean_internal(BUILDROOT, "Debug");
-	clean_internal(BUILDROOT, "Release");
+	print("use clean <channel>");
 }
 
 fn clean(channel) {
@@ -220,6 +273,10 @@ find output/ -name ".stamp_target_installed" |xargs rm -rf
 	]);
 	del_stamp_installed.execute();
 
+}
+
+fn rebuild() {
+	print("use rebuild <channel> <package>");
 }
 
 fn rebuild(channel, pack) {
