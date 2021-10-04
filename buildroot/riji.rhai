@@ -65,6 +65,7 @@ fn build_internal(channel, buildroot, pack_pub) {
 	print("building " + channel);
 
 	let br_out_dir = new_br_out_dir(buildroot, channel);
+	let full_br_out_dir = fs::full_path(br_out_dir);
 	let images = br_out_dir + "/images";
 	let out_dir = "./output/" + channel;
 
@@ -111,7 +112,7 @@ fn build_internal(channel, buildroot, pack_pub) {
 
 	// first create .config file
 	let make_config = cmd([
-		"make", "O=" + fs::full_path(br_out_dir), "defconfig" 
+		"make", "O=" + full_br_out_dir, "defconfig", "BR2_DEFCONFIG=" + full_br_out_dir + "/defconfig"
 	]);
 	make_config.dir(buildroot);
 	print("build config");
