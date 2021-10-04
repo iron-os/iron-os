@@ -1,8 +1,8 @@
 
 const BUILDROOT = "./buildroot";
-const STABLE = "2021.02.4";
+const STABLE = "2021.02.5";
 const PACK_PUB = "./../packages-publisher/target/release/packages-publisher";
-const IMAGES = "./buildroot/output/images";
+// const IMAGES = "./buildroot/output/images";
 
 fn help() {
 	print([
@@ -39,11 +39,39 @@ fn linux_config() {
 	// make linux-savedefconfig
 }
 
+fn validate_channel(channel) {
+	if channel != "Debug" && channel != "Release" {
+		panic!("channel not recognized only Debug | Release");
+	}
+}
+
+fn build(channel) {
+	validate_channel(channel);
+
+	build_internal(channel, BUILDROOT, PACK_PUB);
+}
+
 fn build() {
-	fs::create_dir(IMAGES);
+	build_internal("Debug", BUILDROOT, PACK_PUB);
+}
+
+// channel: Debug|Release
+fn new_br_out_dir(buildroot, channel) {
+	return buildroot + "/output/" + channel;
+}
+
+// channel: Debug|Release
+fn build_internal(channel, buildroot, pack_pub) {
+	print("building " + channel);
+
+	let br_out_dir = new_br_out_dir(buildroot, channel);
+	let images = br_out_dir + "/images";
+	let out_dir = "./output/" + channel;
+
+	fs::create_dir(images);
 
 	// patch
-	patch_internal(BUILDROOT);
+	patch_internal(buildroot, br_out_dir);
 
 	// build service-bootloader
 	let cargo = cmd([
@@ -56,10 +84,10 @@ fn build() {
 	// copy service-bootloader
 	fs::copy(
 		"./../service-bootloader/target/release/service_bootloader",
-		IMAGES + "/service-bootloader"
+		images + "/service-bootloader"
 	);
 
-	fs::copy("./package.toml", IMAGES + "/package.toml");
+	fs::copy("./package.toml", images + "/package.toml");
 
 	// build packages-publisher
 	let cargo = cmd([
@@ -69,37 +97,47 @@ fn build() {
 	print("build packages-publisher");
 	cargo.execute();
 
-	fs::copy(PACK_PUB, IMAGES + "/publisher");
+	fs::copy(pack_pub, images + "/publisher");
 
 	// download packages
 	let publish = cmd([
-		PACK_PUB, "download"
+		pack_pub, "download"
 	]);
 	print("download packages");
 	publish.execute();
 
-	fs::delete(IMAGES + "/packages");
-	fs::move("./packages", IMAGES + "/packages");
+	fs::delete(images + "/packages");
+	fs::move("./packages", images + "/packages");
+
+	// first create .config file
+	let make_config = cmd([
+		"make", "O=" + fs::full_path(br_out_dir), "defconfig" 
+	]);
+	make_config.dir(buildroot);
+	print("build config");
+	make_config.execute();
 
 	// build buildroot
-	let make = cmd("make");
-	make.dir(BUILDROOT);
+	let make = cmd([
+		"make", "O=" + fs::full_path(br_out_dir)
+	]);
+	make.dir(buildroot);
 	print("build buildroot");
 	make.execute();
 
 	// create output
-	fs::create_dir("./output");
+	fs::create_dir(out_dir);
 
 	// now copy the image
-	fs::copy(IMAGES + "/disk.img", "./output");
-	fs::copy(IMAGES + "/image.tar.gz", "./output");
+	fs::copy(images + "/disk.img", out_dir);
+	fs::copy(images + "/image.tar.gz", out_dir);
 
 	// create vdi file if vbox is installed
 	if fs::is_prog("VBoxManage") {
-		fs::delete("./output/disk.vdi");
+		fs::delete(out_dir + "/disk.vdi");
 		let vbox = cmd([
 			"VBoxManage", "convertfromraw", "--format", "VDI",
-			"./output/disk.img", "./output/disk.vdi"
+			out_dir + "/disk.img", out_dir + "/disk.vdi"
 		]);
 		vbox.execute();
 		// the reverse is VBoxManage clonemedium --format RAW debian.vdi debian.img
@@ -107,16 +145,20 @@ fn build() {
 }
 
 fn patch() {
-	patch_internal(BUILDROOT);
+	patch_internal(BUILDROOT, BUILDROOT + "/output/Debug");
+	patch_internal(BUILDROOT, BUILDROOT + "/output/Release");
 }
 
-fn patch_internal(buildroot) {
+fn patch_internal(buildroot, br_out_dir) {
+	print("patching: " + br_out_dir);
+
+	fs::create_dir(br_out_dir);
 
 	// patch
 	// copy board/custom_x64
-	fs::copy("./board/custom_x64", "./buildroot/board/");
+	fs::copy("./board/custom_x64", buildroot + "/board/");
 	// copy .config
-	fs::copy("./.config", "./buildroot/");
+	fs::copy("./board/custom_x64/buildroot.config", br_out_dir + "/defconfig");
 
 	// patch weston
 	fs::delete(buildroot + "/package/weston");
@@ -130,18 +172,30 @@ fn save() {
 	// copy board/custom_x64
 	//fs::copy("./buildroot/board/custom_x64", "./board/");
 	// copy .config
-	fs::copy("./buildroot/.config", "./");
+	fs::copy("./buildroot/output/Debug/.config", "./");
 	//fs::copy("./buildroot/output/build/linux-5.10.43/.config", "./board/linux.config");
 }
 
 // removes all unchached files in main
 fn clean() {
+	clean_internal(BUILDROOT, "Debug");
+	clean_internal(BUILDROOT, "Release");
+}
 
-	let make = cmd(["make", "clean"]);
-	make.dir(BUILDROOT);
+fn clean(channel) {
+	validate_channel(channel);
+	clean_internal(BUILDROOT, channel);
+}
+
+fn clean_internal(buildroot, channel) {
+	let br_out_dir = new_br_out_dir(buildroot, channel);
+	let make = cmd(["make", "O=" + br_out_dir,  "clean"]);
+	make.dir(buildroot);
 	make.execute();
 }
 
+
+/// todo this does not seem to work
 fn clean_target() {
 	/*
 	rm -rf output/target

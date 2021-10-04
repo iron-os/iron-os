@@ -15,6 +15,10 @@ use crypto::signature::Keypair;
 
 
 
+/*
+Todo: use clap
+*/
+
 
 fn help() {
 	println!("unkown command");

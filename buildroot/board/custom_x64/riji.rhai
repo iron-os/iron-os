@@ -119,9 +119,11 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	mkfs.execute();
 
 	// check that lvm2-monitor.service does not exist
-	if fs::is_file(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service") == true {
-		panic("lvm2 exists");
-	}
+	// if fs::is_file(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service") == true {
+	// 	panic("lvm2 exists");
+	// }
+	fs::delete(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service");
+	// TODO either remove lvm2 or fix it
 
 	// cleanup
 	fs::delete(target_dir + "/data");
