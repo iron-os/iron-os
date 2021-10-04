@@ -65,6 +65,8 @@ fn build_internal(channel, buildroot, pack_pub) {
 	print("building " + channel);
 
 	let br_out_dir = new_br_out_dir(buildroot, channel);
+	fs::create_dir(br_out_dir);
+
 	let full_br_out_dir = fs::full_path(br_out_dir);
 	let images = br_out_dir + "/images";
 	let out_dir = "./output/" + channel;
@@ -119,10 +121,8 @@ fn build_internal(channel, buildroot, pack_pub) {
 	make_config.execute();
 
 	// build buildroot
-	let make = cmd([
-		"make", "O=" + fs::full_path(br_out_dir)
-	]);
-	make.dir(buildroot);
+	let make = cmd("make");
+	make.dir(br_out_dir);
 	print("build buildroot");
 	make.execute();
 
@@ -190,8 +190,8 @@ fn clean(channel) {
 
 fn clean_internal(buildroot, channel) {
 	let br_out_dir = new_br_out_dir(buildroot, channel);
-	let make = cmd(["make", "O=" + br_out_dir,  "clean"]);
-	make.dir(buildroot);
+	let make = cmd(["make",  "clean"]);
+	make.dir(br_out_dir);
 	make.execute();
 }
 
@@ -222,9 +222,11 @@ find output/ -name ".stamp_target_installed" |xargs rm -rf
 
 }
 
-fn rebuild(pack) {
+fn rebuild(channel, pack) {
+	validate_channel(channel);
 	print("rebuilding package: " + pack);
+	let br_out_dir = new_br_out_dir(BUILDROOT, channel);
 	let make = cmd(["make", pack + "-dirclean", pack + "-rebuild"]);
-	make.dir(BUILDROOT);
+	make.dir(br_out_dir);
 	make.execute();
 }
