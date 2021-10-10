@@ -1,6 +1,6 @@
 
 const BUILDROOT = "./buildroot";
-const STABLE = "2021.02.5";
+const STABLE = "2021.08";
 const PACK_PUB = "./../packages-publisher/target/release/packages-publisher";
 // const IMAGES = "./buildroot/output/images";
 
@@ -17,7 +17,7 @@ fn help() {
 
 fn download() {
 	// download buildroot
-	let buildroot = git_clone("https://git.busybox.net/buildroot", BUILDROOT);
+	let buildroot = git_clone("git://git.buildroot.net/buildroot", BUILDROOT);
 	buildroot.checkout_tag(STABLE);
 
 }
@@ -90,6 +90,7 @@ fn build_internal(channel, buildroot, pack_pub) {
 	print("building " + channel);
 
 	let br_out_dir = new_br_out_dir(buildroot, channel);
+	print("br_out_dir: " + br_out_dir);
 	fs::create_dir(br_out_dir);
 
 	let full_br_out_dir = fs::full_path(br_out_dir);
@@ -99,7 +100,7 @@ fn build_internal(channel, buildroot, pack_pub) {
 	fs::create_dir(images);
 
 	// patch
-	patch_internal(buildroot, br_out_dir);
+	patch_internal(buildroot, channel);
 
 	// build service-bootloader
 	let cargo = cmd([
