@@ -1,35 +1,119 @@
 
 use crate::error::{Error, Result};
 
+use std::result::Result as StdResult;
 use std::collections::HashMap;
+use std::borrow::Cow;
 
 use tokio::fs;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use packages::packages::{Package, Channel};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::de::{Error as SerdeError, IntoDeserializer};
+use packages::packages::{Package, Channel, TargetArch, BoardArch};
 use file_db::FileDb;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct IndexKey {
+	channel: Channel,
+	arch: TargetArch
+}
+
+impl Serialize for IndexKey {
+	fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
+	where S: Serializer {
+		let s = format!("{}-{}", self.channel, self.arch);
+		serializer.serialize_str(&s)
+	}
+}
+
+impl<'de> Deserialize<'de> for IndexKey {
+	fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+	where D: Deserializer<'de> {
+		let s: Cow<'_, str> = Deserialize::deserialize(deserializer)?;
+		let s = s.as_ref();
+		let (channel, arch) = s.split_once('-')
+			.ok_or_else(|| D::Error::custom("expected <channel>-<arch>"))?;
+		let channel = Channel::deserialize(channel.into_deserializer())?;
+		let arch = TargetArch::deserialize(arch.into_deserializer())?;
+
+		Ok(Self { channel, arch })
+	}
+}
+
+type IndexesV2 = HashMap<IndexKey, PackagesIndex>;
+
+fn default_indexes_v2() -> IndexesV2 {
+	IndexesV2::new()
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesDbFile {
-	indexes: HashMap<Channel, PackagesIndex>
+	// this index is threated as if everyone has TargetArch::Amd64
+	indexes: HashMap<Channel, PackagesIndex>,
+	// todo migrate after all packages where updated at least once
+	#[serde(default = "default_indexes_v2")]
+	indexes_v2: IndexesV2
 }
 
 impl PackagesDbFile {
 	fn new() -> Self {
 		Self {
-			indexes: HashMap::new()
+			indexes: HashMap::new(),
+			indexes_v2: IndexesV2::new()
 		}
 	}
 
-	fn get(&self, channel: &Channel) -> Option<&PackagesIndex> {
+	fn get(
+		&self,
+		arch: &BoardArch,
+		channel: &Channel,
+		name: &str
+	) -> Option<&Package> {
+		// first try indexes_v2
+
+		let pack_v2 = self.get_v2(
+			&(*arch).into(),
+			channel,
+			name
+		).or_else(|| {
+			self.get_v2(
+				&TargetArch::Any,
+				channel,
+				name
+			)
+		});
+		if let Some(p) = pack_v2 {
+			return Some(p)
+		}
+
+		// since we introduces arm after we got indexes v2
+		// we don't check v1
+		if matches!(arch, BoardArch::Arm64) {
+			return None
+		}
+
 		self.indexes.get(channel)
+			.and_then(|idx| idx.get(name))
+	}
+
+	fn get_v2(
+		&self,
+		arch: &TargetArch,
+		channel: &Channel,
+		name: &str
+	) -> Option<&Package> {
+		self.indexes_v2.get(&IndexKey {
+			channel: *channel,
+			arch: *arch
+		}).and_then(|idx| idx.get(name))
 	}
 
 	fn set(&mut self, channel: Channel, package: Package) {
-		let index = self.indexes.entry(channel)
-			.or_insert_with(|| PackagesIndex::new());
+		let index = self.indexes_v2.entry(IndexKey {
+			channel,
+			arch: package.arch
+		}).or_insert_with(|| PackagesIndex::new());
 		index.set(package);
-		// 
 	}
 }
 
@@ -86,11 +170,15 @@ impl PackagesDb {
 		})
 	}
 
-	pub async fn get_package(&self, channel: &Channel, name: &str) -> Option<Package> {
+	pub async fn get_package(
+		&self,
+		arch: &BoardArch,
+		channel: &Channel,
+		name: &str
+	) -> Option<Package> {
 		let lock = self.inner.read().await;
 		let db = lock.data();
-		let index = db.get(channel)?;
-		index.get(name)
+		db.get(arch, channel, name)
 			.map(Clone::clone)
 	}
 

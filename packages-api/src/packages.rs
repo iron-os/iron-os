@@ -69,6 +69,62 @@ pub struct PackagesCfg {
 	pub channel: Channel
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TargetArch {
+	/// should only be used for example for web only
+	/// packages, or script only
+	Any,
+	Amd64,
+	Arm64
+}
+
+impl From<BoardArch> for TargetArch {
+	fn from(b: BoardArch) -> Self {
+		match b {
+			BoardArch::Amd64 => TargetArch::Amd64,
+			BoardArch::Arm64 => TargetArch::Arm64
+		}
+	}
+}
+
+impl FromStr for TargetArch {
+	type Err = value::Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Self::deserialize(s.into_deserializer())
+	}
+}
+
+impl fmt::Display for TargetArch {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.serialize(f)
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BoardArch {
+	Amd64,
+	Arm64
+}
+
+impl FromStr for BoardArch {
+	type Err = value::Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Self::deserialize(s.into_deserializer())
+	}
+}
+
+impl fmt::Display for BoardArch {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.serialize(f)
+	}
+}
+
+fn default_arch() -> TargetArch {
+	TargetArch::Amd64
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Package {
 	pub name: String,
@@ -77,6 +133,9 @@ pub struct Package {
 	pub version: Hash,
 	pub signature: Signature,
 	// pub size: u64,
+	/// todo: remove default at the end of 2021
+	#[serde(default = "default_arch")]
+	pub arch: TargetArch,
 	pub binary: Option<String>
 }
 

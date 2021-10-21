@@ -3,7 +3,9 @@ use super::WsData;
 use super::ws_api::{self, ConnectionBuilder, Connection, Name, Result};
 use crate::context;
 
-use bootloader_api::{VersionInfoReq, VersionInfo, Disks, InstallOn};
+use bootloader_api::{
+	VersionInfoReq, VersionInfo, Disks, InstallOn, Architecture
+};
 
 const DEFAULT_VERSION: &str = "Abfb4ejTGamxvvzxYqrhs7CiM7c3mtjdrJFIMZ41yI-eaOKVkeq88HQlIDQDoPKPU5rvATvh9QH4BciJBT_GnA";
 
@@ -13,6 +15,8 @@ msg_handler!( for Name::VersionInfo,
 	async fn version_info<WsData>(_req: String, sender, bootloader) -> Result<()> {
 		if context::get().is_debug() {
 			sender.send(VersionInfo {
+				arch: Architecture::Amd64,
+				board: "Default Debug".into(),
 				version_str: "Default Debug".into(),
 				version: DEFAULT_VERSION.parse().unwrap(),
 				signature: None,

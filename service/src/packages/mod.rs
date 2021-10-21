@@ -28,8 +28,10 @@ use tokio::process::Command;
 
 use rand::{thread_rng, Rng};
 
-use bootloader_api::{VersionInfoReq, VersionInfo, SystemdRestart};
-use packages::packages::{PackagesCfg, PackageCfg, Package, Source, Channel};
+use bootloader_api::{VersionInfoReq, VersionInfo, SystemdRestart, Architecture};
+use packages::packages::{
+	PackagesCfg, PackageCfg, Package, Source, Channel, BoardArch
+};
 use packages::client::Client;
 use packages::requests::{PackageInfoReq, GetFileReq};
 use file_db::FileDb;
@@ -46,7 +48,7 @@ fn path(s: &str) -> PathBuf {
 pub async fn start(client: Bootloader) -> io::Result<JoinHandle<()>> {
 
 	Ok(tokio::spawn(async move {
-		// get version info so we know if we should update alot or not
+		// get version info so we know if we should update or not
 		let version_info = client.request(&VersionInfoReq).await
 			.expect("fetching version failed");
 
@@ -116,10 +118,16 @@ pub async fn update(
 ) -> io::Result<()> {
 
 	let mut image = Some(version);
+	let arch = match version.arch {
+		Architecture::Amd64 => BoardArch::Amd64,
+		Architecture::Arm64 => BoardArch::Arm64
+	};
 
 	for source in packages.cfg.sources.into_iter().rev() {
 
 		update_from_source(
+			&version.board,
+			&arch,
 			source,
 			packages.cfg.channel,
 			&mut image,
@@ -134,6 +142,8 @@ pub async fn update(
 }
 
 pub async fn update_from_source(
+	board: &str,
+	arch: &BoardArch,
 	source: Source,
 	channel: Channel,
 	image: &mut Option<&VersionInfo>,
@@ -157,7 +167,9 @@ pub async fn update_from_source(
 
 		// check package info
 		let req = PackageInfoReq {
-			channel, name: pack.name.clone()
+			arch: *arch,
+			channel,
+			name: pack.name.clone()
 		};
 		let info = client.request(req).await
 			.map_err(io_other)?;
@@ -194,6 +206,8 @@ pub async fn update_from_source(
 
 	if image.is_some() {
 		update_image(
+			board,
+			arch,
 			&source,
 			channel,
 			image,
@@ -273,6 +287,8 @@ async fn download_file(
 }
 
 pub async fn update_image(
+	board: &str,
+	arch: &BoardArch,
 	source: &Source,
 	channel: Channel,
 	version: &mut Option<&VersionInfo>,
@@ -286,7 +302,9 @@ pub async fn update_image(
 
 	// check for new version
 	let req = PackageInfoReq {
-		channel, name: "image".into()
+		arch: *arch,
+		channel,
+		name: format!("image-{}", board)
 	};
 	let info = client.request(req).await
 		.map_err(io_other)?;

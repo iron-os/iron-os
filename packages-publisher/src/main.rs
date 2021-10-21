@@ -15,31 +15,33 @@ mod script;
 mod upload;
 mod download;
 mod pack_image;
+mod config;
 
 use upload::Upload;
 use download::Download;
 use pack_image::PackImage;
+use config::ConfigOpts;
 
 use std::process;
 
-use clap::{AppSettings, Clap};
-
 use riji::paint_err;
 
+use clap::Parser;
 
-#[derive(Clap)]
+
+#[derive(Parser)]
 #[clap(version = "0.1")]
-#[clap(setting = AppSettings::ColoredHelp)]
 struct Opts {
 	#[clap(subcommand)]
 	subcmd: SubCommand
 }
 
-#[derive(Clap)]
+#[derive(clap::Parser)]
 enum SubCommand {
 	Upload(Upload),
 	Download(Download),
-	PackImage(PackImage)
+	PackImage(PackImage),
+	Config(ConfigOpts)
 }
 
 #[tokio::main]
@@ -56,6 +58,9 @@ async fn main() {
 		},
 		SubCommand::PackImage(p) => {
 			pack_image::pack_image(p).await
+		},
+		SubCommand::Config(opts) => {
+			config::configure(opts).await
 		}
 	};
 

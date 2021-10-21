@@ -1,17 +1,18 @@
 
 use crate::error::{Result};
-use crate::util::{create_dir, read_toml, extract};
+use crate::util::{create_dir, remove_dir, read_toml, extract};
 
 use tokio::fs;
 
 use file_db::FileDb;
 
-use clap::{AppSettings, Clap};
 use riji::paint_act;
 
 use crypto::signature::PublicKey;
 
-use packages::packages::{Channel, Source, Package, PackageCfg, PackagesCfg};
+use packages::packages::{
+	Channel, Source, Package, PackageCfg, PackagesCfg, BoardArch
+};
 use packages::client::Client;
 use packages::requests::{PackageInfoReq, GetFileReq};
 
@@ -33,6 +34,7 @@ pub struct SourceToml {
 pub struct PackagesToml {
 	/// a list of all packages that should be downloaded
 	list: Vec<String>,
+	arch: BoardArch,
 	/// the channel from which it should be downloaded
 	channel: Channel,
 	/// what package to execute on running (the first parameter will be the state)
@@ -42,20 +44,25 @@ pub struct PackagesToml {
 	sources: Vec<SourceToml>
 }
 
-/// Downloads and fills a full packages folder
-/// with the packages listed in `packages.toml`
-/// the address and the channel should be in `packages.toml`
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-pub struct Download {}
+/// Downloads and fills a full packages folder `./packages`
+/// with the packages listed in the provided configuration file
+#[derive(clap::Parser)]
+pub struct Download {
+	/// the location of packages.toml
+	config: String
+}
 
-pub async fn download(_: Download) -> Result<()> {
+pub async fn download(opts: Download) -> Result<()> {
 
 	// read packages.toml
-	let cfg: PackagesToml = read_toml("./packages.toml").await?;
+	let cfg: PackagesToml = read_toml(opts.config).await?;
 
-	// creates packages folder
-	create_dir("./packages").await?;
+	let local_packages = "./packages";
+
+	// delete packages dir
+	let _ = remove_dir(&local_packages).await;
+	create_dir(&local_packages).await?;
+
 
 	if cfg.sources.is_empty() {
 		return Err(err!("no sources", "misssing cfg sources"))
@@ -68,7 +75,26 @@ pub async fn download(_: Download) -> Result<()> {
 	let mut packs = vec![];
 
 	for source in cfg.sources.iter().rev() {
-		download_from_source(&mut list, &mut packs, &cfg.channel, &source).await?;
+		download_from_source(
+			&mut list,
+			&mut packs,
+			&cfg.arch,
+			&cfg.channel,
+			&source,
+			&local_packages
+		).await?;
+	}
+
+	let mut unfinished = false;
+	for pack in list {
+		if let Some(pack) = pack {
+			println!("package not downloaded {:?}", pack);
+			unfinished = true;
+		}
+	}
+
+	if unfinished {
+		return Ok(())
 	}
 
 	let sources: Vec<_> = cfg.sources.into_iter()
@@ -85,12 +111,11 @@ pub async fn download(_: Download) -> Result<()> {
 	// and create package.fdb
 	for pack in packs {
 
-		let path = format!("./packages/{}", pack.name);
-		let tar = format!("./packages/{}.tar.gz", pack.name);
+		let path = format!("{}/{}", local_packages, pack.name);
+		let tar = format!("{}/{}.tar.gz", local_packages, pack.name);
 
 		// create folder
-		fs::create_dir(&path).await
-			.map_err(|e| err!(e, "could not create dir {}", path))?;
+		create_dir(&path).await?;
 
 		// extract
 		extract(&tar, &path)?;
@@ -117,7 +142,7 @@ pub async fn download(_: Download) -> Result<()> {
 		channel: cfg.channel
 	};
 
-	let db = FileDb::new("./packages/packages.fdb", packs_cfg);
+	let db = FileDb::new(format!("{}/packages.fdb", local_packages), packs_cfg);
 	db.write().await
 		.map_err(|e| err!(e, "could not store packages.fdb"))?;
 
@@ -127,8 +152,10 @@ pub async fn download(_: Download) -> Result<()> {
 async fn download_from_source(
 	list: &mut Vec<Option<String>>,
 	packs: &mut Vec<Package>,
+	arch: &BoardArch,
 	channel: &Channel,
-	source: &SourceToml
+	source: &SourceToml,
+	packages_dir: &str
 ) -> Result<()> {
 
 	// should we delete the packages folder
@@ -145,6 +172,7 @@ async fn download_from_source(
 
 		let req = PackageInfoReq {
 			channel: *channel,
+			arch: *arch,
 			name: name.clone()
 		};
 		let res = client.request(req).await
@@ -175,7 +203,7 @@ async fn download_from_source(
 		}
 
 		// write to
-		let path = format!("./packages/{}.tar.gz", pack.name);
+		let path = format!("{}/{}.tar.gz", packages_dir, pack.name);
 		fs::write(&path, res.file()).await
 			.map_err(|e| err!(e, "could not write to {}", path))?;
 

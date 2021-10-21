@@ -67,9 +67,16 @@ pub async fn serve() -> Result<()> {
 // );
 
 request_handler!(
-	async fn package_info(req: PackageInfoReq, packages: PackagesDb) -> ApiResult<PackageInfo> {
+	async fn package_info(
+		req: PackageInfoReq,
+		packages: PackagesDb
+	) -> ApiResult<PackageInfo> {
 		Ok(PackageInfo {
-			package: packages.get_package(&req.channel, &req.name).await
+			package: packages.get_package(
+				&req.arch,
+				&req.channel,
+				&req.name
+			).await
 		})
 	}
 );

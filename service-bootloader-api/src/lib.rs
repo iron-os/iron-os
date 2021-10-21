@@ -330,9 +330,29 @@ impl Request for VersionInfoReq {
 	fn kind() -> Kind { Kind::VersionInfo }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Architecture {
+	Amd64,
+	Arm64
+}
+
+fn default_board() -> String {
+	"image".into()
+}
+
+fn default_arch() -> Architecture {
+	Architecture::Amd64
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionInfo {
+	// todo: should this be an enum
+	// todo: remove default at the end of 2021
+	#[serde(default = "default_board")]
+	pub board: String,
+	// todo: remove default at the end of 2021
+	#[serde(default = "default_arch")]
+	pub arch: Architecture,
 	pub version_str: String,
 	pub version: Hash,
 	pub signature: Option<Signature>,

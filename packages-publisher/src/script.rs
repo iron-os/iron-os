@@ -1,7 +1,7 @@
 
 use crate::error::Result;
 
-use packages::packages::Channel;
+use packages::packages::{Channel, TargetArch};
 
 pub struct Script {
 	inner: riji::Script
@@ -19,14 +19,26 @@ impl Script {
 	// pub fn execute(&mut self, cmd: &str, args: Vec<String>) -> Result<()> 
 
 	/// calls the build function in the script
-	pub fn build(&mut self, channel: &Channel) -> Result<()> {
-		self.inner.execute("build", vec![channel.to_string()])
+	pub fn build(
+		&mut self,
+		arch: &TargetArch,
+		channel: &Channel
+	) -> Result<()> {
+		self.inner.execute("build", vec![arch.to_string(), channel.to_string()])
 			.map_err(|e| err!(format!("{:?}", e), "failed to build"))
 	}
 
-	pub fn pack(&mut self, dest_path: &str, channel: &Channel) -> Result<()> {
-		self.inner.execute("pack", vec![dest_path.into(), channel.to_string()])
-			.map_err(|e| err!(format!("{:?}", e), "failed to pack"))
+	pub fn pack(
+		&mut self,
+		dest_path: &str,
+		arch: &TargetArch,
+		channel: &Channel
+	) -> Result<()> {
+		self.inner.execute("pack", vec![
+			dest_path.into(),
+			arch.to_string(),
+			channel.to_string()
+		]).map_err(|e| err!(format!("{:?}", e), "failed to pack"))
 	}
 
 }

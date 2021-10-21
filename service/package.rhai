@@ -1,13 +1,16 @@
 
-fn build(channel) {
-	let cargo = cmd([
-		"cargo", "build", "--release"
+fn build(arch, channel) {
+	let my_path = fs::full_path(".");
+	let buildroot_riji = cmd([
+		"riji", "rust_build", arch, channel, my_path, "service"
 	]);
-	cargo.execute();
+	buildroot_riji.dir("./../buildroot");
+	buildroot_riji.execute();
+	// the files are stored in /target/rust_build
 }
 
-fn pack(dest, channel) {
-	fs::copy("./target/release/service", dest);
+fn pack(dest, arch, channel) {
+	fs::copy("./target/rust_build/service", dest);
 
 	if fs::is_dir("./www/fire-html") == false {
 		panic("fire-html required");

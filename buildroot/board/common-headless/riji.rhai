@@ -1,5 +1,5 @@
 
-// target dir point sto output/target
+// target dir points to output/target
 // binaries points to the images folder
 fn post_build(host_dir, target_dir, binaries_dir) {
 
@@ -28,8 +28,6 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/chromium.service", systemd_folder);
 	fs::copy("./rootfs/rules.d", target_dir + "/etc/udev/");
 	fs::copy("./rootfs/weston", target_dir + "/etc/");
-
-	fs::copy(binaries_dir + "/service-bootloader", target_dir + "/usr/bin/");
 
 	// copy network
 	fs::copy("./rootfs/network/gsm-connection.mconnection", target_dir + "/etc/NetworkManager/system-connections/");
@@ -80,7 +78,7 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 }
 
 fn fakeroot(host_dir, target_dir, binaries_dir) {
-	// target dir is in ext2/target but we can't se that folder
+	// target dir is in ext2/target but we can't see that folder
 
 	// create service-bootloader symlink
 	let ln = cmd(["ln", "-sf", "../service-bootloader.service", "service-bootloader.service"]);
@@ -97,8 +95,11 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	// delete home folder
 	fs::delete(target_dir + "/home");
 
-	// copy chromium
-	fs::copy(binaries_dir + "/packages", target_dir + "/data/");
+	if fs::is_dir(binaries_dir + "/packages") == true {
+		fs::delete(target_dir + "/data/packages");
+		fs::copy(binaries_dir + "/packages", target_dir + "/data/packages");
+		print("using existing packages");
+	}
 
 	// set corrects rights
 	chown("14:15", target_dir + "/data/home");
@@ -211,4 +212,38 @@ fn chown(user_group, path) {
 fn chmod(modi, path) {
 	let cmd = cmd(["chmod", "-R", modi, path]);
 	cmd.execute();
+}
+
+// commands from main riji
+
+fn create_config(channel, defconfig, linuxconfig) {
+	fs::copy("./buildroot.config", defconfig);
+
+	if channel == "Debug" {
+		// append
+		let debug_defconfig = fs::read("./debug-buildroot.config");
+		fs::append(defconfig, "\n" + debug_defconfig);
+	}
+
+	fs::copy("./linux.config", linuxconfig);
+}
+
+fn apply_patch(channel, buildroot) {
+	fs::delete(buildroot + "/package/service-bootloader");
+	fs::copy("./package/service-bootloader", buildroot + "/package/");
+
+	/*
+		source "package/setserial/Config.in"
+	source "package/service-bootloader/Config.in"
+	*/
+	let package_config = buildroot + "/package/Config.in";
+	if fs::contains(package_config, "service-bootloader") == false {
+		// make open ssh work without rw
+		let pack_regex = regex("source \"package/setserial/Config.in\"");
+		pack_regex.replace_file(
+			package_config,
+			"source \"package/setserial/Config.in\"" +
+			"\nsource \"package/service-bootloader/Config.in\""
+		);
+	}
 }

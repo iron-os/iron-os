@@ -22,7 +22,7 @@ mod macros;
 
 use crate::error::{Error, Result};
 use crate::message::{Action, Message};
-use crate::packages::{Channel, Package};
+use crate::packages::{Channel, Package, BoardArch};
 
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -56,10 +56,15 @@ use bytes::{BytesRead, BytesWrite};
 
 
 // Package Info
+fn default_board_arch() -> BoardArch {
+	BoardArch::Amd64
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackageInfoReq {
 	pub channel: Channel,
+	#[serde(default = "default_board_arch")]
+	pub arch: BoardArch,
 	pub name: String
 }
 
