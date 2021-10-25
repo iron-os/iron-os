@@ -1,3 +1,9 @@
+
+
+/*
+debug chromium
+
+
 #!/bin/bash
 
 set -e
@@ -9,3 +15,16 @@ echo "---"
 /snap/chromium/current/usr/lib/chromium-browser/chrome \
 	--disable-infobars --disable-restore-session-state --disable-session-storage --disable-rollback-option \
 	--disable-speech-api --disable-sync --disable-pinch --load-extension="./extension" "http://127.0.0.1:8888"
+*/
+
+
+/*
+update
+
+
+#!/bin/bash
+rm -rf ./www/fire-html
+cp -r ../../fire-html/src ./www/fire-html
+rm -rf ./extension/fire-html
+cp -r ../../fire-html/src ./extension/fire-html
+*/
