@@ -1,9 +1,4 @@
 
-const BUILDROOT = "./buildroot";
-const STABLE = "2021.08";
-const PACK_PUB = "./../packages-publisher/target/release/packages-publisher";
-// const IMAGES = "./buildroot/output/images";
-
 fn help() {
 	print([
 		"Custom OS Riji help:",
@@ -17,8 +12,8 @@ fn help() {
 
 fn download() {
 	// download buildroot
-	let buildroot = git_clone("git://git.buildroot.net/buildroot", BUILDROOT);
-	buildroot.checkout_tag(STABLE);
+	let buildroot = git_clone("git://git.buildroot.net/buildroot", "./buildroot");
+	buildroot.checkout_tag("2021.08");
 
 }
 
@@ -34,7 +29,7 @@ fn patch() {
 
 fn patch(board, channel) {
 	validate_channel(channel);
-	patch_internal(BUILDROOT, board, channel);
+	patch_internal("./buildroot", board, channel);
 }
 
 fn patch_internal(buildroot, board, channel) {
@@ -78,14 +73,14 @@ fn patch_internal(buildroot, board, channel) {
 	make_config.execute();
 }
 
+fn build() {
+	print("build <board> <channel>");
+}
+
 fn build(board, channel) {
 	validate_channel(channel);
 
-	build_internal(board, channel, BUILDROOT, PACK_PUB);
-}
-
-fn build() {
-	print("build <board> <channel>");
+	build_internal(board, channel, "./buildroot");
 }
 
 // channel: Debug|Release
@@ -94,7 +89,7 @@ fn new_br_out_dir(buildroot, board, channel) {
 }
 
 // channel: Debug|Release
-fn build_internal(board, channel, buildroot, pack_pub) {
+fn build_internal(board, channel, buildroot) {
 	print("building " + board + " " + channel);
 
 	let br_out_dir = new_br_out_dir(buildroot, board, channel);
@@ -118,7 +113,10 @@ fn build_internal(board, channel, buildroot, pack_pub) {
 	print("build packages-publisher");
 	cargo.execute();
 
-	fs::copy(pack_pub, images + "/publisher");
+	fs::copy(
+		"./../packages-publisher/target/release/packages-publisher",
+		images + "/publisher"
+	);
 
 	// download packages
 	//let publish = cmd([
@@ -168,14 +166,14 @@ fn publish(board, channel, pub_channel) {
 
 // channel is only used for the board
 fn download_packages(product, board, channel) {
-	patch_internal(BUILDROOT, board, channel);
+	patch_internal("./buildroot", board, channel);
 
 	let publisher = cmd([
 		"publisher", "download", "./products/" + product + ".toml"
 	]);
 	publisher.execute();
 
-	let br_out_dir = new_br_out_dir(BUILDROOT, board, channel);
+	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
 	let images = br_out_dir + "/images";
 	fs::create_dir(images);
 
@@ -193,7 +191,7 @@ fn config() {
 
 fn config(board, channel) {
 	validate_channel(channel);
-	config_internal(BUILDROOT, board, channel);
+	config_internal("./buildroot", board, channel);
 }
 
 fn config_internal(buildroot, board, channel) {
@@ -208,7 +206,7 @@ fn config_internal(buildroot, board, channel) {
 // TODO
 fn linux_config() {
 	let make = cmd(["make", "linux-menuconfig"]);
-	make.dir(BUILDROOT);
+	make.dir("./buildroot");
 	make.execute();
 
 	// output in output/build/linux-<>/.config
@@ -222,7 +220,7 @@ fn save() {
 
 fn save(channel) {
 	validate_channel(channel);
-	save_internal(BUILDROOT, channel);
+	save_internal("./buildroot", channel);
 }
 
 fn save_internal(buildroot, channel) {
@@ -248,7 +246,7 @@ fn clean() {
 
 fn clean(board, channel) {
 	validate_channel(channel);
-	clean_internal(BUILDROOT, board, channel);
+	clean_internal("./buildroot", board, channel);
 }
 
 fn clean_internal(buildroot, board, channel) {
@@ -292,7 +290,7 @@ fn rebuild() {
 fn rebuild(board, channel, pack) {
 	validate_channel(channel);
 	print("rebuilding package: " + pack);
-	let br_out_dir = new_br_out_dir(BUILDROOT, board, channel);
+	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
 	let make = cmd(["make", pack + "-dirclean", pack + "-rebuild"]);
 	make.dir(br_out_dir);
 	make.execute();
@@ -316,7 +314,7 @@ fn rust_build(arch, channel, path, binary) {
 		panic("unknown " + arch + " architecture");
 	}
 
-	let host_raw = BUILDROOT + "/output/" + board + "/Release/host";
+	let host_raw = "./buildroot/output/" + board + "/" + channel + "/host";
 	if fs::is_dir(host_raw) == false {
 		panic("host folder not found: " + host_raw);
 	}
