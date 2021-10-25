@@ -20,10 +20,16 @@ pub mod system_info {
 
 	serde_req!(Action::SystemInfo, SystemInfoReq, SystemInfo);
 
+	fn default_board() -> String {
+		"image".into()
+	}
+
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct SystemInfo {
 		// equivalent of version_str
 		pub version: String,
+		#[serde(default = "default_board")]
+		pub board: String,
 		pub packages: Vec<Package>,
 		pub channel: Channel,
 		pub installed: bool
@@ -68,6 +74,7 @@ pub mod device_info {
 		// display
 		// touch
 		// network
+		// todo complete
 	}
 
 	serde_res!(DeviceInfo);
@@ -177,3 +184,10 @@ pub mod install_on {
 	serde_res!(InstallOn);
 
 }
+
+
+// Todo:
+// - Restart
+// - Shutdown
+// - add packages
+// - remove packages

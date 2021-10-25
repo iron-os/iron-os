@@ -103,6 +103,7 @@ request_handler!(
 
 		Ok(SystemInfo {
 			version: version_info.version_str,
+			board: version_info.board,
 			installed: version_info.installed,
 			channel: convert_channel(packages.cfg.channel),
 			packages: packages_list

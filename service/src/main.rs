@@ -8,6 +8,9 @@ mod util;
 mod subprocess;
 mod display;
 
+/// Todo
+/// make it possible to run without a ui
+
 use context::Context;
 use bootloader::Bootloader;
 
