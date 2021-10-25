@@ -176,6 +176,10 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	let data_uuid_reg = regex("DATA_UUID");
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", data_uuid);
 
+	if fs::is_file(binaries_dir + "/Image") == true {
+		fs::copy(binaries_dir + "/Image", binaries_dir + "/bzImage");
+	}
+
 	let publisher = cmd([
 		binaries_dir + "/publisher", "pack-image"
 	]);

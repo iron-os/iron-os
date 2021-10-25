@@ -30,8 +30,20 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 
 	copy("./bzImage", &format!("{}/bzImage", tmp_path)).await?;
 	copy("./rootfs.ext2", &format!("{}/rootfs.ext2", tmp_path)).await?;
-	// todo this files should be modified
-	copy("./efi-part/EFI/BOOT/bootx64.efi", &format!("{}/bootx64.efi", tmp_path)).await?;
+	match cfg.arch {
+		Architecture::Amd64 => {
+			copy(
+				"./efi-part/EFI/BOOT/bootx64.efi",
+				&format!("{}/bootx64.efi", tmp_path)
+			).await?;
+		},
+		Architecture::Arm64 => {
+			copy(
+				"./efi-part/EFI/BOOT/bootaa64.efi",
+				&format!("{}/bootaa64.efi", tmp_path)
+			).await?;
+		}
+	}
 
 	// todo: maybe use the version as a name?
 	compress("image.tar.gz", "./image_tmp", "image")?;

@@ -48,6 +48,7 @@ fn patch_internal(buildroot, board, channel) {
 	let defconfig = full_br_out_dir + "/defconfig";
 	let linuxconfig = full_br_out_dir + "/linux.config";
 	let images = full_br_out_dir + "/images";
+	fs::create_dir(images);
 	let board_riji = cmd([
 		"riji", "create_config", channel, defconfig, linuxconfig, images
 	]);
@@ -187,17 +188,16 @@ fn download_packages(product, board, channel) {
 }
 
 fn config() {
-	print("use config <channel>");
+	print("use config <board> <channel>");
 }
 
-fn config(channel) {
+fn config(board, channel) {
 	validate_channel(channel);
-	config_internal(BUILDROOT, channel);
+	config_internal(BUILDROOT, board, channel);
 }
 
-fn config_internal(buildroot, channel) {
-	patch_internal(buildroot, channel);
-	let board = "intel";
+fn config_internal(buildroot, board, channel) {
+	patch_internal(buildroot, board, channel);
 	let br_out_dir = new_br_out_dir(buildroot, board, channel);
 
 	let make = cmd(["make", "menuconfig"]);
@@ -309,8 +309,9 @@ fn rust_build(arch, channel, path, binary) {
 		buildroot_target = "x86_64-buildroot-linux-gnu";
 		target = "x86_64-unknown-linux-gnu";
 	} else if arch == "Arm64" {
-		panic("add Arm64");
-		// board = ""
+		board = "pi4-headless";
+		buildroot_target = "aarch64-buildroot-linux-gnu";
+		target = "aarch64-unknown-linux-gnu";
 	} else {
 		panic("unknown " + arch + " architecture");
 	}
