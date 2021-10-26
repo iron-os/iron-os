@@ -16,11 +16,13 @@ mod upload;
 mod download;
 mod pack_image;
 mod config;
+mod auth;
 
 use upload::Upload;
 use download::Download;
 use pack_image::PackImage;
 use config::ConfigOpts;
+use auth::AuthOpts;
 
 use std::process;
 
@@ -41,7 +43,8 @@ enum SubCommand {
 	Upload(Upload),
 	Download(Download),
 	PackImage(PackImage),
-	Config(ConfigOpts)
+	Config(ConfigOpts),
+	Auth(AuthOpts)
 }
 
 #[tokio::main]
@@ -61,6 +64,9 @@ async fn main() {
 		},
 		SubCommand::Config(opts) => {
 			config::configure(opts).await
+		},
+		SubCommand::Auth(opts) => {
+			auth::authenticate(opts).await
 		}
 	};
 

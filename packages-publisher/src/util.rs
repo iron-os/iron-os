@@ -1,14 +1,16 @@
 
 use crate::error::Result;
+use crate::config::Source;
 
 use std::process::Command;
 use std::path::Path;
-use std::fmt;
+use std::{fmt, io};
 
 use tokio::fs::{self, read_to_string};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use crypto::hash::{Hasher, Hash};
+use crypto::signature::Keypair;
 
 pub async fn read_toml<T>(path: impl AsRef<Path>) -> Result<T>
 where T: DeserializeOwned {
@@ -84,4 +86,21 @@ pub async fn hash_file(path: &str) -> Result<Hash> {
 		.map_err(|e| err!(e, "could not hash file {:?}", path))?;
 
 	Ok(Hasher::hash(&v))
+}
+
+pub async fn get_priv_key(source: &Source) -> Result<Keypair> {
+	if let Some(k) = &source.priv_key {
+		println!("using existing private signature key");
+		Ok(k.clone())
+	} else {
+		println!();
+		println!("Please enter the private signature key:");
+
+		let mut priv_key_b64 = String::new();
+		let stdin = io::stdin();
+		stdin.read_line(&mut priv_key_b64)
+			.map_err(|e| err!(e, "could not read private key"))?;
+		Keypair::from_b64(priv_key_b64.trim())
+			.map_err(|e| err!(format!("{:?}", e), "invalid private key"))
+	}
 }

@@ -8,6 +8,7 @@ use stream::basic::{
 	self,
 	request::Request
 };
+use stream::client::Config;
 use stream::packet::EncryptedBytes;
 
 use crypto::signature::PublicKey;
@@ -28,7 +29,14 @@ impl Client {
 		let stream = TcpStream::connect(addr).await
 			.map_err(Error::io)?;
 		Ok(Self {
-			inner: basic::Client::<_, EncryptedBytes>::new(stream, TIMEOUT, pub_key)
+			inner: basic::Client::<_, EncryptedBytes>::new(
+				stream,
+				Config {
+					timeout: TIMEOUT,
+					body_limit: 0
+				},
+				pub_key
+			)
 		})
 	}
 
@@ -36,6 +44,10 @@ impl Client {
 	where R: Request<Action, EncryptedBytes> {
 		self.inner.request(req).await
 			.map_err(Error::Stream)
+	}
+
+	pub async fn close(self) {
+		self.inner.close().await
 	}
 
 }

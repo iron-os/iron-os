@@ -4,10 +4,12 @@ mod error;
 mod packages;
 mod server;
 mod files;
+mod auth;
 
 use config::Config;
 use files::Files;
 use error::Result;
+use auth::AuthDb;
 use crate::packages::PackagesDb;
 
 use std::env;
@@ -90,6 +92,8 @@ async fn create() -> Result<()> {
 	let _pack_db = PackagesDb::create().await?;
 
 	let _files = Files::create(&cfg).await?;
+
+	let _auths = AuthDb::create().await?;
 
 	Ok(())
 }

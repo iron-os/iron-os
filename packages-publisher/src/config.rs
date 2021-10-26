@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use crypto::signature::{Keypair, PublicKey};
 
+use packages::auth::AuthKey;
 use packages::packages::Channel;
 
 use serde::{Serialize, Deserialize};
@@ -63,7 +64,21 @@ impl Config {
 		}
 	}
 
-	async fn write(&self) -> Result<()> {
+	pub fn get_mut(&mut self, channel: &Channel) -> Result<&mut Source> {
+		let opt = match channel {
+			Channel::Debug => self.inner.debug.as_mut(),
+			Channel::Alpha => self.inner.alpha.as_mut(),
+			Channel::Beta => self.inner.beta.as_mut(),
+			Channel::Release => self.inner.release.as_mut()
+		};
+
+		match opt {
+			Some(src) => Ok(src),
+			None => Err(err!("None", "no configuration for {:?}", channel))
+		}
+	}
+
+	pub async fn write(&self) -> Result<()> {
 		write_toml(&path()?, &self.inner).await
 	}
 
@@ -83,7 +98,9 @@ pub struct Source {
 	#[serde(rename = "public-key")]
 	pub public_key: PublicKey,
 	#[serde(rename = "private-key")]
-	pub priv_key: Option<Keypair>
+	pub priv_key: Option<Keypair>,
+	#[serde(rename = "auth-key")]
+	pub auth_key: Option<AuthKey>
 }
 
 /// Configures an address and a public key to use for uploading for a
@@ -110,7 +127,8 @@ pub async fn configure(opts: ConfigOpts) -> Result<()> {
 	*src = Some(Source {
 		addr: opts.address,
 		public_key: opts.public_key,
-		priv_key: None
+		priv_key: None,
+		auth_key: None
 	});
 
 	cfg.write().await?;

@@ -23,6 +23,7 @@ mod macros;
 use crate::error::{Error, Result};
 use crate::message::{Action, Message};
 use crate::packages::{Channel, Package, BoardArch};
+use crate::auth::AuthKey;
 
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -253,3 +254,38 @@ impl Response<Action, EncryptedBytes> for SetFile {
 		Ok(Self)
 	}
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthenticationReq {
+	pub key: AuthKey
+}
+
+serde_req!(Action::Authentication, AuthenticationReq, Authentication);
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Authentication {
+	pub valid: bool
+}
+
+serde_res!(Authentication);
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewAuthKeyReq {
+	pub sign: Option<Signature>
+}
+
+serde_req!(Action::NewAuthKey, NewAuthKeyReq, NewAuthKey);
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewAuthKey {
+	pub kind: NewAuthKeyKind,
+	pub key: AuthKey
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NewAuthKeyKind {
+	Challenge,
+	NewKey
+}
+
+serde_res!(NewAuthKey);

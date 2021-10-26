@@ -1,6 +1,8 @@
 
 use crate::error::Result;
-use crate::util::{read_toml, create_dir, compress, remove_dir, hash_file};
+use crate::util::{
+	read_toml, create_dir, compress, remove_dir, hash_file, get_priv_key
+};
 use crate::script::Script;
 use crate::config::Config;
 
@@ -11,7 +13,7 @@ use crypto::signature::Keypair;
 use tokio::fs::{self, File};
 
 use packages::client::Client;
-use packages::requests::{SetFileReq, SetPackageInfoReq};
+use packages::requests::{SetFileReq, SetPackageInfoReq, AuthenticationReq};
 use packages::packages::{Channel, Package, TargetArch, BoardArch};
 
 use riji::paint_act;
@@ -59,23 +61,15 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	let config = Config::open().await?;
 	let source = config.get(&cfg.channel)?;
 
+	if source.auth_key.is_none() {
+		println!("please first call auth <channel> to get an auth key");
+		return Ok(())
+	}
+
 	// read package toml
 	let package: PackageToml = read_toml("./package.toml").await?;
 
-	let priv_key = if let Some(k) = &source.priv_key {
-		println!("using existing private signature key");
-		k.clone()
-	} else {
-		println!();
-		println!("Please enter the private signature key:");
-
-		let mut priv_key_b64 = String::new();
-		let stdin = io::stdin();
-		stdin.read_line(&mut priv_key_b64)
-			.map_err(|e| err!(e, "could not read private key"))?;
-		Keypair::from_b64(priv_key_b64.trim())
-			.map_err(|e| err!(format!("{:?}", e), "invalid private key"))?
-	};
+	let priv_key = get_priv_key(&source).await?;
 
 	let mut packages = vec![];
 
@@ -131,6 +125,23 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	let client = Client::connect(&source.addr, source.public_key.clone()).await
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
+	// athenticate
+	{
+		let req = AuthenticationReq {
+			key: source.auth_key.clone().unwrap()
+		};
+
+		let r = client.request(req).await
+			.map_err(|e| err!(e, "failed to upload file"))?;
+
+		if !r.valid {
+			return Err(err!(
+				"auth key error",
+				"Authentication failed, please create a new auth key"
+			))
+		}
+	}
+
 	for (tar_path, package) in packages {
 
 		let tar = File::open(&tar_path).await
@@ -156,6 +167,11 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	}
 
 	println!("package uploaded");
+
+	// wait until the client is closed
+	// this is done since the background task has not time to close
+	// the connection since this process ends here
+	client.close().await;
 
 	Ok(())
 }

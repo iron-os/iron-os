@@ -9,7 +9,10 @@ use stream::basic::{
 	self,
 	server::RequestHandler
 };
+pub use stream::basic::server::Session;
 use stream::packet::EncryptedBytes;
+pub use stream::server::Config;
+pub use stream::handler::Configurator;
 
 use crypto::signature::Keypair;
 
@@ -17,6 +20,7 @@ use tokio::net::{TcpListener, ToSocketAddrs};
 
 // long since pings are not implemented yet
 const TIMEOUT: Duration = Duration::from_secs(10);
+const BODY_LIMIT: usize = 4096;// 4kb request limit
 
 type BasicServer = basic::Server<Action, EncryptedBytes, TcpListener, Keypair>;
 
@@ -32,7 +36,10 @@ impl Server {
 			.map_err(Error::io)?;
 
 		Ok(Self {
-			inner: BasicServer::new(listener, TIMEOUT, priv_key)
+			inner: BasicServer::new(listener, Config {
+				timeout: TIMEOUT,
+				body_limit: BODY_LIMIT
+			}, priv_key)
 		})
 	}
 

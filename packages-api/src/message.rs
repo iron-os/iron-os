@@ -38,7 +38,10 @@ action!{
 	PackageInfo = 11,
 	SetPackageInfo = 13,
 	GetFile = 20,
-	SetFile = 22
+	SetFile = 22,
+
+	NewAuthKey = 30,
+	Authentication = 32
 }
 
 pub type Message = message::Message<Action, EncryptedBytes>;
