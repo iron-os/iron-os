@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "1.0", features = ["net", "io-util", "time", "fs"] }
-stream = { package = "fire-stream", version = "0.1", features = ["json", "fs", "basic"], path = "./../../fire-stream" }
+stream = { package = "fire-stream", version = "0.2", features = ["json", "fs", "basic"], path = "./../../fire-stream" }
 bytes = { package = "simple-bytes", version = "0.2.6" }
 serde = { version = "1.0", features = ["derive"] }
 # crypto = { package = "fire-crypto", version = "0.2", features = ["signature", "serde", "b64", "hash"] }

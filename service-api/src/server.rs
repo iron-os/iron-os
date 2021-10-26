@@ -11,6 +11,7 @@ use stream::basic::{
 	server::RequestHandler
 };
 use stream::packet::PlainBytes;
+use stream::server::Config;
 
 use tokio::net::UnixListener;
 
@@ -30,7 +31,10 @@ impl Server {
 			.map_err(Error::io)?;
 
 		Ok(Self {
-			inner: BasicServer::new(listener, TIMEOUT)
+			inner: BasicServer::new(listener, Config {
+				timeout: TIMEOUT,
+				body_limit: 0
+			})
 		})
 	}
 

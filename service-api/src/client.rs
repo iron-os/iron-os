@@ -10,6 +10,7 @@ use stream::basic::{
 	request::Request
 };
 use stream::packet::PlainBytes;
+use stream::client::Config;
 
 use tokio::net::UnixStream;
 
@@ -26,7 +27,10 @@ impl Client {
 		let stream = UnixStream::connect(path).await
 			.map_err(Error::io)?;
 		Ok(Self {
-			inner: basic::Client::<_, PlainBytes>::new(stream, TIMEOUT)
+			inner: basic::Client::<_, PlainBytes>::new(stream, Config {
+				timeout: TIMEOUT,
+				body_limit: 0
+			})
 		})
 	}
 
