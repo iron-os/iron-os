@@ -297,8 +297,6 @@ fn rebuild(board, channel, pack) {
 }
 
 fn rust_build(arch, channel, path, binary) {
-	validate_channel(channel);
-
 	let board;
 	let buildroot_target;
 	let target;
@@ -314,9 +312,14 @@ fn rust_build(arch, channel, path, binary) {
 		panic("unknown " + arch + " architecture");
 	}
 
-	let host_raw = "./buildroot/output/" + board + "/" + channel + "/host";
+	let host_raw_release = "./buildroot/output/" + board + "/Release/host";
+	let host_raw_debug = "./buildroot/output/" + board + "/Debug/host";
+	let host_raw = host_raw_release;
 	if fs::is_dir(host_raw) == false {
-		panic("host folder not found: " + host_raw);
+		host_raw = host_raw_debug;
+	}
+	if fs::is_dir(host_raw) == false {
+		panic("host folder not found: " + host_raw_release + " & " + host_raw_debug);
 	}
 
 	let host = fs::full_path(host_raw);
