@@ -39,7 +39,13 @@ action!{
 	OpenPage = 10,
 	SetDisplayState = 13,
 	Disks = 16,
-	InstallOn = 17
+	InstallOn = 17,
+	SetPowerState = 20,
+	// packages
+	ListPackages = 30,
+	AddPackage = 32,
+	RemovePackage = 34
+
 }
 
 pub type Message = message::Message<Action, PlainBytes>;
