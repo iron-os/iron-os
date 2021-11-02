@@ -1,6 +1,7 @@
 
 use std::path::PathBuf;
 use std::{io, fs};
+use std::ops::{Deref, DerefMut};
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -77,6 +78,19 @@ impl<T> FileDb<T> {
 		self.data
 	}
 
+}
+
+impl<T> Deref for FileDb<T> {
+	type Target = T;
+	fn deref(&self) -> &T {
+		self.data()
+	}
+}
+
+impl<T> DerefMut for FileDb<T> {
+	fn deref_mut(&mut self) -> &mut T {
+		self.data_mut()
+	}
 }
 
 #[cfg(any(feature = "async", test))]
