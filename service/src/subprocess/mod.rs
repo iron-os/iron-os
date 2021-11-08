@@ -13,11 +13,9 @@ use bootloader_api::SystemdRestart;
 const CMD: &str = include_str!("start_process.templ");
 const SERVICE_PACKAGE: &str = "/data/packages/service";
 
-pub async fn start(client: Bootloader) -> io::Result<()> {
+pub async fn start(packages: Packages, client: Bootloader) -> io::Result<()> {
 
-	let packages = Packages::load().await?;
-
-	let (on_run_dir, on_run_binary) = packages.on_run_binary()
+	let (on_run_dir, on_run_binary) = packages.on_run_binary().await
 		.expect("no on run binary found");
 	eprintln!("starting binary {:?}", on_run_binary);
 

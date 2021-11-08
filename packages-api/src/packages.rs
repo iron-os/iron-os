@@ -2,8 +2,8 @@
 use std::str::FromStr;
 use std::{fmt, mem};
 
-use crypto::signature::{PublicKey, Signature};
-use crypto::hash::Hash;
+pub use crypto::signature::{PublicKey, Signature};
+pub use crypto::hash::Hash;
 
 use serde::{Serialize, Deserialize};
 use serde::de::{value, IntoDeserializer};

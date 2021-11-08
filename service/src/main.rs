@@ -1,3 +1,8 @@
+//! ## Perfomance
+//! there are probably multiple places where performance could be imporved
+//! but that would probably not do a big difference.
+//! Since this code runs on not that limited hardware
+//!
 
 mod ui;
 mod context;
@@ -56,20 +61,20 @@ async fn main() {
 		return;
 	}
 
-
 	// start the ui
 	let ui_bg_task = ui::start(bootloader.clone(), ui_api_rx).await
 		.expect("ui start failed");
 
 	// start packages api
-	let packages_bg_task = packages::start(bootloader.clone()).await
+	let (packages, packages_bg_task) = packages::start(bootloader.clone()).await
 		.expect("packages failed");
 
 	// start service api
 	let service_bg_task = crate::api::start(
 		bootloader.clone(),
 		ui_api_tx,
-		display.clone()
+		display.clone(),
+		packages.clone()
 	).await.expect("service api failed");
 
 	// start display api
@@ -77,7 +82,7 @@ async fn main() {
 
 	// detect what package should be run
 	// and run it
-	subprocess::start(bootloader).await
+	subprocess::start(packages, bootloader).await
 		.expect("failed to start subprocess");
 
 	// now wait until some task fails and restart
@@ -87,8 +92,6 @@ async fn main() {
 		service_bg_task,
 		display_bg_task
 	).expect("some task failed");
-
-
 
 /*
 ## Chnobli service

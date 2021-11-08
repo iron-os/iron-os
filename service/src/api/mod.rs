@@ -7,15 +7,20 @@ use crate::display::{Display, State};
 
 use std::io;
 
-use packages::packages::Channel;
-
 use api::server::Server;
 use api::requests::{
-	open_page::{OpenPageReq, OpenPage},
-	system_info::{SystemInfoReq, SystemInfo, Package, Channel as ApiChannel},
-	set_display_state::{SetDisplayStateReq, SetDisplayState},
-	disks::{DisksReq, Disk as ApiDisk, Disks as ApiDisks},
-	install_on::{InstallOnReq, InstallOn as ApiInstallOn}
+	ui::{OpenPageReq, OpenPage},
+	system::{
+		SystemInfoReq, SystemInfo, ShortPackage,
+		InstallOnReq, InstallOn as ApiInstallOn
+	},
+	device::{
+		SetDisplayStateReq, SetDisplayState,
+		DisksReq, Disk as ApiDisk, Disks as ApiDisks
+	},
+	packages::{
+		ListPackagesReq, ListPackages, AddPackage, AddPackageReq
+	}
 };
 use api::request_handler;
 use api::error::{Result as ApiResult, Error as ApiError};
@@ -28,7 +33,8 @@ use bootloader_api::{VersionInfoReq, Disks, InstallOn};
 pub async fn start(
 	client: Bootloader,
 	ui_api: ApiSender,
-	display: Display
+	display: Display,
+	packages: Packages
 ) -> io::Result<JoinHandle<()>> {
 
 	// since there is only one instance of service running this is fine
@@ -39,11 +45,14 @@ pub async fn start(
 	server.register_data(ui_api);
 	server.register_data(client);
 	server.register_data(display);
+	server.register_data(packages);
 	server.register_request(open_page);
 	server.register_request(system_info);
 	server.register_request(set_display_state);
 	server.register_request(disks);
 	server.register_request(install_on);
+	server.register_request(list_packages);
+	server.register_request(add_package);
 
 	Ok(tokio::spawn(async move {
 		server.run().await
@@ -69,34 +78,25 @@ pub struct SystemInfo {
 }
 */
 
-fn convert_channel(channel: Channel) -> ApiChannel {
-	match channel {
-		Channel::Debug => ApiChannel::Debug,
-		Channel::Alpha => ApiChannel::Alpha,
-		Channel::Beta => ApiChannel::Beta,
-		Channel::Release => ApiChannel::Release
-	}
-}
-
 request_handler!(
 	async fn system_info(
 		_req: SystemInfoReq,
-		bootloader: Bootloader
+		bootloader: Bootloader,
+		packages: Packages
 	) -> ApiResult<SystemInfo> {
 
 		let version_info = bootloader.request(&VersionInfoReq).await
 			.map_err(ApiError::io)?;
 
-		let packages = Packages::load().await
-			.map_err(ApiError::io_other)?;
+		let cfg = packages.config().await;
 
-		let packages_list: Vec<_> = packages.list.into_iter()
+		let packages_list: Vec<_> = packages.packages().await
+			.into_iter()
 			.map(|pack| {
-				let p = pack.package();
-				Package {
-					name: p.name.clone(),
-					version: p.version_str.clone(),
-					path: format!("/data/packages/{}/{}", p.name, pack.current())
+				ShortPackage {
+					name: pack.name,
+					version: pack.version_str,
+					path: pack.path
 				}
 			})
 			.collect();
@@ -105,7 +105,7 @@ request_handler!(
 			version: version_info.version_str,
 			board: version_info.board,
 			installed: version_info.installed,
-			channel: convert_channel(packages.cfg.channel),
+			channel: cfg.channel,
 			packages: packages_list
 		})
 	}
@@ -167,5 +167,41 @@ request_handler!(
 		}).await
 			.map(|_| ApiInstallOn)
 			.map_err(ApiError::io)
+	}
+);
+
+// setPowerState
+
+// listPackages
+// addpackage
+// removePackage
+
+request_handler!(
+	async fn list_packages(
+		_req: ListPackagesReq,
+		packages: Packages
+	) -> ApiResult<ListPackages> {
+
+		let cfg = packages.config().await;
+		let list = packages.packages().await;
+
+		Ok(ListPackages {
+			packages: list,
+			sources: cfg.sources,
+			channel: cfg.channel,
+			on_run: cfg.on_run
+		})
+	}
+);
+
+request_handler!(
+	async fn add_package(
+		req: AddPackageReq,
+		packages: Packages
+	) -> ApiResult<AddPackage> {
+		let mut packages = packages.clone();
+		let pack = packages.add_package(req.name).await;
+
+		Ok(AddPackage { package: pack })
 	}
 );

@@ -22,7 +22,7 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	// do we need to setsid?
 	// so chrome closes if this process closes??
 
-	let package_cfg: PackageCfg = FileDb::open(
+	let package_cfg = FileDb::<PackageCfg>::open(
 		format!("{}/package.fdb", CHROME_PACKAGE)
 	).await?.into_data();
 	let package = package_cfg.package();

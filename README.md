@@ -2,10 +2,10 @@
 
 ## Name
 
-- chnobli
+- iron OS
 
 ## Description
-Chnobli OS is an operation system based on linux/buildroot
+Iron OS is an operation system based on linux/buildroot
 with chromium as it's gui.
 
 ## image

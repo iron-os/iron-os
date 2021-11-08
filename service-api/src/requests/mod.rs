@@ -103,7 +103,7 @@ pub mod packages {
 
 	use super::*;
 
-	pub use packages_api::packages::{Package, Source, Channel};
+	pub use packages_api::packages::{Source, Channel, Hash, Signature};
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct ListPackagesReq;
@@ -119,7 +119,25 @@ pub mod packages {
 		pub on_run: String
 	}
 
+	impl ListPackages {
+		pub fn get(&self, name: &str) -> Option<&Package> {
+			self.packages.iter().find(|p| p.name == name)
+		}
+	}
+
 	serde_res!(ListPackages);
+
+	/// practically the same as packages_api
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct Package {
+		pub name: String,
+		pub version_str: String,
+		/// blake2s hash of the full compressed file
+		pub version: Hash,
+		pub signature: Signature,
+		pub binary: Option<String>,
+		pub path: String
+	}
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct AddPackageReq {
@@ -135,6 +153,7 @@ pub mod packages {
 
 	serde_res!(AddPackage);
 
+	/// Not implemented
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct RemovePackageReq {
 		pub name: String
