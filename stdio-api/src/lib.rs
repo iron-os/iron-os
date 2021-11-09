@@ -113,6 +113,7 @@ mod serde {
 }
 #[cfg(feature = "serde")]
 pub use serde::{serialize, deserialize};
+#[cfg(feature = "serde")]
 pub use serde::Error as SerdeError;
 
 

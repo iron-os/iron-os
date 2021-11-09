@@ -181,7 +181,9 @@ mod r#async {
 					.map_err(io_other)?
 			);
 			self.inner.write(&line).await?;
-			let line = self.inner.read().await?;
+			let line = self.inner.read().await?
+				.ok_or_else(|| io_other("stdin closed"))?;
+
 			if let LineKind::Request = line.kind() {
 				return Err(io_other("received request instead of response"))
 			}

@@ -152,7 +152,8 @@ pub fn start() -> io::Result<()> {
 
 	let service_package = Path::new("/data/packages/service");
 	let package_file = service_package.join("package.fdb");
-	let package: PackageCfg = FileDb::open_sync(package_file)?.into_data();
+	let package: PackageCfg = FileDb::<PackageCfg>::open_sync(package_file)?
+		.into_data();
 	let curr_path = service_package.join(package.current());
 	let bin_path = curr_path.join(&package.pack().binary);
 

@@ -18,13 +18,17 @@ impl<H> AsyncHandle<H> {
 	}
 
 	/// this function is not abortsafe
-	pub async fn read(&mut self) -> io::Result<Line>
+	pub async fn read(&mut self) -> io::Result<Option<Line>>
 	where H: AsyncBufRead + Unpin {
 		loop {
-			self.inner.read_line(self.buffer.as_mut()).await?;
+			let r = self.inner.read_line(self.buffer.as_mut()).await?;
+			if r == 0 {
+				return Ok(None)
+			}
+
 			let line = self.buffer.parse_line();
 			if let Some(line) = line {
-				return Ok(line)
+				return Ok(Some(line))
 			}
 		}
 	}
@@ -68,12 +72,16 @@ impl AsyncStdio {
 	}
 
 	/// this function is not abortsafe
-	pub async fn read(&mut self) -> io::Result<Line> {
+	pub async fn read(&mut self) -> io::Result<Option<Line>> {
 		loop {
-			self.read.read(self.buffer.as_mut()).await?;
+			let r = self.read.read(self.buffer.as_mut()).await?;
+			if r == 0 {
+				return Ok(None)
+			}
+
 			let line = self.buffer.parse_line();
 			if let Some(line) = line {
-				return Ok(line)
+				return Ok(Some(line))
 			}
 		}
 	}
@@ -92,11 +100,11 @@ enum AsyncStdRead {
 
 impl AsyncStdRead {
 
-	async fn read(&mut self, buf: &mut String) -> io::Result<()> {
+	async fn read(&mut self, buf: &mut String) -> io::Result<usize> {
 		match self {
 			Self::Child(c) => c.read_line(buf).await,
 			Self::This(io) => io.read_line(buf).await
-		}.map(|_| ())
+		}
 	}
 
 }
