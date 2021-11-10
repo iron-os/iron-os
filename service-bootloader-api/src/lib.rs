@@ -339,7 +339,7 @@ pub enum Architecture {
 }
 
 fn default_board() -> String {
-	"image".into()
+	"intel".into()
 }
 
 fn default_arch() -> Architecture {
