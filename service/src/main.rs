@@ -4,12 +4,13 @@
 //! Since this code runs on not that limited hardware
 //!
 
+#[macro_use]
+mod util;
 mod ui;
 mod context;
 mod bootloader;
 mod packages;
 mod api;
-mod util;
 mod subprocess;
 mod display;
 
@@ -56,7 +57,15 @@ async fn main() {
 		let ui_bg_task = ui::start(bootloader, ui_api_rx).await
 			.expect("ui start failed");
 
-		ui_bg_task.await.expect("ui task failed");
+		// ui_bg_task.await.expect("ui task failed");
+
+		let (_ui, _pan) = tokio::try_join!(
+			ui_bg_task,
+			tokio::spawn(async move {
+				tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+				panic!("exit")
+			})
+		).expect("some task failed");
 
 		return;
 	}

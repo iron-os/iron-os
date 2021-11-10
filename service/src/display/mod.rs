@@ -6,11 +6,12 @@ pub use kiosk_api::State;
 
 use std::{io, thread};
 use std::sync::Arc;
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tokio::runtime::Handle;
 use tokio::sync::watch;
-use tokio::task::{spawn_blocking, JoinHandle};
+use tokio::task::JoinHandle;
+use tokio::time::{sleep, Duration};
 
 use wayland_client::{
 	Display as WlDisplay, GlobalManager, ConnectError, GlobalError
@@ -115,6 +116,46 @@ impl Message {
 	}
 }
 
+#[derive(Debug)]
+struct HasExited {
+	inner: Arc<AtomicBool>,
+	modify: bool
+}
+
+impl HasExited {
+	pub fn new() -> Self {
+		Self {
+			inner: Arc::new(AtomicBool::new(false)),
+			modify: false
+		}
+	}
+
+	pub fn set_modify(&mut self, v: bool) {
+		self.modify = v;
+	}
+
+	pub fn has_exited(&self) -> bool {
+		self.inner.load(Ordering::Relaxed)
+	}
+}
+
+impl Clone for HasExited {
+	fn clone(&self) -> Self {
+		Self {
+			inner: self.inner.clone(),
+			modify: false
+		}
+	}
+}
+
+impl Drop for HasExited {
+	fn drop(&mut self) {
+		if self.modify {
+			self.inner.store(true, Ordering::Relaxed);
+		}
+	}
+}
+
 pub async fn start(
 	display: Display
 ) -> JoinHandle<()> {
@@ -123,17 +164,47 @@ pub async fn start(
 
 		let Display { tx, rx } = display;
 
-		spawn_blocking(move || {
+		let mut has_exited = HasExited::new();
+		// we need to modify the flag when has_exited goes out of scope
+		// so the thread knows it should cleanup and exit
+		has_exited.set_modify(true);
+
+		let mut display_task = has_exited.clone();
+		let handle = thread::spawn(move || {
+			// we need to modify the flag when has_exited goes out of scope
+			// so the thread knows it should cleanup and exit
+			display_task.set_modify(true);
+
 			loop {
+				let display_task_c = display_task.clone();
+
 				let tx = tx.clone();
 				let rx = rx.clone();
 				let runtime = runtime.clone();
-				let re = manage_display(runtime, tx, rx);
+				let re = manage_display(runtime, tx, rx, display_task_c);
 				println!("mange_display {:?}", re);
+
+				if display_task.has_exited() {
+					break
+				}
 
 				thread::sleep(Duration::from_secs(2));
 			}
-		}).await.expect("display blocking panicked");
+		});
+
+		loop {
+
+			sleep(Duration::from_secs(5)).await;
+
+			if has_exited.has_exited() {
+				eprintln!("display thread exited");
+				handle.join().expect("display thread failed");
+				return
+			}
+
+		}
+
+
 	})
 }
 
@@ -141,7 +212,8 @@ pub async fn start(
 fn manage_display(
 	runtime: Handle,
 	tx: Arc<watch::Sender<Message>>,
-	rx: watch::Receiver<Message>
+	rx: watch::Receiver<Message>,
+	display_task: HasExited
 ) -> Result<(), WaylandError> {
 
 	let display = WlDisplay::connect_to_env()?;
@@ -149,12 +221,14 @@ fn manage_display(
 	let recv_runtime = runtime.clone();
 	let recv_tx = tx.clone();
 
+	let display_task_c = display_task.clone();
+
 	let sender_thread = thread::spawn(move || {
-		sender(display, runtime, rx)
+		sender(display, runtime, rx, display_task_c)
 	});
 
 	let recv_thread = thread::spawn(move || {
-		receiver(recv_display, recv_runtime, recv_tx)
+		receiver(recv_display, recv_runtime, recv_tx, display_task)
 	});
 	let recv_thread = recv_thread.join();
 	eprintln!("recv_thread closed {:?}", recv_thread);
@@ -169,7 +243,8 @@ fn manage_display(
 fn sender(
 	display: WlDisplay,
 	runtime: Handle,
-	mut rx: watch::Receiver<Message>
+	mut rx: watch::Receiver<Message>,
+	display_task: HasExited
 ) -> Result<(), WaylandError> {
 	// event queue for state change
 	let mut event_queue = display.create_event_queue();
@@ -200,6 +275,10 @@ fn sender(
 			},
 			(Flag::Close, _) => return Ok(())
 		}
+
+		if display_task.has_exited() {
+			return Ok(())
+		}
 	}
 }
 
@@ -207,7 +286,8 @@ fn sender(
 fn receiver(
 	display: WlDisplay,
 	_runtime: Handle,
-	tx: Arc<watch::Sender<Message>>
+	tx: Arc<watch::Sender<Message>>,
+	display_task: HasExited
 ) -> Result<(), WaylandError> {
 
 	// event queue for state change
@@ -239,5 +319,10 @@ fn receiver(
 
 	loop {
 		event_queue.dispatch(&mut (), |_, _, _| {})?;
+		eprintln!("display dispatch");
+
+		if display_task.has_exited() {
+			return Ok(())
+		}
 	}
 }

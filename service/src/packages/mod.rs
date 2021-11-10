@@ -366,7 +366,7 @@ impl Update {
 		&mut self
 	) -> impl Iterator<Item=(&str, &mut PackageUpdateState)> {
 		self.packages.iter_mut()
-			.filter(|(_, pack)| pack.is_finished())
+			.filter(|(_, pack)| !pack.is_finished())
 			.map(|(name, pack)| (name.as_str(), pack))
 	}
 
@@ -567,7 +567,7 @@ impl RawPackages {
 				},
 				// this should never happen
 				PackageUpdateState::ToUpdate {..} => {
-					return Err(io_other("package was not found"))
+					return Err(io_other!("package {:?} was not found", name))
 				}
 			}
 		}
