@@ -198,7 +198,7 @@ async fn build(
 	let hash = hash_file(&tar_name).await?;
 
 	// sign
-	let sign = priv_key.sign(hash.as_slice());
+	let sign = priv_key.sign(&hash);
 
 	// create the package
 	let package = Package {

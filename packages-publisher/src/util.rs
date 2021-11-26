@@ -5,6 +5,7 @@ use crate::config::Source;
 use std::process::Command;
 use std::path::Path;
 use std::{fmt, io};
+use std::str::FromStr;
 
 use tokio::fs::{self, read_to_string};
 use serde::Serialize;
@@ -100,7 +101,7 @@ pub async fn get_priv_key(source: &Source) -> Result<Keypair> {
 		let stdin = io::stdin();
 		stdin.read_line(&mut priv_key_b64)
 			.map_err(|e| err!(e, "could not read private key"))?;
-		Keypair::from_b64(priv_key_b64.trim())
+		Keypair::from_str(priv_key_b64.trim())
 			.map_err(|e| err!(format!("{:?}", e), "invalid private key"))
 	}
 }

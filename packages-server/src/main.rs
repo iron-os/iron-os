@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
 			}
 
 			let sign = Keypair::new();
-			println!("New signature private key: {}", sign.to_b64());
+			println!("New signature private key: {}", sign);
 			println!("New signature public key: {}", sign.public());
 
 			Ok(())

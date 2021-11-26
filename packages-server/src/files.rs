@@ -33,7 +33,7 @@ impl Files {
 	}
 
 	pub async fn get(&self, hash: &Hash) -> Option<File> {
-		let hash = hash.to_b64();
+		let hash = hash.to_string();
 		let path = self.path.join(hash);
 		File::open(path).await.ok()
 	}
@@ -46,7 +46,7 @@ impl Files {
 			assert_eq!(hash, &n_hash);
 		}
 
-		let path = self.path.join(hash.to_b64());
+		let path = self.path.join(hash.to_string());
 
 		let file = OpenOptions::new()
 			.create_new(true)
@@ -67,7 +67,7 @@ impl Files {
 	}
 
 	pub async fn exists(&self, hash: &Hash) -> bool {
-		let path = self.path.join(hash.to_b64());
+		let path = self.path.join(hash.to_string());
 		fs::metadata(&path).await.is_ok()
 	}
 

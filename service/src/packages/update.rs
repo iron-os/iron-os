@@ -85,7 +85,7 @@ async fn update_from_source(
 
 		// validate signature
 		if !source.sign_key.verify(
-			package.version.as_slice(),
+			&package.version,
 			&package.signature
 		) {
 			return Err(io_other(format!("signature mismatch {:?}", package)))
@@ -212,7 +212,7 @@ async fn update_image(
 
 	// validate signature
 	if !source.sign_key.verify(
-		package.version.as_slice(),
+		&package.version,
 		&package.signature
 	) {
 		return Err(io_other(format!("signature mismatch {:?}", package)))

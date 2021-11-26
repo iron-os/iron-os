@@ -187,7 +187,7 @@ impl SetFileReq {
 		let mut body = msg.body_mut();
 		body.reserve(buf_size + Signature::LEN);
 
-		body.write(sign.as_slice());
+		body.write(&sign);
 
 		unsafe {
 			// safe because file.read_to_end only appends

@@ -44,8 +44,11 @@ action!{
 	// packages
 	ListPackages = 30,
 	AddPackage = 32,
-	RemovePackage = 34
-
+	RemovePackage = 34,
+	// storage
+	GetStorage = 40,
+	SetStorage = 42,
+	RemoveStorage = 44
 }
 
 pub type Message = message::Message<Action, PlainBytes>;

@@ -204,7 +204,7 @@ request_handler!(
 		// validate signature
 		let sign_key = cfg.sign_key.as_ref().unwrap();
 		let signature = req.signature();
-		if !sign_key.verify(hash.as_slice(), signature) {
+		if !sign_key.verify(&hash, signature) {
 			return Err(ApiError::Stream(
 				PacketError::Body("Signature incorrect".into()).into()
 			))
@@ -242,7 +242,7 @@ request_handler!(
 
 		// validate that the signature is correct
 		let sign_key = cfg.sign_key.as_ref().unwrap();
-		if !sign_key.verify(hash.as_slice(), &req.package.signature) {
+		if !sign_key.verify(hash, &req.package.signature) {
 			return Err(ApiError::Stream(
 				PacketError::Body("Signature incorrect".into()).into()
 			))

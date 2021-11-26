@@ -197,7 +197,7 @@ async fn download_from_source(
 		}
 
 		if res.hash() != pack.version ||
-			!source.sign_key.verify(pack.version.as_slice(), &pack.signature)
+			!source.sign_key.verify(&pack.version, &pack.signature)
 		{
 			return Err(err!("hash / sig", "file {} not correct", pack.name));
 		}

@@ -48,7 +48,6 @@ Make sure the folder `extension/fire-html` and `www/fire-html` exists.
 
 Publish: `publisher upload <Channel> <address> <public-key>`
 
-
 ### Publish user programm (TODO)
 
 ### Build buildroot / rootfs

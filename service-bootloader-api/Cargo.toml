@@ -12,4 +12,4 @@ async = ["stdio-api/async"]
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 stdio-api = { version = "0.1", path = "./../stdio-api", features = ["serde"] }
-crypto = { package = "fire-crypto", version = "0.2", features = ["signature", "hash", "b64", "serde"] }
+crypto = { package = "fire-crypto", version = "0.3", features = ["signature", "hash", "b64", "serde"] }
