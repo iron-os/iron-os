@@ -1,5 +1,21 @@
 
-
+fn startChrome(url) {
+	let extension = fs::full_path("./extension");
+	print("extension " + extension);
+	let chrome = cmd([
+		"/snap/chromium/current/usr/lib/chromium-browser/chrome",
+		"--disable-infobars",
+		"--disable-restore-session-state",
+		"--disable-session-storage",
+		"--disable-rollback-option",
+		"--disable-speech-api",
+		"--disable-sync",
+		"--disable-pinch",
+		"--load-extension=" + extension,
+		url
+	]);
+	chrome.execute();
+}
 /*
 debug chromium
 
