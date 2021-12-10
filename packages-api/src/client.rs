@@ -35,6 +35,7 @@ impl Client {
 					timeout: TIMEOUT,
 					body_limit: 0
 				},
+				None,
 				pub_key
 			)
 		})

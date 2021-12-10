@@ -30,7 +30,7 @@ impl Client {
 			inner: basic::Client::<_, PlainBytes>::new(stream, Config {
 				timeout: TIMEOUT,
 				body_limit: 0
-			})
+			}, None)
 		})
 	}
 
