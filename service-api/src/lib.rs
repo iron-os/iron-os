@@ -2,7 +2,9 @@
 
 pub mod requests;
 pub mod message;
+#[cfg(target_family = "unix")]
 pub mod client;
+#[cfg(target_family = "unix")]
 pub mod server;
 pub mod error;
 
