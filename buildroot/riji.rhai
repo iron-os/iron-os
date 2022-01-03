@@ -215,16 +215,15 @@ fn linux_config() {
 
 // creates the patch
 fn save() {
-	print("use save <channel>");
+	print("use save <board> <channel>");
 }
 
-fn save(channel) {
+fn save(board, channel) {
 	validate_channel(channel);
-	save_internal("./buildroot", channel);
+	save_internal("./buildroot", board, channel);
 }
 
-fn save_internal(buildroot, channel) {
-	let board = "intel";
+fn save_internal(buildroot, board, channel) {
 	let br_out_dir = new_br_out_dir(buildroot, board, channel);
 	print("save to " + br_out_dir + "/defconfig");
 
@@ -312,17 +311,7 @@ fn rust_build(arch, channel, path, binary) {
 		panic("unknown " + arch + " architecture");
 	}
 
-	let host_raw_release = "./buildroot/output/" + board + "/Release/host";
-	let host_raw_debug = "./buildroot/output/" + board + "/Debug/host";
-	let host_raw = host_raw_release;
-	if fs::is_dir(host_raw) == false {
-		host_raw = host_raw_debug;
-	}
-	if fs::is_dir(host_raw) == false {
-		panic("host folder not found: " + host_raw_release + " & " + host_raw_debug);
-	}
-
-	let host = fs::full_path(host_raw);
+	let host = full_host_path(board);
 	let sysroot = host + "/" + buildroot_target + "/sysroot";
 	let cargo_bin = host + "/bin/cargo";
 	let cargo_home = host + "/share/cargo";
@@ -347,4 +336,47 @@ fn rust_build(arch, channel, path, binary) {
 	fs::delete(rust_out);
 	fs::create_dir(rust_out);
 	fs::copy(bin, rust_out);
+}
+
+fn full_host_path(board) {
+	let host_raw_release = "./buildroot/output/" + board + "/Release/host";
+	let host_raw_debug = "./buildroot/output/" + board + "/Debug/host";
+	let host_raw = host_raw_release;
+	if !fs::is_dir(host_raw) {
+		host_raw = host_raw_debug;
+	}
+	if !fs::is_dir(host_raw) {
+		panic("host folder not found: " + host_raw_release + " & " + host_raw_debug);
+	}
+
+	return fs::full_path(host_raw);
+}
+
+fn host_sysroot(board) {
+	let host = full_host_path(board);
+	print(host);
+}
+
+fn sysroot(arch) {
+	let board;
+	if arch == "Amd64" {
+		board = "intel-headless";
+	} else {
+		panic("only Amd64 supported");
+	}
+	sysroot(arch, board);
+}
+
+fn sysroot(arch, board) {
+	let buildroot_target;
+	if arch == "Amd64" {
+		buildroot_target = "x86_64-buildroot-linux-gnu";
+	} else {
+		panic("only Amd64 supported");
+	}
+
+	let host = full_host_path(board);
+	let sysroot = host + "/" + buildroot_target + "/sysroot";
+
+	print(sysroot);
 }
