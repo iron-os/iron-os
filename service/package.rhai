@@ -17,8 +17,5 @@ fn pack(dest, arch, channel) {
 	}
 	fs::copy("./www", dest);
 
-	if fs::is_dir("./extension/fire-html") == false {
-		panic("fire-html required");
-	}
 	fs::copy("./extension", dest);
 }
