@@ -22,8 +22,14 @@ use_x11 = false
 enable_basic_printing = false
 use_cups = false
 enable_paint_preview = false
+enable_plugins = false
 
 enable_linux_installer = true
 is_component_build = false
 
-angle_enable_vulkan = true
+angle_enable_cgl = true
+enable_distro_version_check = false
+
+target_cpu = "x64"
+target_environment = "device"
+target_os = "linux"

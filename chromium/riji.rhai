@@ -4,7 +4,7 @@ const PATCH_FILE = "./patches.patch";
 const DEPOT = "./depot_tools";
 const CHROM_DEPOT = "../../depot_tools";
 const CHROM = "./chromium/src";
-const STABLE = "92.0.4515.131";
+const STABLE = "96.0.4664.110";
 
 
 fn help() {
@@ -70,14 +70,33 @@ fn checkout() {
 	gclient.execute();
 }
 
+fn add_pgo() {
+	// "custom_vars": {}
+	let custom_vars = regex("custom_vars"": \\{\\}");
+	custom_vars.replace_file("./chromium/.gclient", "custom_vars"": {" +
+		"""checkout_pgo_profiles"": True" +
+	"}");
+
+	let pre_sync = cmd([
+		CHROM_DEPOT + "/gclient",
+		"runhooks"
+	]);
+	pre_sync.dir(CHROM);
+	pre_sync.execute();
+}
+
 fn configure() {
 	print("call with build release or build debug");
 }
 
 fn configure(target) {
+	_configure(CHROM_DEPOT, CHROM, target);
+}
+
+fn _configure(depot, chrome, target) {
 	print("build target: " + target);
 	let out_path = "out/" + target;
-	let chrome_out = CHROM + "/" + out_path;
+	let chrome_out = chrome + "/" + out_path;
 	fs::create_dir(chrome_out);
 
 	// inspiration was taken from
@@ -90,9 +109,25 @@ fn configure(target) {
 		fs::read("./args/" + target + ".gn")
 	]);
 
+	let br_riji = cmd(["riji", "host_sysroot", "intel"]);
+	br_riji.dir("./../buildroot");
+	let sysroot = trim(br_riji.output());
+	print("using sysroot: " + sysroot);
+
+	let buildroot_riji = cmd(["riji", "sysroot", "Amd64", "intel"]);
+	buildroot_riji.dir("./../buildroot");
+	let target_sysroot = trim(buildroot_riji.output());
+	print("using target sysroot: " + target_sysroot);
+
+	fs::append(args_file, [
+		"",
+		"sysroot = \"" + target_sysroot + "\"",
+		//"target_sysroot = \"" + target_sysroot + "\""
+	]);
+
 	// generate folder
-	let gn = cmd(CHROM_DEPOT + "/gn");
-	gn.dir(CHROM);
+	let gn = cmd(depot + "/gn");
+	gn.dir(chrome);
 	gn.args(["gen", out_path]);
 	gn.execute();
 }
@@ -102,13 +137,15 @@ fn build() {
 }
 
 fn build(target) {
+	_configure(CHROM_DEPOT, CHROM, target);
+
 	print("build target: " + target);
 	let out_path = "out/" + target;
 
 	// generate folder
 	let ninja = cmd(CHROM_DEPOT + "/autoninja");
 	ninja.dir(CHROM);
-	ninja.args(["-C", out_path, "chrome", "chrome_sandbox", "chrome/installer/linux:stable"]);
+	ninja.args(["-C", out_path, "chrome", "chrome_sandbox"]);
 	ninja.execute();
 
 	// copy out/release
@@ -117,6 +154,38 @@ fn build(target) {
 		"chrome", // chromium-bin?
 		"icudtl.dat"
 	];*/
+
+	bundle(CHROM + "/" + out_path, "./output/" + target + "/chromium");
+}
+
+// copy's every file that is needed
+// out path must already exist
+fn bundle(build_path, out_path) {
+	if fs::is_dir(out_path) {
+		fs::delete(out_path);
+	}
+	fs::create_dir(out_path);
+
+	// first strip binary if it is not already stripped
+	if !fs::is_file(build_path + "/chrome.stripped") {
+		// eu-strip -o chrome.stripped -f chrome.symbols chrome
+		panic("todo implement stripped");
+	}
+
+	fs::copy(build_path + "/chrome.stripped", out_path + "/chrome");
+	fs::copy(build_path + "/chrome_crashpad_handler", out_path);
+	fs::copy(build_path + "/chrome_sandbox", out_path);
+	fs::copy(build_path + "/libEGL.so", out_path);
+	fs::copy(build_path + "/libGLESv2.so", out_path);
+	fs::copy(build_path + "/libvk_swiftshader.so", out_path);
+	fs::copy(build_path + "/icudtl.dat", out_path);
+	fs::copy(build_path + "/v8_context_snapshot.bin", out_path);
+	fs::copy(build_path + "/chrome_100_percent.pak", out_path);
+	fs::copy(build_path + "/chrome_200_percent.pak", out_path);
+	fs::copy(build_path + "/resources.pak", out_path);
+	fs::copy(build_path + "/swiftshader", out_path);
+	fs::copy(build_path + "/locales", out_path);
+	fs::copy(build_path + "/MEIPreload", out_path);
 }
 
 /*

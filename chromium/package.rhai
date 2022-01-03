@@ -8,5 +8,5 @@ fn pack(dest, arch, channel) {
 		panic("Arm64 not supported")
 	}
 
-	fs::copy("./out/" + arch + "/release/chromium/", dest + "/../");
+	fs::copy("./output/Release/chromium", dest + "/../");
 }
