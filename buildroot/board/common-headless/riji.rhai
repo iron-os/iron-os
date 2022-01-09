@@ -250,4 +250,9 @@ fn apply_patch(channel, buildroot) {
 			"\nsource \"package/service-bootloader/Config.in\""
 		);
 	}
+
+	// patch gcc.mk file
+	let buildroot_repo = git(buildroot);
+	let gcc_diff = diff_from_file("./pre-patches/gcc-copy-more-libs.patch");
+	buildroot_repo.apply_diff(gcc_diff);
 }

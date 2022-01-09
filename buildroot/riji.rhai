@@ -33,6 +33,8 @@ fn patch(board, channel) {
 }
 
 fn patch_internal(buildroot, board, channel) {
+	let buildroot_git = git(buildroot);
+	buildroot_git.force_head();
 
 	let br_out_dir = new_br_out_dir(buildroot, board, channel);
 	print("patching: " + br_out_dir);
@@ -164,6 +166,10 @@ fn publish(board, channel, pub_channel) {
 	publisher.execute();
 }
 
+fn download_packages() {
+	print("download_packages <product> <board> <channel>");
+}
+
 // channel is only used for the board
 fn download_packages(product, board, channel) {
 	patch_internal("./buildroot", board, channel);
@@ -204,9 +210,13 @@ fn config_internal(buildroot, board, channel) {
 }
 
 // TODO
-fn linux_config() {
+fn linux_config(board, channel) {
+	validate_channel(channel);
+	patch_internal("./buildroot", board, channel);
+	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
+
 	let make = cmd(["make", "linux-menuconfig"]);
-	make.dir("./buildroot");
+	make.dir(br_out_dir);
 	make.execute();
 
 	// output in output/build/linux-<>/.config
@@ -350,11 +360,6 @@ fn full_host_path(board) {
 	}
 
 	return fs::full_path(host_raw);
-}
-
-fn host_sysroot(board) {
-	let host = full_host_path(board);
-	print(host);
 }
 
 fn sysroot(arch) {

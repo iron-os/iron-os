@@ -9,3 +9,6 @@ ExecStart=/data/packages/chromium/start.sh
 User=user
 Restart=always
 RestartSec=2
+
+# Set a custom pam session
+PAMName=weston

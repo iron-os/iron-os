@@ -1,0 +1,15 @@
+diff --git a/package/gcc/gcc-final/gcc-final.mk b/package/gcc/gcc-final/gcc-final.mk
+index 24d034b720..2682a1eb66 100644
+--- a/package/gcc/gcc-final/gcc-final.mk
++++ b/package/gcc/gcc-final/gcc-final.mk
+@@ -149,6 +149,10 @@ endif
+ define HOST_GCC_FINAL_INSTALL_LIBGCC
+ 	-cp -dpf $(HOST_GCC_FINAL_GCC_LIB_DIR)/libgcc_s* \
+ 		$(STAGING_DIR)/lib/
++	-cp -dpf $(HOST_DIR)/lib*/gcc/$(GNU_TARGET_NAME)/$(GCC_FINAL_VERSION)/libgcc.a \
++			$(STAGING_DIR)/lib/
++	-cp -dpf $(HOST_DIR)/lib*/gcc/$(GNU_TARGET_NAME)/$(GCC_FINAL_VERSION)/*.o \
++			$(STAGING_DIR)/lib/
+ 	-cp -dpf $(HOST_GCC_FINAL_GCC_LIB_DIR)/libgcc_s* \
+ 		$(TARGET_DIR)/lib/
+ endef
