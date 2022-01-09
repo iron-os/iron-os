@@ -4,9 +4,12 @@ fn build(arch, channel) {
 }
 
 fn pack(dest, arch, channel) {
-	if arch == "Arm64" {
-		panic("Arm64 not supported")
+	if arch != "Amd64" {
+		panic("only Amd64 supported");
 	}
 
-	fs::copy("./output/Release/chromium", dest + "/../");
+	fs::copy(
+		"./output/" + lowercase(arch) + "/release/chromium",
+		dest + "/../"
+	);
 }

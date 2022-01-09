@@ -85,17 +85,39 @@ fn add_pgo() {
 	pre_sync.execute();
 }
 
+fn all_args() {
+	print("all_args <arch> <channel>");
+}
+
+fn all_args(arch, channel) {
+	_configure(CHROM_DEPOT, CHROM, arch, channel);
+
+	arch = lowercase(arch);
+	channel = lowercase(channel);
+	let out_path = "./out/" + arch + "/" + channel;
+
+	let gn = cmd([
+		"gn", "args", "--list",
+		out_path
+	]);
+	gn.dir(CHROM);
+	let args = gn.output();
+	fs::write("./args.txt", args);
+}
+
 fn configure() {
-	print("call with build release or build debug");
+	print("configure <arch> <channel>");
 }
 
-fn configure(target) {
-	_configure(CHROM_DEPOT, CHROM, target);
+fn configure(arch, channel) {
+	_configure(CHROM_DEPOT, CHROM, arch, channel);
 }
 
-fn _configure(depot, chrome, target) {
-	print("build target: " + target);
-	let out_path = "out/" + target;
+fn _configure(depot, chrome, arch, channel) {
+	let real_arch = arch;
+	arch = lowercase(arch);
+	channel = lowercase(channel);
+	let out_path = "out/" + arch + "/" + channel;
 	let chrome_out = chrome + "/" + out_path;
 	fs::create_dir(chrome_out);
 
@@ -106,23 +128,28 @@ fn _configure(depot, chrome, target) {
 	fs::copy("./args/default.gn", args_file);
 	fs::append(args_file, [
 		"",
-		fs::read("./args/" + target + ".gn")
+		fs::read("./args/" + arch + ".gn")
+	]);
+	fs::append(args_file, [
+		"",
+		fs::read("./args/" + channel + ".gn")
 	]);
 
-	let br_riji = cmd(["riji", "host_sysroot", "intel"]);
-	br_riji.dir("./../buildroot");
-	let sysroot = trim(br_riji.output());
-	print("using sysroot: " + sysroot);
+	let board;
+	if real_arch == "Amd64" {
+		board = "intel";
+	} else {
+		panic("only Amd64 supported for the moment");
+	}
 
-	let buildroot_riji = cmd(["riji", "sysroot", "Amd64", "intel"]);
+	let buildroot_riji = cmd(["riji", "sysroot", real_arch, board]);
 	buildroot_riji.dir("./../buildroot");
-	let target_sysroot = trim(buildroot_riji.output());
-	print("using target sysroot: " + target_sysroot);
+	let sysroot = trim(buildroot_riji.output());
+	print("using sysroot: " + sysroot);
 
 	fs::append(args_file, [
 		"",
-		"sysroot = \"" + target_sysroot + "\"",
-		//"target_sysroot = \"" + target_sysroot + "\""
+		"sysroot = \"" + sysroot + "\""
 	]);
 
 	// generate folder
@@ -133,14 +160,16 @@ fn _configure(depot, chrome, target) {
 }
 
 fn build() {
-	print("call with build release or build debug");
+	print("build <arch> <channel>");
 }
 
-fn build(target) {
-	_configure(CHROM_DEPOT, CHROM, target);
+fn build(arch, channel) {
+	_configure(CHROM_DEPOT, CHROM, arch, channel);
 
-	print("build target: " + target);
-	let out_path = "out/" + target;
+	print("build arch: " + arch + " channel: " + channel);
+	arch = lowercase(arch);
+	channel = lowercase(channel);
+	let out_path = "out/" + arch + "/" + channel;
 
 	// generate folder
 	let ninja = cmd(CHROM_DEPOT + "/autoninja");
@@ -155,53 +184,55 @@ fn build(target) {
 		"icudtl.dat"
 	];*/
 
-	bundle(CHROM + "/" + out_path, "./output/" + target + "/chromium");
+	bundle(
+		CHROM,
+		CHROM + "/" + out_path,
+		"./output/" + arch + "/" + channel + "/chromium"
+	);
 }
 
 // copy's every file that is needed
 // out path must already exist
-fn bundle(build_path, out_path) {
+fn bundle(chrome, build_path, out_path) {
 	if fs::is_dir(out_path) {
 		fs::delete(out_path);
 	}
 	fs::create_dir(out_path);
 
-	// first strip binary if it is not already stripped
-	if !fs::is_file(build_path + "/chrome.stripped") {
-		// eu-strip -o chrome.stripped -f chrome.symbols chrome
-		panic("todo implement stripped");
-	}
+	fs::delete(build_path + "/chrome.stripped");
+	fs::delete(build_path + "/chrome.symbols");
+
+	// strip binary
+	let eu_strip = cmd([
+		fs::full_path(chrome + "/buildtools/third_party/eu-strip/bin/eu-strip"),
+		"-o", "chrome.stripped",
+		"-f", "chrome.symbols",
+		"chrome"
+	]);
+	eu_strip.dir(build_path);
+	eu_strip.execute();
 
 	fs::copy(build_path + "/chrome.stripped", out_path + "/chrome");
 	fs::copy(build_path + "/chrome_crashpad_handler", out_path);
-	fs::copy(build_path + "/chrome_sandbox", out_path);
+	fs::copy(build_path + "/chrome_sandbox", out_path + "/chrome-sandbox");
 	fs::copy(build_path + "/libEGL.so", out_path);
 	fs::copy(build_path + "/libGLESv2.so", out_path);
+	fs::copy(build_path + "/libvulkan.so.1", out_path);
 	fs::copy(build_path + "/libvk_swiftshader.so", out_path);
+	fs::copy(build_path + "/libVkLayer_khronos_validation.so", out_path);
 	fs::copy(build_path + "/icudtl.dat", out_path);
 	fs::copy(build_path + "/v8_context_snapshot.bin", out_path);
 	fs::copy(build_path + "/chrome_100_percent.pak", out_path);
 	fs::copy(build_path + "/chrome_200_percent.pak", out_path);
 	fs::copy(build_path + "/resources.pak", out_path);
 	fs::copy(build_path + "/swiftshader", out_path);
-	fs::copy(build_path + "/locales", out_path);
+	fs::copy(build_path + "/vk_swiftshader_icd.json", out_path);
+	fs::create_dir(out_path + "/locales");
+	fs::copy(build_path + "/locales/en-US.pak", out_path + "/locales");
+	fs::copy(build_path + "/locales/de.pak", out_path + "/locales");
 	fs::copy(build_path + "/MEIPreload", out_path);
+	fs::copy(build_path + "/wayland_scanner", out_path);
 }
-
-/*
-RuntimeError: requested profile "/big-drive/chromium/chromium/src/chrome/build/pgo_profiles/chrome-linux-4515-1627572323-7b80f2d12f40afe6f7872c5528a069e31662276b.profdata" doesn't exist, please make sure "checkout_pgo_profiles" is set to True in the "custom_vars" section of your .gclient file, e.g.: 
-solutions = [ 
-  { 
-    "name": "src", 
-    # ...  
-    "custom_vars": { 
-      "checkout_pgo_profiles": True, 
-    }, 
-  }, 
-], 
-and then run "gclient runhooks" to download it. You can also simply disable the PGO optimizations by setting |chrome_pgo_phase = 0| in your GN arguments.
-
-*/
 
 // creates the patch
 fn create() {
@@ -231,7 +262,7 @@ fn patch_3way() {
 }
 
 // removes all unchached files in main
-fn clean() {
+fn clean_changes() {
 	let yes = prompt("really remove unchaged files");
 	if yes == false {
 		print("nothing done");
@@ -239,6 +270,10 @@ fn clean() {
 	}
 	let main = git(CHROM);
 	main.force_head();
+}
+
+fn clean(target) {
+	fs::delete(CHROM + "/out/" + target);
 }
 
 

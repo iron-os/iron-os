@@ -1,14 +1,31 @@
+
+# features
 enable_pdf = false
 use_gnome_keyring = false
 use_kerberos = false
-use_pulseaudio = true
 enable_js_type_check = false
 
 use_lld = true
 use_gold = false
 enable_remoting = false
 enable_nacl = false
-fieldtrial_testing_like_official_build = true
+disable_fieldtrial_testing_config = true
+enable_vr = false
+enable_reading_list = false
+
+use_system_libjpeg = true
+use_system_libpng = true
+
+enable_basic_printing = false
+use_cups = false
+enable_paint_preview = false
+enable_plugins = false
+enable_webui_tab_strip = false
+use_pulseaudio = false
+
+has_native_accessibility = false
+
+# display manager
 
 use_ozone = true
 ozone_auto_platforms = false
@@ -16,20 +33,25 @@ ozone_platform = "wayland"
 ozone_platform_headless = false
 ozone_platform_wayland = true
 ozone_platform_x11 = false
-enable_webui_tab_strip = false
 use_gtk = false
 use_x11 = false
-enable_basic_printing = false
-use_cups = false
-enable_paint_preview = false
-enable_plugins = false
 
-enable_linux_installer = true
-is_component_build = false
 
-angle_enable_cgl = true
-enable_distro_version_check = false
+## graphics
+use_egl = true
+# for the moment we need to enable vulkan else we cannot build
+enable_vulkan = true
+angle_enable_vulkan = true
+angle_enable_gl = true
+angle_enable_swiftshader = true
+enable_swiftshader_vulkan = true
 
-target_cpu = "x64"
-target_environment = "device"
-target_os = "linux"
+use_dawn = false
+# dawn_enable_desktop_gl = true
+# dawn_enable_opengles = true
+# dawn_use_angle = true
+# dawn_use_swiftshader = false
+# dawn_enable_vulkan = false
+# for the moment dawn using swiftshader needs xcb (x11 bindings)
+
+# use_vaapi
