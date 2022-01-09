@@ -1,0 +1,13 @@
+[package]
+name = "example-binary"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+lto = true
+
+[dependencies]
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time"] }
+service-api = { version = "0.1", path = "./../service-api" }
