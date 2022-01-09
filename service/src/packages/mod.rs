@@ -575,6 +575,10 @@ impl RawPackages {
 		Ok(())
 	}
 
+	/// returns the binary
+	/// that should be run after the ui has started
+	/// The first string is the path of the package
+	/// and the second string is the path to the binary
 	pub fn on_run_binary(&self) -> Option<(String, String)> {
 		let on_run = &self.cfg.on_run;
 		let package = self.list.get(on_run)?;
