@@ -138,8 +138,10 @@ fn _configure(depot, chrome, arch, channel) {
 	let board;
 	if real_arch == "Amd64" {
 		board = "intel";
+	} else if real_arch == "Arm64" {
+		board = "pi4";
 	} else {
-		panic("only Amd64 supported for the moment");
+		panic("only Amd64 && Arm64 are supported");
 	}
 
 	let buildroot_riji = cmd(["riji", "sysroot", real_arch, board]);

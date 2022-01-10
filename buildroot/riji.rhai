@@ -376,8 +376,10 @@ fn sysroot(arch, board) {
 	let buildroot_target;
 	if arch == "Amd64" {
 		buildroot_target = "x86_64-buildroot-linux-gnu";
+	} else if arch == "Arm64" {
+		buildroot_target = "aarch64-buildroot-linux-gnu";
 	} else {
-		panic("only Amd64 supported");
+		panic("only Amd64 && Arm64 supported");
 	}
 
 	let host = full_host_path(board);

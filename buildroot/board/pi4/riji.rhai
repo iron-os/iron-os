@@ -9,18 +9,15 @@ fn create_config(channel, defconfig, linuxconfig, images) {
 	let buildroot = fs::read("./buildroot.config");
 	fs::append(defconfig, "\n" + buildroot);
 
-	let linux = fs::read("./linux.config");
-	fs::append(linuxconfig, "\n" + linux);
-
 	// need to add the image.toml
 	let image = images + "/image.toml";
 	fs::copy("./../../package.toml", image);
 	fs::append(image, [
 		"",
-		"name = \"image-intel\"",
-		"board = \"intel\"",
-		"arch = \"Amd64\"",
-		"single-arch = \"Amd64\""
+		"name = \"image-pi4\"",
+		"board = \"pi4\"",
+		"arch = \"Arm64\"",
+		"single-arch = \"Arm64\""
 	]);
 }
 
