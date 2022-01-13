@@ -305,16 +305,35 @@ fn rebuild(board, channel, pack) {
 	make.execute();
 }
 
+fn board_by_arch(arch) {
+	let br = "./buildroot/output/";
+	if arch == "Amd64" {
+		if fs::is_dir(br + "intel") {
+			return "intel";
+		} else if fs::is_dir(br + "intel-headless") {
+			return "intel-headless";
+		}
+	} else if arch == "Arm64" {
+		if fs::is_dir(br + "pi4") {
+			return "pi4";
+		} else if fs::is_dir(br + "pi4-headless") {
+			return "pi4-headless";
+		}
+	}
+
+	panic("no board found for arch " + arch);
+}
+
 fn rust_build(arch, channel, path, binary) {
 	let board;
 	let buildroot_target;
 	let target;
 	if arch == "Amd64" {
-		board = "intel-headless";
+		board = board_by_arch(arch);
 		buildroot_target = "x86_64-buildroot-linux-gnu";
 		target = "x86_64-unknown-linux-gnu";
 	} else if arch == "Arm64" {
-		board = "pi4-headless";
+		board = board_by_arch(arch);
 		buildroot_target = "aarch64-buildroot-linux-gnu";
 		target = "aarch64-unknown-linux-gnu";
 	} else {
