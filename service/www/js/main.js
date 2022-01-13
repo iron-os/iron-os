@@ -1,8 +1,6 @@
 
-import doc, { c } from '/fire-html/doc.js';
-import { timeout, randomToken } from '/fire-html/util.js';
+import { timeout, c } from './util.js';
 import Connection from './connection.js';
-import Data from '/fire-html/data/data.js';
 import Landing from './landing.js';
 
 async function main() {
@@ -11,7 +9,8 @@ async function main() {
 	await con.connect();// wait until a connection is made
 
 	const main = c('main');
-	doc.body.insert(main);
+	main.classList.add('abs-full');
+	document.body.appendChild(main);
 
 	// const rawVersionInfo = await con.request('VersionInfo', 'versioninfo');
 	// const versionInfo = new VersionInfo(rawVersionInfo);
@@ -27,8 +26,8 @@ async function main() {
 
 	await page.prepare(con);
 
-	main.clear();
-	main.insert(page);
+	// main.clear();
+	main.appendChild(page.el);
 
 }
 

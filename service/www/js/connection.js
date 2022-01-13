@@ -1,5 +1,5 @@
 
-import { timeout, randomToken } from '/fire-html/util.js';
+import { timeout, randomToken } from './util.js';
 import Websocket from './websocket.js';
 
 /*

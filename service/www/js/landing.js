@@ -1,14 +1,20 @@
 
-import { c } from '/fire-html/doc.js';
-import { link } from '/fire-html/els/link.js';
-import Data from '/fire-html/data/data.js';
+import { c } from './util.js';
 
 // install page
 export default class Landing {
 	constructor() {
-		this.cont = c('div', { id: 'landing-page', cls: 'loading' });
+		this.el = c('div');
+		this.el.classList.add('abs-full');
 		this.iframe = c('iframe');
-		this.loading = c('p', { text: 'Loading' });
+		this.iframe.classList.add('abs-full');
+
+		this.loading = c('p');
+		this.loading.id = 'loading-text';
+		this.loading.innerText = 'Loading';
+
+		this.el.appendChild(this.loading);
+
 		this.active = null;
 	}
 
@@ -21,11 +27,10 @@ export default class Landing {
 	openPage(url) {
 		if (this.active === null) {
 			// no page was ever opened
-			this.cont.cls.remove('loading');
-			this.cont.clear();
-			this.cont.insert(this.iframe);
+			this.loading.remove();
+			this.el.appendChild(this.iframe);
 		}
-		this.iframe.attr.src = url;
+		this.iframe.src = url;
 		this.active = url;
 	}
 

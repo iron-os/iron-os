@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio::sync::watch;
 
-use fire::{data_struct, static_file, static_files, mgcss_files};
+use fire::{data_struct, static_file, static_files};
 
 // start chromium and the server manually
 // but then return a task which contains the serevr
@@ -39,10 +39,7 @@ pub async fn start(
 static_file!(Index, "/" => "./www/index.html");
 
 static_files!(Js, "/js" => "./www/js");
-
-static_files!(FireHtml, "/fire-html" => "./www/fire-html");
-
-mgcss_files!(Mgcss, "/mgcss" => "./www/mgcss");
+static_files!(Css, "/css" => "./www/css");
 
 /*
 struct Message {
@@ -145,8 +142,7 @@ pub fn start_server(
 
 	server.add_route(Index::new());
 	server.add_route(Js::new());
-	server.add_route(FireHtml::new());
-	server.add_route(Mgcss::new());
+	server.add_route(Css::new());
 	server.add_raw_route(ws::MainWs);
 
 	tokio::spawn(async move {

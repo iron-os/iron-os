@@ -1,5 +1,5 @@
 
-import { timeout } from '/fire-html/util.js';
+import { timeout } from './util.js';
 
 export default class Websocket {
 

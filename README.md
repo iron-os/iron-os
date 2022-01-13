@@ -9,10 +9,10 @@ Iron OS is an operation system based on linux/buildroot
 with chromium as it's gui.
 
 ## image
-the image of chnobli should be for all uses the same
+the image of iron should be for all uses the same
 
 ## Image vs Packages
-In chnobli there are two ways to add software either
+In iron there are two ways to add software either
 in the rootfs or via packages.
 
 The rootfs is updated bi yearly and if vulnerabilities are discovered
@@ -20,21 +20,21 @@ more.
 Packages are a shorter release cycle and should be used
 for software that changes fast.
 
-## Chnobli service bootloader
+## service bootloader
 
 - manage pssplash
-- start chnobli service package
+- start iron service package
 
 - supports api via stdin
  - can switch boot img
  - update images from img file
  - can restart
- - watchdog for chnobli service
-   restart if chnobli service does not send
+ - watchdog for iron service
+   restart if iron service does not send
    connected for a given period
  - start weston service
 
-## Chnobli service
+## service
 
 - start chnobli_ui (or chnobli_shell)
 - start chromium
@@ -53,7 +53,7 @@ for software that changes fast.
 
 
 
-## chnobli ui
+## iron ui
 - extension needs to handle the keyboard
 - allow secure storage
 - set which page to show

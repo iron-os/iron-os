@@ -46,8 +46,7 @@ async fn main() {
 	if context::get().is_debug() {
 		eprintln!("Service started in Debug context, chromium will not start");
 		if !cfg!(debug_assertions) {
-			// only show address in release since else
-			// fire displays it
+			// only show address in release since in debug fire-http displays it
 			eprintln!("Access the page via 127.0.0.1:8888");
 		}
 
@@ -57,15 +56,7 @@ async fn main() {
 		let ui_bg_task = ui::start(bootloader, ui_api_rx).await
 			.expect("ui start failed");
 
-		// ui_bg_task.await.expect("ui task failed");
-
-		let (_ui, _pan) = tokio::try_join!(
-			ui_bg_task,
-			tokio::spawn(async move {
-				tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-				panic!("exit")
-			})
-		).expect("some task failed");
+		ui_bg_task.await.expect("ui task failed");
 
 		return;
 	}
@@ -101,22 +92,5 @@ async fn main() {
 		service_bg_task,
 		display_bg_task
 	).expect("some task failed");
-
-/*
-## Chnobli service
-
-- start chnobli_ui (or chnobli_shell)
-- start chromium
-- start chnobli_packages
-- maybe need chromium debug protocol (to be able to log console.logs warnings etc)
-
-- api to start other packages
-- api to interact with ui (reset, show display)
-
-- start installer if not installed
-
-- start chnobli_core
-- start frame package
-*/
 
 }

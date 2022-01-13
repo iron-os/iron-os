@@ -11,11 +11,6 @@ fn build(arch, channel) {
 
 fn pack(dest, arch, channel) {
 	fs::copy("./target/rust_build/service", dest);
-
-	if fs::is_dir("./www/fire-html") == false {
-		panic("fire-html required");
-	}
 	fs::copy("./www", dest);
-
 	fs::copy("./extension", dest);
 }
