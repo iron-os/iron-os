@@ -205,3 +205,9 @@ request_handler!(
 		Ok(AddPackage { package: pack })
 	}
 );
+
+/*
+Get JournalLogs
+
+journalctl -n 400 --output-fields=_SYSTEMD_UNIT,MESSAGE,CODE_FILE,CODE_LINE,CODE_FUNC,_EXE -r -o json > test.txt
+*/

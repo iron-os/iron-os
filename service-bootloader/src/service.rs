@@ -20,7 +20,6 @@ use file_db::FileDb;
 use serde::Deserialize;
 
 
-
 #[derive(Debug, Deserialize)]
 pub struct Package {
 	pub name: String,
@@ -134,21 +133,6 @@ request_handler!{
 }
 
 pub fn start() -> io::Result<()> {
-
-	/*
-## Chnobli service bootloader
-
-- manage pssplash
-- start chnobli service package
-
-- supports api via stdin
- - can switch boot img
- - update images from img file
- - can restart
- - watchdog for chnobli service
-	 restart if chnobli service does not send
-	 connected for a given period
-*/
 
 	let service_package = Path::new("/data/packages/service");
 	let package_file = service_package.join("package.fdb");
