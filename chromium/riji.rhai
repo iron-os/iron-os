@@ -5,6 +5,7 @@ const DEPOT = "./depot_tools";
 const CHROM_DEPOT = "../../depot_tools";
 const CHROM = "./chromium/src";
 const STABLE = "96.0.4664.110";
+// const STABLE = "97.0.4692.92";
 
 
 fn help() {
@@ -27,18 +28,19 @@ fn download() {
 	fs::create_dir("./chromium");
 
 	// download chromium
-	//let fetch = cmd("../" + DEPOT + "/fetch");
-	//fetch.dir("./chromium");
-	//fetch.args(["--nohooks", "chromium"]);
-	//fetch.execute();
+	let fetch = cmd("../" + DEPOT + "/fetch");
+	fetch.dir("./chromium");
+	fetch.args(["--nohooks", "chromium"]);
+	fetch.execute();
 
 	// install build deps
 	let build_deps = cmd("./build/install-build-deps.sh");
 	build_deps.dir(CHROM);
 	build_deps.execute();
 
-	//checkout();
-	print("\n > call checkout");
+	_add_pgo(CHROM_DEPOT, CHROM);
+
+	_checkout(CHROM_DEPOT, CHROM, STABLE);
 }
 
 fn update() {
@@ -53,24 +55,32 @@ fn update() {
 }
 
 fn checkout() {
+	_checkout(CHROM_DEPOT, CHROM, STABLE);
+}
+
+fn _checkout(depot, chrome, stable) {
 	// sync tags
-	let pre_sync = cmd(CHROM_DEPOT + "/gclient");
-	pre_sync.dir(CHROM);
+	let pre_sync = cmd(depot + "/gclient");
+	pre_sync.dir(chrome);
 	pre_sync.args(["sync", "--with_tags"]);
 	pre_sync.execute();
 
 	// checkout current branch
-	let repo = git(CHROM);
-	repo.checkout_tag(STABLE);
+	let repo = git(chrome);
+	repo.checkout_tag(stable);
 
 	// remove unused stuff
-	let gclient = cmd(CHROM_DEPOT + "/gclient");
-	gclient.dir(CHROM);
+	let gclient = cmd(depot + "/gclient");
+	gclient.dir(chrome);
 	gclient.args(["sync", "-D", "--force", "--with_tags"]);
 	gclient.execute();
 }
 
 fn add_pgo() {
+	_add_pgo(CHROM_DEPOT, CHROM);
+}
+
+fn _add_pgo(depot, chrome) {
 	// "custom_vars": {}
 	let custom_vars = regex("custom_vars"": \\{\\}");
 	custom_vars.replace_file("./chromium/.gclient", "custom_vars"": {" +
@@ -78,10 +88,10 @@ fn add_pgo() {
 	"}");
 
 	let pre_sync = cmd([
-		CHROM_DEPOT + "/gclient",
+		depot + "/gclient",
 		"runhooks"
 	]);
-	pre_sync.dir(CHROM);
+	pre_sync.dir(chrome);
 	pre_sync.execute();
 }
 
@@ -114,6 +124,8 @@ fn configure(arch, channel) {
 }
 
 fn _configure(depot, chrome, arch, channel) {
+	_patch(chrome);
+
 	let real_arch = arch;
 	arch = lowercase(arch);
 	channel = lowercase(channel);
@@ -151,7 +163,7 @@ fn _configure(depot, chrome, arch, channel) {
 
 	fs::append(args_file, [
 		"",
-		"sysroot = \"" + sysroot + "\""
+		"target_sysroot = \"" + sysroot + "\""
 	]);
 
 	// generate folder
@@ -246,12 +258,19 @@ fn create() {
 	diff.to_file(PATCH_FILE);
 }
 
-// apply the patch
 fn patch() {
-	print("patch");
+	_patch(CHROM);
+}
 
-	let diff = diff_from_file(PATCH_FILE);
-	let main = git(CHROM);
+// apply the patch
+fn _patch(chrome) {
+	return;
+
+	let main = git(chrome);
+
+	main.force_head();
+
+	let diff = diff_from_file("./patches/disable-atk.patch");
 	main.apply_diff(diff);
 }
 

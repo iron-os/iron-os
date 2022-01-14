@@ -22,6 +22,7 @@ enable_paint_preview = false
 enable_plugins = false
 enable_webui_tab_strip = false
 use_pulseaudio = false
+use_gnome_keyring = false
 
 has_native_accessibility = false
 
@@ -35,7 +36,6 @@ ozone_platform_wayland = true
 ozone_platform_x11 = false
 use_gtk = false
 use_x11 = false
-
 
 ## graphics
 use_egl = true

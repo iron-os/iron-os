@@ -157,6 +157,10 @@ fn build_internal(board, channel, buildroot) {
 	}
 }
 
+fn publish() {
+	print("publish <board> <channel> <pub-channel>");
+}
+
 fn publish(board, channel, pub_channel) {
 	let out_dir = "./output/" + board + "/" + channel;
 	let publisher = cmd([

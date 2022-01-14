@@ -12,7 +12,8 @@ use serde::{Deserialize};
 pub struct ImageToml {
 	pub version: String,
 	pub board: String,
-	pub arch: Architecture
+	pub arch: Architecture,
+	pub name: String
 }
 
 /// Downloads and fills a full packages folder
@@ -25,8 +26,8 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 
 	let cfg: ImageToml = read_toml("./image.toml").await?;
 
-	let tmp_path = "./image_tmp/image";
-	create_dir(tmp_path).await?;
+	let tmp_path = format!("./image_tmp/{}", cfg.name);
+	create_dir(&tmp_path).await?;
 
 	copy("./bzImage", &format!("{}/bzImage", tmp_path)).await?;
 	copy("./rootfs.ext2", &format!("{}/rootfs.ext2", tmp_path)).await?;
@@ -46,7 +47,7 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 	}
 
 	// todo: maybe use the version as a name?
-	compress("image.tar.gz", "./image_tmp", "image")?;
+	compress("image.tar.gz", "./image_tmp", &cfg.name)?;
 	remove_dir("./image_tmp").await?;
 
 	let hash = hash_file("./image.tar.gz").await?;
