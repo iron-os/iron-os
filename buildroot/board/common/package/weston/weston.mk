@@ -4,9 +4,9 @@
 #
 ################################################################################
 
-WESTON_VERSION = 10.0.0-alpha.1
-WESTON_SITE = https://gitlab.freedesktop.org/soerenmeier/weston/uploads/8a2c9141f3dd698346166162e4b35550
-WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
+WESTON_VERSION = 9.0.92-kiosk-sleep
+WESTON_SITE = https://gitlab.freedesktop.org/soerenmeier/weston/-/archive/v$(WESTON_VERSION)
+WESTON_SOURCE = weston-v$(WESTON_VERSION).tar.gz
 WESTON_LICENSE = MIT
 WESTON_LICENSE_FILES = COPYING
 WESTON_CPE_ID_VENDOR = wayland

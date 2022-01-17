@@ -11,4 +11,4 @@ Restart=always
 RestartSec=2
 
 # Set a custom pam session
-PAMName=weston
+PAMName=chromium

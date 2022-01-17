@@ -1,0 +1,446 @@
+diff --git a/package/mesa3d-demos/mesa3d-demos.mk b/package/mesa3d-demos/mesa3d-demos.mk
+index 4289acfffb..6b5262a2e9 100644
+--- a/package/mesa3d-demos/mesa3d-demos.mk
++++ b/package/mesa3d-demos/mesa3d-demos.mk
+@@ -43,7 +43,7 @@ else
+ MESA3D_DEMOS_CONF_OPTS += --disable-vg
+ endif
+ 
+-ifeq ($(BR2_PACKAGE_MESA3D_OPENGL_EGL),y)
++ifeq ($(BR2_PACKAGE_MESA3D_GBM),y)
+ MESA3D_DEMOS_DEPENDENCIES += mesa3d
+ MESA3D_DEMOS_CONF_OPTS += --enable-gbm
+ else
+diff --git a/package/mesa3d-headers/mesa3d-headers.mk b/package/mesa3d-headers/mesa3d-headers.mk
+index 64587b4bcd..1cdfff50c9 100644
+--- a/package/mesa3d-headers/mesa3d-headers.mk
++++ b/package/mesa3d-headers/mesa3d-headers.mk
+@@ -12,7 +12,7 @@ endif
+ 
+ # Not possible to directly refer to mesa3d variables, because of
+ # first/second expansion trickery...
+-MESA3D_HEADERS_VERSION = 21.1.6
++MESA3D_HEADERS_VERSION = 21.3.3
+ MESA3D_HEADERS_SOURCE = mesa-$(MESA3D_HEADERS_VERSION).tar.xz
+ MESA3D_HEADERS_SITE = https://archive.mesa3d.org
+ MESA3D_HEADERS_DL_SUBDIR = mesa3d
+diff --git a/package/mesa3d/0006-fix-valist.patch b/package/mesa3d/0006-fix-valist.patch
+new file mode 100644
+index 0000000000..84a254cec5
+--- /dev/null
++++ b/package/mesa3d/0006-fix-valist.patch
+@@ -0,0 +1,37 @@
++From f6892df8eb115fa712fd69068432b48b028e1e54 Mon Sep 17 00:00:00 2001
++From: Bernd Kuhls <bernd.kuhls@t-online.de>
++Date: Sat, 20 Nov 2021 22:48:54 +0100
++Subject: [PATCH] util/u_printf.h: fix build
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Fixes build error with uClibc and gcc-9.3.0:
++
++In file included from ../src/util/u_printf.cpp:24:
++../src/util/u_printf.h:43:41: error: ‘va_list’ has not been declared
++   43 | size_t u_printf_length(const char *fmt, va_list untouched_args);
++
++Patch sent upstream:
++https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13897
++
++Signed-off-by: Bernd Kuhls <bernd.kuhls@t-online.de>
++---
++ src/util/u_printf.h | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/src/util/u_printf.h b/src/util/u_printf.h
++index 44dcce5529f..14f324de10c 100644
++--- a/src/util/u_printf.h
+++++ b/src/util/u_printf.h
++@@ -25,6 +25,7 @@
++ #ifdef __cplusplus
++ 
++ #include <string>
+++#include <stdarg.h>
++ 
++ /* find next valid printf specifier in a C++ std::string */
++ size_t util_printf_next_spec_pos(const std::string &s, size_t pos);
++-- 
++GitLab
++
+diff --git a/package/mesa3d/0007-fix-cpp-detection.patch b/package/mesa3d/0007-fix-cpp-detection.patch
+new file mode 100644
+index 0000000000..2e097277de
+--- /dev/null
++++ b/package/mesa3d/0007-fix-cpp-detection.patch
+@@ -0,0 +1,40 @@
++From ab5519971a090863f8c559907766e0b2382e0471 Mon Sep 17 00:00:00 2001
++From: Bernd Kuhls <bernd.kuhls@t-online.de>
++Date: Sat, 20 Nov 2021 23:02:18 +0100
++Subject: [PATCH] c11_compat.h: fix uClibc build
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Fixes build error with uClibc and gcc-9.3.0:
++
++../src/egl/main/egldisplay.c: In function ‘_eglGetNativePlatformFromEnv’:
++../src/egl/main/egldisplay.c:101:4: error: implicit declaration of function ‘static_assert’ [-Werror=implicit-function-declaration]
++  101 |    static_assert(ARRAY_SIZE(egl_platforms) == _EGL_NUM_PLATFORMS,
++
++CC: 21.3 <mesa-stable>
++
++Patch sent upstream:
++https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13898
++
++Signed-off-by: Bernd Kuhls <bernd.kuhls@t-online.de>
++---
++ include/c11_compat.h | 2 --
++ 1 file changed, 2 deletions(-)
++
++diff --git a/include/c11_compat.h b/include/c11_compat.h
++index d35740f47a4..cdcd3f1f52f 100644
++--- a/include/c11_compat.h
+++++ b/include/c11_compat.h
++@@ -8,8 +8,6 @@
++ 
++ #if defined(__cplusplus)
++    /* This is C++ code, not C */
++-#elif (__STDC_VERSION__ >= 201112L)
++-   /* Already C11 */
++ #else
++ 
++ 
++-- 
++GitLab
++
+diff --git a/package/mesa3d/Config.in b/package/mesa3d/Config.in
+index 82a40511f1..e41da562dc 100644
+--- a/package/mesa3d/Config.in
++++ b/package/mesa3d/Config.in
+@@ -54,20 +54,24 @@ config BR2_PACKAGE_MESA3D_OPENCL
+ 	select BR2_PACKAGE_LIBCLC
+ 	select BR2_PACKAGE_HAS_LIBOPENCL
+ 
+-# inform the .mk file of gallium, dri or vulkan driver selection
++# inform the .mk file of gallium, dri, dri3 or vulkan driver selection
++config BR2_PACKAGE_MESA3D_DRI3
++	bool
++	select BR2_PACKAGE_XLIB_LIBXSHMFENCE
++
+ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
+ 	bool
+ 	select BR2_PACKAGE_MESA3D_DRIVER
+ 
+ config BR2_PACKAGE_MESA3D_DRI_DRIVER
+ 	bool
++	select BR2_PACKAGE_MESA3D_DRI3 if \
++		(BR2_PACKAGE_XORG7 && BR2_TOOLCHAIN_HAS_SYNC_4 && \
++			!BR2_RISCV_32)
+ 	select BR2_PACKAGE_MESA3D_DRIVER
+ 	select BR2_PACKAGE_MESA3D_GBM if \
+ 		!BR2_PACKAGE_MESA3D_OPENGL_GLX && \
+ 		!BR2_PACKAGE_MESA3D_OPENGL_EGL
+-	select BR2_PACKAGE_XLIB_LIBXSHMFENCE if \
+-		(BR2_PACKAGE_XORG7 && BR2_TOOLCHAIN_HAS_SYNC_4 && \
+-			!BR2_RISCV_32)
+ 
+ config BR2_PACKAGE_MESA3D_VULKAN_DRIVER
+ 	bool
+@@ -97,8 +101,17 @@ config BR2_PACKAGE_MESA3D_NEEDS_X11
+ 
+ comment "Gallium drivers"
+ 
++config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_CROCUS
++	bool "Gallium crocus driver"
++	depends on BR2_i386 || BR2_x86_64
++	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
++	help
++	  Mesa driver for gen4-7 Intel GPUs.
++
+ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_ETNAVIV
+ 	bool "Gallium Etnaviv driver"
++	depends on (BR2_TOOLCHAIN_HAS_SYNC_4 && !BR2_RISCV_32) || !BR2_PACKAGE_XORG7 # libxshmfence
++	select BR2_PACKAGE_MESA3D_DRI3 if BR2_PACKAGE_XORG7
+ 	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
+ 	select BR2_PACKAGE_LIBDRM_ETNAVIV
+ 	help
+@@ -112,6 +125,7 @@ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_FREEDRENO
+ 	# can't see is just spurious. However, that dependency is about
+ 	# the toolchain having sync4 primitives, which is always a given
+ 	# for arm/aarch64.
++	select BR2_PACKAGE_MESA3D_DRI3 if BR2_PACKAGE_XORG7
+ 	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
+ 	select BR2_PACKAGE_LIBDRM_FREEDRENO
+ 	help
+@@ -139,6 +153,8 @@ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_IRIS
+ 
+ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LIMA
+ 	bool "Gallium lima driver"
++	depends on (BR2_TOOLCHAIN_HAS_SYNC_4 && !BR2_RISCV_32) || !BR2_PACKAGE_XORG7 # libxshmfence
++	select BR2_PACKAGE_MESA3D_DRI3 if BR2_PACKAGE_XORG7
+ 	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
+ 	help
+ 	  Mesa driver for ARM Mali Utgard GPUs.
+@@ -154,6 +170,8 @@ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_NOUVEAU
+ 
+ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_PANFROST
+ 	bool "Gallium panfrost driver"
++	depends on (BR2_TOOLCHAIN_HAS_SYNC_4 && !BR2_RISCV_32) || !BR2_PACKAGE_XORG7 # libxshmfence
++	select BR2_PACKAGE_MESA3D_DRI3 if BR2_PACKAGE_XORG7
+ 	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
+ 	help
+ 	  Mesa driver for ARM Mali Midgard and Bifrost GPUs.
+@@ -241,8 +259,10 @@ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_TEGRA
+ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_V3D
+ 	bool "Gallium v3d driver"
+ 	depends on (BR2_arm && BR2_ARM_CPU_HAS_NEON) || BR2_aarch64
++	depends on BR2_TOOLCHAIN_HAS_SYNC_4 || !BR2_PACKAGE_XORG7 # libxshmfence
++	select BR2_PACKAGE_MESA3D_DRI3 if BR2_PACKAGE_XORG7
+ 	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
+-	select BR2_PACKAGE_LIBDRM_VC4
++	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_VC4 # runtime
+ 	select BR2_PACKAGE_MESA3D_OPENGL_EGL
+ 	help
+ 	  Driver for Broadcom VC6 (rpi4) GPUs (needs vc4).
+@@ -254,7 +274,9 @@ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_V3D
+ 
+ config BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_VC4
+ 	bool "Gallium vc4 driver"
+-	depends on BR2_arm || BR2_aarch64
++	depends on (BR2_arm && BR2_ARM_CPU_HAS_NEON) || BR2_aarch64
++	depends on BR2_TOOLCHAIN_HAS_SYNC_4 || !BR2_PACKAGE_XORG7 # libxshmfence
++	select BR2_PACKAGE_MESA3D_DRI3 if BR2_PACKAGE_XORG7
+ 	select BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
+ 	select BR2_PACKAGE_LIBDRM_VC4
+ 	select BR2_PACKAGE_MESA3D_OPENGL_EGL
+@@ -356,21 +378,19 @@ comment "Vulkan drivers"
+ config BR2_PACKAGE_MESA3D_VULKAN_DRIVER_INTEL
+ 	bool "Vulkan Intel driver"
+ 	depends on BR2_i386 || BR2_x86_64
+-	depends on BR2_TOOLCHAIN_HAS_SYNC_4 # libxshmfence
++	depends on BR2_TOOLCHAIN_HAS_SYNC_4 || !BR2_PACKAGE_XORG7 # libxshmfence
+ 	depends on BR2_TOOLCHAIN_HEADERS_AT_LEAST_3_17 # memfd.h
+ 	depends on BR2_TOOLCHAIN_USES_GLIBC # ifunc, static_assert
+-	depends on BR2_PACKAGE_XORG7 # xorgproto
++	select BR2_PACKAGE_MESA3D_DRI3 if BR2_PACKAGE_XORG7
+ 	select BR2_PACKAGE_MESA3D_VULKAN_DRIVER
+-	select BR2_PACKAGE_XORGPROTO
+-	select BR2_PACKAGE_XLIB_LIBXSHMFENCE
+ 	help
+ 	  Vulkan driver for Intel hardware from Ivy Bridge onward.
+ 
+-comment "intel vulkan depends on X.org and needs a glibc toolchain w/ headers >= 3.17"
++comment "intel vulkan needs a glibc toolchain w/ headers >= 3.17"
+ 	depends on BR2_i386 || BR2_x86_64
+-	depends on BR2_TOOLCHAIN_HAS_SYNC_4
++	depends on BR2_TOOLCHAIN_HAS_SYNC_4 || !BR2_PACKAGE_XORG7
+ 	depends on !BR2_TOOLCHAIN_HEADERS_AT_LEAST_3_17 || \
+-		!BR2_TOOLCHAIN_USES_GLIBC || !BR2_PACKAGE_XORG7
++		!BR2_TOOLCHAIN_USES_GLIBC
+ 
+ comment "Off-screen Rendering"
+ 
+@@ -388,6 +408,9 @@ config BR2_PACKAGE_MESA3D_GBM
+ 	bool "gbm"
+ 	depends on BR2_PACKAGE_MESA3D_DRI_DRIVER \
+ 		|| (BR2_PACKAGE_MESA3D_GALLIUM_DRIVER && BR2_PACKAGE_MESA3D_OPENGL_EGL)
++	select BR2_PACKAGE_HAS_LIBGBM
++	select BR2_PACKAGE_LIBGBM_HAS_FEATURE_FORMAT_MODIFIER_PLANE_COUNT
++	select BR2_PACKAGE_LIBGBM_HAS_FEATURE_DMA_BUF
+ 	help
+ 	  Enable Generic Buffer Management (gbm)
+ 
+@@ -398,7 +421,8 @@ comment "gbm support needs a dri driver or a gallium driver w/ EGL support."
+ config BR2_PACKAGE_MESA3D_OPENGL_GLX
+ 	bool "OpenGL GLX"
+ 	depends on BR2_PACKAGE_XORG7
+-	select BR2_PACKAGE_HAS_LIBGL
++	select BR2_PACKAGE_HAS_LIBGL if !BR2_PACKAGE_LIBGLVND
++	select BR2_PACKAGE_LIBGLVND_DISPATCH_GL if BR2_PACKAGE_LIBGLVND
+ 	select BR2_PACKAGE_MESA3D_NEEDS_X11
+ 	help
+ 	  Enable GLX graphic acceleration (OpenGL + X11).
+@@ -408,7 +432,9 @@ comment "OpenGL GLX support needs X11"
+ 
+ config BR2_PACKAGE_MESA3D_OPENGL_EGL
+ 	bool "OpenGL EGL"
+-	select BR2_PACKAGE_HAS_LIBEGL
++	depends on BR2_PACKAGE_MESA3D_DRI_DRIVER || BR2_PACKAGE_MESA3D_GALLIUM_DRIVER
++	select BR2_PACKAGE_HAS_LIBEGL if !BR2_PACKAGE_LIBGLVND
++	select BR2_PACKAGE_LIBGLVND_DISPATCH_EGL if BR2_PACKAGE_LIBGLVND
+ 	select BR2_PACKAGE_HAS_LIBEGL_WAYLAND
+ 	select BR2_PACKAGE_MESA3D_GBM
+ 	help
+@@ -417,21 +443,25 @@ config BR2_PACKAGE_MESA3D_OPENGL_EGL
+ 
+ config BR2_PACKAGE_MESA3D_OPENGL_ES
+ 	bool "OpenGL ES"
+-	select BR2_PACKAGE_HAS_LIBGLES
++	select BR2_PACKAGE_HAS_LIBGLES if !BR2_PACKAGE_LIBGLVND
++	select BR2_PACKAGE_LIBGLVND_DISPATCH_GLES if BR2_PACKAGE_LIBGLVND
+ 	help
+ 	  Use the Khronos OpenGL ES APIs. This is commonly used on
+ 	  embedded systems and represents a subset of the OpenGL API.
+ 
+ endif # BR2_PACKAGE_MESA3D_DRIVER
+ 
++config BR2_PACKAGE_PROVIDES_LIBGBM
++	default "mesa3d" if BR2_PACKAGE_MESA3D_GBM
++
+ config BR2_PACKAGE_PROVIDES_LIBGL
+-	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENGL_GLX
++	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENGL_GLX && !BR2_PACKAGE_LIBGLVND
+ 
+ config BR2_PACKAGE_PROVIDES_LIBEGL
+-	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENGL_EGL
++	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENGL_EGL && !BR2_PACKAGE_LIBGLVND
+ 
+ config BR2_PACKAGE_PROVIDES_LIBGLES
+-	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENGL_ES
++	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENGL_ES && !BR2_PACKAGE_LIBGLVND
+ 
+ config BR2_PACKAGE_PROVIDES_LIBOPENCL
+ 	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENCL
+diff --git a/package/mesa3d/mesa3d.hash b/package/mesa3d/mesa3d.hash
+index 4b63e0cece..235a1b55bb 100644
+--- a/package/mesa3d/mesa3d.hash
++++ b/package/mesa3d/mesa3d.hash
+@@ -1,6 +1,6 @@
+-# From https://lists.freedesktop.org/archives/mesa-announce/2021-July/000640.html
+-sha256  b1cb0122f911dfa9fe1f209a7061378c61a1448a280e711511ca72dad9999e37  mesa-21.1.6.tar.xz
+-sha512  5daf389aad4fe7ab3574f6af3aabc62ba8b3034004a0a0853dcc18ef6c8003d2f2195cc377dc57b30863ae4cf158149e3156247445ca2b11e401700011cb878c  mesa-21.1.6.tar.xz
++# From https://lists.freedesktop.org/archives/mesa-announce/2021-December/000658.html
++sha256  ad7f4613ea7c5d08d9fcb5025270199e6ceb9aa99fd72ee572b70342240a8121  mesa-21.3.3.tar.xz
++sha512  0263d75435f8c16d40eba3eae29bf372e8994816718deec153c582a17c4dd6ef1c67b3236ed31e63f98bf4e1089fac5cfafae9fb84d3e1fa919b274f43e7e673  mesa-21.3.3.tar.xz
+ 
+ # License
+ sha256  998437f3f75f0c542046f83c1cb349408122268168fb13eb4ae6967aa18b7d98  docs/license.rst
+diff --git a/package/mesa3d/mesa3d.mk b/package/mesa3d/mesa3d.mk
+index 3cabc42cc4..aa365838ab 100644
+--- a/package/mesa3d/mesa3d.mk
++++ b/package/mesa3d/mesa3d.mk
+@@ -5,7 +5,7 @@
+ ################################################################################
+ 
+ # When updating the version, please also update mesa3d-headers
+-MESA3D_VERSION = 21.1.6
++MESA3D_VERSION = 21.3.3
+ MESA3D_SOURCE = mesa-$(MESA3D_VERSION).tar.xz
+ MESA3D_SITE = https://archive.mesa3d.org
+ MESA3D_LICENSE = MIT, SGI, Khronos
+@@ -20,7 +20,7 @@ MESA3D_PROVIDES =
+ MESA3D_DEPENDENCIES = \
+ 	host-bison \
+ 	host-flex \
+-	host-python3-mako \
++	host-python-mako \
+ 	expat \
+ 	libdrm \
+ 	zlib
+@@ -35,6 +35,15 @@ ifeq ($(BR2_TOOLCHAIN_EXTERNAL_CODESOURCERY_ARM),y)
+ MESA3D_CONF_OPTS += -Db_asneeded=false
+ endif
+ 
++ifeq ($(BR2_PACKAGE_MESA3D_DRI3),y)
++MESA3D_CONF_OPTS += -Ddri3=enabled
++ifeq ($(BR2_PACKAGE_XLIB_LIBXSHMFENCE),y)
++MESA3D_DEPENDENCIES += xlib_libxshmfence
++endif
++else
++MESA3D_CONF_OPTS += -Ddri3=disabled
++endif
++
+ ifeq ($(BR2_PACKAGE_MESA3D_LLVM),y)
+ MESA3D_DEPENDENCIES += host-llvm llvm
+ MESA3D_MESON_EXTRA_BINARIES += llvm-config='$(STAGING_DIR)/usr/bin/llvm-config'
+@@ -64,7 +73,10 @@ ifeq ($(BR2_PACKAGE_MESA3D_OPENGL_GLX),y)
+ #  dri          : dri based GLX requires at least one DRI driver || dri based GLX requires shared-glapi
+ #  xlib         : xlib conflicts with any dri driver
+ #  gallium-xlib : Gallium-xlib based GLX requires at least one gallium driver || Gallium-xlib based GLX requires softpipe or llvmpipe || gallium-xlib conflicts with any dri driver.
+-MESA3D_CONF_OPTS += -Dglx=dri
++# Always enable glx-direct; without it, amy GLX applications don't work.
++MESA3D_CONF_OPTS += \
++	-Dglx=dri \
++	-Dglx-direct=true
+ ifeq ($(BR2_PACKAGE_MESA3D_NEEDS_XA),y)
+ MESA3D_CONF_OPTS += -Dgallium-xa=enabled
+ else
+@@ -85,6 +97,7 @@ endif
+ # Drivers
+ 
+ #Gallium Drivers
++MESA3D_GALLIUM_DRIVERS-$(BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_CROCUS)   += crocus
+ MESA3D_GALLIUM_DRIVERS-$(BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_ETNAVIV)  += etnaviv
+ MESA3D_GALLIUM_DRIVERS-$(BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_FREEDRENO) += freedreno
+ MESA3D_GALLIUM_DRIVERS-$(BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_I915)     += i915
+@@ -122,17 +135,10 @@ endif
+ 
+ ifeq ($(BR2_PACKAGE_MESA3D_DRI_DRIVER),)
+ MESA3D_CONF_OPTS += \
+-	-Ddri-drivers= -Ddri3=disabled
++	-Ddri-drivers=
+ else
+-ifeq ($(BR2_PACKAGE_XLIB_LIBXSHMFENCE),y)
+-MESA3D_DEPENDENCIES += xlib_libxshmfence
+-MESA3D_CONF_OPTS += -Ddri3=enabled
+-else
+-MESA3D_CONF_OPTS += -Ddri3=disabled
+-endif
+ MESA3D_CONF_OPTS += \
+ 	-Dshared-glapi=enabled \
+-	-Dglx-direct=true \
+ 	-Ddri-drivers=$(subst $(space),$(comma),$(MESA3D_DRI_DRIVERS-y))
+ endif
+ 
+@@ -140,9 +146,7 @@ ifeq ($(BR2_PACKAGE_MESA3D_VULKAN_DRIVER),)
+ MESA3D_CONF_OPTS += \
+ 	-Dvulkan-drivers=
+ else
+-MESA3D_DEPENDENCIES += xlib_libxshmfence
+ MESA3D_CONF_OPTS += \
+-	-Ddri3=enabled \
+ 	-Dvulkan-drivers=$(subst $(space),$(comma),$(MESA3D_VULKAN_DRIVERS-y))
+ endif
+ 
+@@ -162,9 +166,9 @@ MESA3D_CONF_OPTS += -Dopengl=true
+ # we do not need libva support in mesa3d, therefore disable this option
+ MESA3D_CONF_OPTS += -Dgallium-va=disabled
+ 
+-# libGL is only provided for a full xorg stack
++# libGL is only provided for a full xorg stack, without libglvnd
+ ifeq ($(BR2_PACKAGE_MESA3D_OPENGL_GLX),y)
+-MESA3D_PROVIDES += libgl
++MESA3D_PROVIDES += $(if $(BR2_PACKAGE_LIBGLVND),,libgl)
+ else
+ define MESA3D_REMOVE_OPENGL_HEADERS
+ 	rm -rf $(STAGING_DIR)/usr/include/GL/
+@@ -202,7 +206,7 @@ MESA3D_CONF_OPTS += \
+ endif
+ 
+ ifeq ($(BR2_PACKAGE_MESA3D_OPENGL_EGL),y)
+-MESA3D_PROVIDES += libegl
++MESA3D_PROVIDES += $(if $(BR2_PACKAGE_LIBGLVND),,libegl)
+ MESA3D_CONF_OPTS += \
+ 	-Degl=enabled
+ else
+@@ -211,7 +215,7 @@ MESA3D_CONF_OPTS += \
+ endif
+ 
+ ifeq ($(BR2_PACKAGE_MESA3D_OPENGL_ES),y)
+-MESA3D_PROVIDES += libgles
++MESA3D_PROVIDES += $(if $(BR2_PACKAGE_LIBGLVND),,libgles)
+ MESA3D_CONF_OPTS += -Dgles1=enabled -Dgles2=enabled
+ else
+ MESA3D_CONF_OPTS += -Dgles1=disabled -Dgles2=disabled
+@@ -266,4 +270,11 @@ ifeq ($(BR2_m68k),y)
+ MESA3D_CFLAGS += -mlong-jump-table-offsets
+ endif
+ 
++ifeq ($(BR2_PACKAGE_LIBGLVND),y)
++MESA3D_DEPENDENCIES += libglvnd
++MESA3D_CONF_OPTS += -Dglvnd=true
++else
++MESA3D_CONF_OPTS += -Dglvnd=false
++endif
++
+ $(eval $(meson-package))

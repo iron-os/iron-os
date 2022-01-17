@@ -124,7 +124,7 @@ fn configure(arch, channel) {
 }
 
 fn _configure(depot, chrome, arch, channel) {
-	_patch(chrome);
+	//_patch(chrome);
 
 	let real_arch = arch;
 	arch = lowercase(arch);
@@ -245,7 +245,7 @@ fn bundle(chrome, build_path, out_path) {
 	fs::copy(build_path + "/locales/en-US.pak", out_path + "/locales");
 	fs::copy(build_path + "/locales/de.pak", out_path + "/locales");
 	fs::copy(build_path + "/MEIPreload", out_path);
-	fs::copy(build_path + "/wayland_scanner", out_path);
+	// fs::copy(build_path + "/wayland_scanner", out_path);
 }
 
 // creates the patch
@@ -264,14 +264,18 @@ fn patch() {
 
 // apply the patch
 fn _patch(chrome) {
-	return;
-
 	let main = git(chrome);
-
 	main.force_head();
 
-	let diff = diff_from_file("./patches/disable-atk.patch");
+	let diff = diff_from_file("./patches/all.patch");
 	main.apply_diff(diff);
+
+
+	let ffmpeg = git(chrome + "/third_party/ffmpeg");
+	ffmpeg.force_head();
+
+	let ffmpeg_diff = diff_from_file("./patches/ffmpeg.patch");
+	ffmpeg.apply_diff(ffmpeg_diff);
 }
 
 fn patch_3way() {

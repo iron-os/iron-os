@@ -1,0 +1,13 @@
+diff --git a/gn/BUILDCONFIG.gn b/gn/BUILDCONFIG.gn
+index 5f800a67ca..610079f208 100644
+--- a/gn/BUILDCONFIG.gn
++++ b/gn/BUILDCONFIG.gn
+@@ -57,7 +57,7 @@ is_android = current_os == "android"
+ is_fuchsia = current_os == "fuchsia"
+ is_ios = current_os == "ios" || current_os == "tvos"
+ is_tvos = current_os == "tvos"
+-is_linux = current_os == "linux"
++is_linux = current_os == "linux" || current_os == "ironos"
+ is_mac = current_os == "mac"
+ is_win = current_os == "win"
+ 

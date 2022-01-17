@@ -255,4 +255,10 @@ fn apply_patch(channel, buildroot) {
 	let buildroot_repo = git(buildroot);
 	let gcc_diff = diff_from_file("./pre-patches/gcc-copy-more-libs.patch");
 	buildroot_repo.apply_diff(gcc_diff);
+	let pipwire_diff = diff_from_file("./pre-patches/pipewire-build-fails-with-vulkan.patch");
+	buildroot_repo.apply_diff(pipwire_diff);
+	let wayland_diff = diff_from_file("./pre-patches/update-wayland.patch");
+	buildroot_repo.apply_diff(wayland_diff);
+	let mesa3d_diff = diff_from_file("./pre-patches/mesa3d-update.patch");
+	buildroot_repo.apply_diff(mesa3d_diff);
 }

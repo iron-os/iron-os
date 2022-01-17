@@ -1,3 +1,2 @@
-# From https://lists.freedesktop.org/archives/wayland-devel/2020-September/041595.html
-sha256  b3317ea802403faef7344c8eecaafdd6d6dce4eb0443e03e5fcae67f7f98e210  weston-10.0.0-alpha.1.tar.xz
-sha512 ada982f28e194d21086ba7dffa6816a897b55b1f8a78c6e90b948805d2e780c4c37f6ec707c0cee8731d5be0cbba083c3a276d6c6b7ac5d74887b6ac75458504  weston-10.0.0-alpha.1.tar.xz
+sha256 bd6eff20241089140a5d75fcda34d58e0f684de602c1914b16dc47486091a0e7  weston-v9.0.92-kiosk-sleep.tar.gz
+sha512 fde233f2c3e1793f5e8e7c33016175fe7be64be6b3f510cf11d85f22053da9ad66a926a4a59ed1780cf724ef492bca5d8bb10c7aea760d4081a785f052b29d99  weston-v9.0.92-kiosk-sleep.tar.gz

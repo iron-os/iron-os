@@ -57,14 +57,14 @@ index 55478b02cd0fe..b936947e368d2 100644
  
  # Whether using Xvfb to provide a display server for a test might be
 diff --git a/components/policy/BUILD.gn b/components/policy/BUILD.gn
-index 998af332de4a3..c2eccb0bc813a 100644
+index 998af332de4a3..4768f488a273d 100644
 --- a/components/policy/BUILD.gn
 +++ b/components/policy/BUILD.gn
 @@ -121,12 +121,17 @@ action("policy_code_generate") {
      outputs -= [ app_restrictions_path ]
    }
  
-+  target_platform = target_os
++  target_platform = target_os;
 +  if (target_os == "ironos") {
 +    target_platform = "linux"
 +  }
@@ -83,7 +83,7 @@ index 998af332de4a3..c2eccb0bc813a 100644
      policy_common_definitions_full_runtime_proto_path,
    ]
  
-+  target_platform = target_os
++  target_platform = target_os;
 +  if (target_os == "ironos") {
 +    target_platform = "linux"
 +  }
