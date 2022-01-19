@@ -4,8 +4,8 @@ const PATCH_FILE = "./patches.patch";
 const DEPOT = "./depot_tools";
 const CHROM_DEPOT = "../../depot_tools";
 const CHROM = "./chromium/src";
-const STABLE = "96.0.4664.110";
-// const STABLE = "97.0.4692.92";
+// const STABLE = "96.0.4664.110";
+const BETA = "98.0.4758.54";
 
 
 fn help() {
@@ -40,7 +40,7 @@ fn download() {
 
 	_add_pgo(CHROM_DEPOT, CHROM);
 
-	_checkout(CHROM_DEPOT, CHROM, STABLE);
+	_checkout(CHROM_DEPOT, CHROM, BETA);
 }
 
 fn update() {
@@ -55,7 +55,7 @@ fn update() {
 }
 
 fn checkout() {
-	_checkout(CHROM_DEPOT, CHROM, STABLE);
+	_checkout(CHROM_DEPOT, CHROM, BETA);
 }
 
 fn _checkout(depot, chrome, stable) {
@@ -270,12 +270,19 @@ fn _patch(chrome) {
 	let diff = diff_from_file("./patches/all.patch");
 	main.apply_diff(diff);
 
-
+	// ffmpeg
 	let ffmpeg = git(chrome + "/third_party/ffmpeg");
 	ffmpeg.force_head();
 
 	let ffmpeg_diff = diff_from_file("./patches/ffmpeg.patch");
 	ffmpeg.apply_diff(ffmpeg_diff);
+
+	// skia
+	let skia = git(chrome + "/third_party/skia");
+	skia.force_head();
+
+	let skia_diff = diff_from_file("./patches/skia.patch");
+	skia.apply_diff(skia_diff);
 }
 
 fn patch_3way() {
@@ -288,13 +295,16 @@ fn patch_3way() {
 
 // removes all unchached files in main
 fn clean_changes() {
-	let yes = prompt("really remove unchaged files");
-	if yes == false {
-		print("nothing done");
-		return;
-	}
 	let main = git(CHROM);
 	main.force_head();
+
+	// ffmpeg
+	let ffmpeg = git(CHROM + "/third_party/ffmpeg");
+	ffmpeg.force_head();
+
+	// skia
+	let skia = git(CHROM + "/third_party/skia");
+	skia.force_head();
 }
 
 fn clean(target) {

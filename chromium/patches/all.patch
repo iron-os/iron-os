@@ -1,8 +1,8 @@
 diff --git a/build/config/BUILDCONFIG.gn b/build/config/BUILDCONFIG.gn
-index 62e7e4bcd3e6c..ed9284d6d7c4e 100644
+index fcc7e12834733..7798f73b73c05 100644
 --- a/build/config/BUILDCONFIG.gn
 +++ b/build/config/BUILDCONFIG.gn
-@@ -229,6 +229,8 @@ if (target_os == "android") {
+@@ -236,6 +236,8 @@ if (target_os == "android") {
    } else {
      _default_toolchain = "//build/toolchain/linux:$target_cpu"
    }
@@ -11,7 +11,7 @@ index 62e7e4bcd3e6c..ed9284d6d7c4e 100644
  } else if (target_os == "fuchsia") {
    _default_toolchain = "//build/toolchain/fuchsia:$target_cpu"
  } else if (target_os == "ios") {
-@@ -287,7 +289,8 @@ is_android = current_os == "android"
+@@ -296,7 +298,8 @@ is_android = current_os == "android"
  is_chromeos = current_os == "chromeos"
  is_fuchsia = current_os == "fuchsia"
  is_ios = current_os == "ios"
@@ -22,13 +22,13 @@ index 62e7e4bcd3e6c..ed9284d6d7c4e 100644
  is_nacl = current_os == "nacl"
  is_win = current_os == "win" || current_os == "winuwp"
 diff --git a/build/config/sanitizers/sanitizers.gni b/build/config/sanitizers/sanitizers.gni
-index 8d26d0054cce7..981aa91e91f48 100644
+index 2940bfc37f264..86b86039b2e55 100644
 --- a/build/config/sanitizers/sanitizers.gni
 +++ b/build/config/sanitizers/sanitizers.gni
 @@ -57,7 +57,7 @@ declare_args() {
    # TODO(crbug.com/1159424): Reassess the validity of the next expression.
    is_cfi =
-       is_official_build &&
+       is_official_build && is_clang &&
 -      (((target_os == "linux" || is_chromeos_lacros) && target_cpu == "x64") ||
 +      (((target_os == "linux" || target_os == "ironos" || is_chromeos_lacros) && target_cpu == "x64") ||
         ((is_chromeos_ash || is_chromeos_lacros) && is_chromeos_device))
@@ -56,6 +56,44 @@ index 55478b02cd0fe..b936947e368d2 100644
            current_toolchain == default_toolchain
  
  # Whether using Xvfb to provide a display server for a test might be
+diff --git a/build/toolchain/ironos/BUILD.gn b/build/toolchain/ironos/BUILD.gn
+new file mode 100644
+index 0000000000000..99d91182f4f31
+--- /dev/null
++++ b/build/toolchain/ironos/BUILD.gn
+@@ -0,0 +1,31 @@
++# Copyright 2013 The Chromium Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
++import("//build/config/ozone.gni")
++import("//build/config/sysroot.gni")
++import("//build/toolchain/gcc_toolchain.gni")
++
++clang_toolchain("clang_arm") {
++  toolchain_args = {
++    current_cpu = "arm"
++    current_os = "linux"
++  }
++}
++
++clang_toolchain("clang_arm64") {
++  toolchain_args = {
++    current_cpu = "arm64"
++    current_os = "linux"
++  }
++}
++
++clang_toolchain("clang_x64") {
++  # Output linker map files for binary size analysis.
++  enable_linker_map = true
++
++  toolchain_args = {
++    current_cpu = "x64"
++    current_os = "linux"
++  }
++}
+\ No newline at end of file
 diff --git a/components/policy/BUILD.gn b/components/policy/BUILD.gn
 index 998af332de4a3..c2eccb0bc813a 100644
 --- a/components/policy/BUILD.gn
@@ -150,3 +188,4 @@ index 9ecf38974795f..3afde792b94d5 100755
    description_filename = os.path.normpath(args[0])
    shortroot = opts.output
    if opts.destdir:
+   

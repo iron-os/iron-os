@@ -16,6 +16,9 @@ enable_reading_list = false
 # use_system_libjpeg = true
 # use_system_libpng = true
 
+use_vaapi = true
+use_vaapi_image_codecs = true
+
 enable_basic_printing = false
 use_cups = false
 enable_paint_preview = false
@@ -32,7 +35,6 @@ ozone_auto_platforms = false
 ozone_platform = "wayland"
 ozone_platform_wayland = true
 use_gtk = false
-use_x11 = false
 
 ## graphics
 # use_egl = true
@@ -50,5 +52,3 @@ use_x11 = false
 # dawn_use_swiftshader = false
 # dawn_enable_vulkan = false
 # for the moment dawn using swiftshader needs xcb (x11 bindings)
-
-# use_vaapi
