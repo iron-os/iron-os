@@ -261,4 +261,6 @@ fn apply_patch(channel, buildroot) {
 	buildroot_repo.apply_diff(wayland_diff);
 	let mesa3d_diff = diff_from_file("./pre-patches/mesa3d-update.patch");
 	buildroot_repo.apply_diff(mesa3d_diff);
+	let psplash_diff = diff_from_file("./pre-patches/psplash.patch");
+	buildroot_repo.apply_diff(psplash_diff);
 }

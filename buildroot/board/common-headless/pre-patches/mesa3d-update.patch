@@ -333,7 +333,7 @@ index 3cabc42cc4..aa365838ab 100644
  	host-bison \
  	host-flex \
 -	host-python3-mako \
-+	host-python-mako \
++	host-python3-mako \
  	expat \
  	libdrm \
  	zlib
