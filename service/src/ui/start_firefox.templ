@@ -1,0 +1,4 @@
+#!/bin/bash
+cd CURRENT_DIR
+XDG_RUNTIME_DIR=/run/user/14 WAYLAND_DISPLAY=wayland-0 MOZ_ENABLE_WAYLAND=1 \
+	BINARY --kiosk "URL"

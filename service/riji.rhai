@@ -1,5 +1,16 @@
 
-fn startChrome(url) {
+fn help() {
+	print([
+		"Service riji help:",
+		"start_chrome <url> // starts chrome with the extension"
+	]);
+}
+
+fn start_chrome() {
+	print("start_chrome <url>");
+}
+
+fn start_chrome(url) {
 	let extension = fs::full_path("./extension");
 	print("extension " + extension);
 	let chrome = cmd([

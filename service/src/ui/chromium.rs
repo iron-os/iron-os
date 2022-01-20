@@ -15,6 +15,7 @@ use bootloader_api::{SystemdRestart, MakeRoot};
 use packages::packages::PackageCfg;
 
 const CMD: &str = include_str!("start_chrome.templ");
+const FIREFOX_CMD: &str = include_str!("start_firefox.templ");
 const CHROME_PACKAGE: &str = "/data/packages/chromium";
 
 // the url needs https or http
@@ -27,7 +28,11 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	).await?.into_data();
 	let package = package_cfg.package();
 	let curr_path = format!("{}/{}", CHROME_PACKAGE, package_cfg.current());
-	let bin_path = format!("{}/{}", curr_path, package.binary.as_ref().unwrap());
+	let binary = package.binary.as_ref()
+		.expect("chromium package does not have a binary");
+	let bin_path = format!("{}/{}", curr_path, binary);
+
+	let is_firefox = binary == "firefox";
 
 	let my_curr_path = env::current_dir()?
 		.into_os_string().into_string()
@@ -39,10 +44,16 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	// message
 
 	// this is not really efficient
-	let cmd = CMD.replace("CURRENT_DIR", &curr_path)
-		.replace("BINARY", &bin_path)
-		.replace("URL", url)
-		.replace("EXTENSION", &extension_path);
+	let cmd = if is_firefox {
+		FIREFOX_CMD.replace("CURRENT_DIR", &curr_path)
+			.replace("BINARY", &bin_path)
+			.replace("URL", url)
+	} else { // is chrome
+		CMD.replace("CURRENT_DIR", &curr_path)
+			.replace("BINARY", &bin_path)
+			.replace("URL", url)
+			.replace("EXTENSION", &extension_path)
+	};
 
 	// create start script
 	let mut script = File::create(format!("{}/start.sh", CHROME_PACKAGE)).await?;
@@ -54,10 +65,12 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	// this is done to free start.sh so the service can start chromium
 	drop(script);
 
-	// now make chrome-sandbox root
-	client.request(&MakeRoot {
-		path: format!("{}/chrome-sandbox", curr_path)
-	}).await?;
+	if !is_firefox {
+		// now make chrome-sandbox root
+		client.request(&MakeRoot {
+			path: format!("{}/chrome-sandbox", curr_path)
+		}).await?;
+	}
 
 	// now restart service
 	client.request(&SystemdRestart { name: "chromium".into() }).await?;

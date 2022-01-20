@@ -63,6 +63,7 @@ async fn update_from_source(
 		let info = client.request(req).await
 			.map_err(io_other)?;
 
+		// skip if the package as not changed
 		let package = match info.package {
 			Some(p) => p,
 			None => continue

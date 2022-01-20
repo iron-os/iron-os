@@ -21,7 +21,7 @@ function allowIframes() {
 
 		return { responseHeaders: headers };
 	}, {
-		urls: [ '*://www.speedtest.net/*', '*://speedtest.net/*' ],
+		urls: [ '<all_urls>' ],
 		types: [ 'sub_frame' ]
 	}, ['blocking', 'responseHeaders', 'extraHeaders']);
 
@@ -48,22 +48,22 @@ const whitelist = [
 	// main 
 	'127.0.0.1:8888',
 	// client
-	'127.0.0.1:8080',
+	// '127.0.0.1:8080',
 	// to test speed in debug view
-	'www.speedtest.net', 'speedtest.net',
-	'livgood.ch', 'fonts.googleapis.com',
-	'fonts.gstatic.com'
+	// 'www.speedtest.net', 'speedtest.net',
+	// 'livgood.ch', 'fonts.googleapis.com',
+	// 'fonts.gstatic.com'
 ];
 
-const speedtestBlacklist = [
-	'c.amazon-adsystem.com', 'www.googletagmanager.com',
-	'sb.scorecardresearch.com', 'gurgle.speedtest.net',
-	'securepubads.g.doubleclick.net', 'www.google-analytics.com',
-	'jogger.zdbb.net', 'fastlane.rebiconproject.com',
-	'ib.adnxs.com', 'c2shb.ssp.yahoo.com',
-	'stags.bluekai.com', 'adservice.google.com', 'adservice.google.ch',
-	'ookla-d.openx.net'
-];
+// const speedtestBlacklist = [
+// 	'c.amazon-adsystem.com', 'www.googletagmanager.com',
+// 	'sb.scorecardresearch.com', 'gurgle.speedtest.net',
+// 	'securepubads.g.doubleclick.net', 'www.google-analytics.com',
+// 	'jogger.zdbb.net', 'fastlane.rebiconproject.com',
+// 	'ib.adnxs.com', 'c2shb.ssp.yahoo.com',
+// 	'stags.bluekai.com', 'adservice.google.com', 'adservice.google.ch',
+// 	'ookla-d.openx.net'
+// ];
 
 function blockRequests() {
 	chrome.webRequest.onBeforeRequest.addListener(info => {
@@ -71,14 +71,16 @@ function blockRequests() {
 		console.log(info.initiator, info.url);
 
 		// allow wss initiated from speedtest
-		if ('initiator' in info &&
-			info.initiator === 'https://www.speedtest.net' &&
-			(info.url.startsWith('wss://') || info.url.startsWith('https://')) &&
-			speedtestBlacklist.indexOf(info.url.split('/')[2]) === -1)
-			return { cancel: false };
+		// if ('initiator' in info &&
+		// 	info.initiator === 'https://www.speedtest.net' &&
+		// 	(info.url.startsWith('wss://') || info.url.startsWith('https://')) &&
+		// 	speedtestBlacklist.indexOf(info.url.split('/')[2]) === -1)
+		// 	return { cancel: false };
 
 		//console.log(info);
 		const domain = info.url.split('/')[2];
+
+		console.log('domain', domain);
 
 		return {
 			cancel: whitelist.indexOf(domain) === -1

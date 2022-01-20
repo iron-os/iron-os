@@ -34,8 +34,6 @@ pub async fn start(
 	Ok(server)
 }
 
-
-
 static_file!(Index, "/" => "./www/index.html");
 
 static_files!(Js, "/js" => "./www/js");

@@ -8,8 +8,12 @@ fn pack(dest, arch, channel) {
 		panic("only Amd64 supported");
 	}
 
+	fs::move("./output/default/firefox", "./output/default/chromium");
+
 	fs::copy(
-		"./output/default/firefox",
+		"./output/default/chromium",
 		dest + "/../"
 	);
+
+	fs::delete("./output/default/chromium");
 }
