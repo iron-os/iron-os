@@ -1,36 +1,30 @@
 diff --git a/package/wayland-protocols/wayland-protocols.hash b/package/wayland-protocols/wayland-protocols.hash
-index 321fc62de5..a9b75ea8da 100644
+index b76bafb437..55d75375e9 100644
 --- a/package/wayland-protocols/wayland-protocols.hash
 +++ b/package/wayland-protocols/wayland-protocols.hash
 @@ -1,5 +1,3 @@
--# From https://lists.freedesktop.org/archives/wayland-devel/2020-February/041269.html
--md5  b0836533a3f2dc6585b1dae00341157f  wayland-protocols-1.20.tar.xz
--sha1  e78c739a3a85477ed524b81e8bb75efe7f8bf4df  wayland-protocols-1.20.tar.xz
--sha256  9782b7a1a863d82d7c92478497d13c758f52e7da4f197aa16443f73de77e4de7  wayland-protocols-1.20.tar.xz
+-# From https://lists.freedesktop.org/archives/wayland-devel/2021-September/041979.html
+-md5  31a6c469718db37d2688109e548506e4  wayland-protocols-1.23.tar.xz
+-sha1  8c4ebdce35953b1e2af458c139a432a308af6f50  wayland-protocols-1.23.tar.xz
+-sha256  6c0af1915f96f615927a6270d025bd973ff1c58e521e4ca1fc9abfc914633f76  wayland-protocols-1.23.tar.xz
 -sha256  f1a2b233e8a9a71c40f4aa885be08a0842ac85bb8588703c1dd7e6e6502e3124  COPYING
 +# From https://lists.freedesktop.org/archives/wayland-devel/2021-November/042039.html
 +sha1 c695d37f75414b10e7e1ef8d67120332d4955586  wayland-protocols-1.24.tar.xz
 +sha256 bff0d8cffeeceb35159d6f4aa6bab18c807b80642c9d50f66cba52ecf7338bc2  wayland-protocols-1.24.tar.xz
-\ No newline at end of file
 diff --git a/package/wayland-protocols/wayland-protocols.mk b/package/wayland-protocols/wayland-protocols.mk
-index 84028b97d5..fb980f5d67 100644
+index 41ab1e1c99..119b863fdb 100644
 --- a/package/wayland-protocols/wayland-protocols.mk
 +++ b/package/wayland-protocols/wayland-protocols.mk
 @@ -4,7 +4,7 @@
  #
  ################################################################################
  
--WAYLAND_PROTOCOLS_VERSION = 1.20
+-WAYLAND_PROTOCOLS_VERSION = 1.23
 +WAYLAND_PROTOCOLS_VERSION = 1.24
  WAYLAND_PROTOCOLS_SITE = https://wayland.freedesktop.org/releases
  WAYLAND_PROTOCOLS_SOURCE = wayland-protocols-$(WAYLAND_PROTOCOLS_VERSION).tar.xz
  WAYLAND_PROTOCOLS_LICENSE = MIT
-@@ -12,4 +12,4 @@ WAYLAND_PROTOCOLS_LICENSE_FILES = COPYING
- WAYLAND_PROTOCOLS_INSTALL_STAGING = YES
- WAYLAND_PROTOCOLS_INSTALL_TARGET = NO
- 
--$(eval $(autotools-package))
-+$(eval $(meson-package))
+
 diff --git a/package/wayland/0001-build-add-option-to-disable-tests.patch b/package/wayland/0001-build-add-option-to-disable-tests.patch
 deleted file mode 100644
 index 5ecf100d64..0000000000
@@ -159,6 +153,54 @@ index 84d0e4cf6f..0000000000
 - 
 --- 
 -2.31.1
+-
+diff --git a/package/wayland-protocols/0001-meson.build-wayland-scanner-is-only-needed-for-tests.patch b/package/wayland-protocols/0001-meson.build-wayland-scanner-is-only-needed-for-tests.patch
+deleted file mode 100644
+index ff3ec5719c..0000000000
+--- a/package/wayland-protocols/0001-meson.build-wayland-scanner-is-only-needed-for-tests.patch
++++ /dev/null
+@@ -1,42 +0,0 @@
+-From 80e97bd00bf6263845aa98b411507baba28be67e Mon Sep 17 00:00:00 2001
+-From: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+-Date: Sun, 19 Sep 2021 11:01:00 +0200
+-Subject: [PATCH] meson.build: wayland-scanner is only needed for tests
+-
+-wayland-scanner is only needed for tests so don't require it if tests
+-are disabled
+-
+-Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+-[Retrieved from:
+-https://gitlab.freedesktop.org/wayland/wayland-protocols/-/commit/80e97bd00bf6263845aa98b411507baba28be67e]
+----
+- meson.build       | 2 --
+- tests/meson.build | 1 +
+- 2 files changed, 1 insertion(+), 2 deletions(-)
+-
+-diff --git a/meson.build b/meson.build
+-index 94b49e7..15dbc37 100644
+---- a/meson.build
+-+++ b/meson.build
+-@@ -8,8 +8,6 @@ wayland_protocols_version = meson.project_version()
+- 
+- fs = import('fs')
+- 
+--dep_scanner = dependency('wayland-scanner', native: true)
+--
+- stable_protocols = [
+-   'presentation-time',
+-   'viewporter',
+-diff --git a/tests/meson.build b/tests/meson.build
+-index 66337e7..74824ae 100644
+---- a/tests/meson.build
+-+++ b/tests/meson.build
+-@@ -1,4 +1,5 @@
+- prog_scan_sh = find_program('scan.sh')
+-+dep_scanner = dependency('wayland-scanner', native: true)
+- prog_scanner = find_program(dep_scanner.get_pkgconfig_variable('wayland_scanner'))
+- 
+- libwayland = [
+--- 
+-GitLab
 -
 diff --git a/package/wayland/wayland.hash b/package/wayland/wayland.hash
 index e9dcb63a90..54559a93c5 100644

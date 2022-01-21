@@ -253,14 +253,19 @@ fn apply_patch(channel, buildroot) {
 
 	// patch gcc.mk file
 	let buildroot_repo = git(buildroot);
+	print("patch gcc");
 	let gcc_diff = diff_from_file("./pre-patches/gcc-copy-more-libs.patch");
 	buildroot_repo.apply_diff(gcc_diff);
+	print("patch pipewire");
 	let pipwire_diff = diff_from_file("./pre-patches/pipewire-build-fails-with-vulkan.patch");
 	buildroot_repo.apply_diff(pipwire_diff);
+	print("patch wayland");
 	let wayland_diff = diff_from_file("./pre-patches/update-wayland.patch");
 	buildroot_repo.apply_diff(wayland_diff);
+	print("patch mesa3d");
 	let mesa3d_diff = diff_from_file("./pre-patches/mesa3d-update.patch");
 	buildroot_repo.apply_diff(mesa3d_diff);
+	print("patch psplash");
 	let psplash_diff = diff_from_file("./pre-patches/psplash.patch");
 	buildroot_repo.apply_diff(psplash_diff);
 }
