@@ -106,8 +106,8 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	println!("do you really wan't to upload package:");
 	println!("channel: {}", cfg.channel);
 	println!("addr: {}", source.addr);
-	for (_, pack) in packages.iter() {
-		print_package(pack);
+	for (tar_path, pack) in packages.iter() {
+		print_package(tar_path, pack).await;
 	}
 	println!();
 	println!("Enter YES to confirm");
@@ -120,6 +120,8 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	if confirm.trim() != "YES" {
 		return Err(err!(confirm, "confirmation not received"))
 	}
+
+	println!("connecting to {}", source.addr);
 
 	// build a connection
 	let client = Client::connect(&source.addr, source.public_key.clone()).await
@@ -238,11 +240,15 @@ async fn pack(
 	Ok(tar_name)
 }
 
-fn print_package(pack: &Package) {
+async fn print_package(tar_path: &str, pack: &Package) {
+	let size = fs::metadata(tar_path).await
+		.expect("failed to read package archive metadata")
+		.len();
 	println!("name: {}", pack.name);
 	println!("version_str: {}", pack.version_str);
 	println!("version: {}", pack.version);
 	println!("signature: {}", pack.signature);
 	println!("arch: {}", pack.arch);
 	println!("binary: {:?}", pack.binary);
+	println!("tar size: {:.0}mb", size / 1000_000);
 }
