@@ -74,6 +74,16 @@ gdb <binary>
 target remote <ip>:<port>
 ```
 
+## Debugging with perf
+For this to work you need debug symbols:
+```
+sudo perf record -F 99 -a -g -- sleep 45
+```
+To get a report:
+```
+sudo perf report > perf.report.txt
+```
+
 ## Data partition
 - var
 - etc (for configs)

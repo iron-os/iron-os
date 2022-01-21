@@ -222,14 +222,17 @@ fn chmod(modi, path) {
 
 fn create_config(channel, defconfig, linuxconfig) {
 	fs::copy("./buildroot.config", defconfig);
+	fs::copy("./linux.config", linuxconfig);
 
 	if channel == "Debug" {
-		// append
+		// append buildroot
 		let debug_defconfig = fs::read("./debug-buildroot.config");
 		fs::append(defconfig, "\n" + debug_defconfig);
-	}
 
-	fs::copy("./linux.config", linuxconfig);
+		// append linux
+		let debug_linux = fs::read("./debug-linux.config");
+		fs::append(linuxconfig, "\n" + debug_linux);
+	}
 }
 
 fn apply_patch(channel, buildroot) {
