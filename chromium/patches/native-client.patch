@@ -1,0 +1,13 @@
+diff --git a/src/trusted/platform_qualify/BUILD.gn b/src/trusted/platform_qualify/BUILD.gn
+index 5bebe0be2..840392e31 100644
+--- a/src/trusted/platform_qualify/BUILD.gn
++++ b/src/trusted/platform_qualify/BUILD.gn
+@@ -63,7 +63,7 @@ if (current_cpu != "arm" && current_cpu != "mipsel") {
+       "arch/x86/vcpuid.c",
+     ]
+ 
+-    if (current_os == "linux") {
++    if (current_os == "linux" || current_os == "ironos") {
+       cflags_c += [ "-msse3" ]
+     }
+ 

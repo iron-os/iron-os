@@ -1,0 +1,24 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index f491f2a4e6..bc10e0589e 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -1172,7 +1172,7 @@ config("toolchain") {
+   } else if (target_os == "ios") {
+     defines += [ "V8_HAVE_TARGET_OS" ]
+     defines += [ "V8_TARGET_OS_IOS" ]
+-  } else if (target_os == "linux") {
++  } else if (target_os == "linux" || target_os == "ironos") {
+     defines += [ "V8_HAVE_TARGET_OS" ]
+     defines += [ "V8_TARGET_OS_LINUX" ]
+   } else if (target_os == "mac") {
+@@ -2041,6 +2041,10 @@ template("run_mksnapshot") {
+ 
+     data = []
+ 
++    if (current_os == "ironos") {
++      current_os = "linux"
++    }
++
+     args = [
+       "./" + rebase_path(get_label_info(":mksnapshot($v8_snapshot_toolchain)",
+                                         "root_out_dir") + "/mksnapshot",

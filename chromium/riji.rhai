@@ -267,22 +267,41 @@ fn _patch(chrome) {
 	let main = git(chrome);
 	main.force_head();
 
+	print("main");
 	let diff = diff_from_file("./patches/all.patch");
 	main.apply_diff(diff);
 
 	// ffmpeg
-	let ffmpeg = git(chrome + "/third_party/ffmpeg");
-	ffmpeg.force_head();
-
-	let ffmpeg_diff = diff_from_file("./patches/ffmpeg.patch");
-	ffmpeg.apply_diff(ffmpeg_diff);
+	print("patch ffmpeg");
+	patch_git(chrome + "/third_party/ffmpeg", "./patches/ffmpeg.patch");
 
 	// skia
-	let skia = git(chrome + "/third_party/skia");
-	skia.force_head();
+	print("patch skia");
+	patch_git(chrome + "/third_party/skia", "./patches/skia.patch");
 
-	let skia_diff = diff_from_file("./patches/skia.patch");
-	skia.apply_diff(skia_diff);
+	// native client
+	print("patch native client");
+	patch_git(chrome + "/native_client", "./patches/native-client.patch");
+
+	// devtools frontend
+	print("patch devtools");
+	patch_git(chrome + "/third_party/devtools-frontend/src", "./patches/devtools-frontend.patch");
+
+	// v8
+	print("patch v8");
+	patch_git(chrome + "/v8", "./patches/v8.patch");
+
+	// breakpad
+	print("patch breakpad");
+	patch_git(chrome + "/third_party/breakpad/breakpad", "./patches/breakpad.patch");
+}
+
+fn patch_git(git_dir, patch) {
+	let g = git(git_dir);
+	g.force_head();
+
+	let diff = diff_from_file(patch);
+	g.apply_diff(diff);
 }
 
 fn patch_3way() {
@@ -305,6 +324,22 @@ fn clean_changes() {
 	// skia
 	let skia = git(CHROM + "/third_party/skia");
 	skia.force_head();
+
+	// native client
+	let nc = git(CHROM + "/native_client");
+	nc.force_head();
+
+	// devtools
+	let nc = git(CHROM + "/third_party/devtools-frontend/src");
+	nc.force_head();
+
+	// v8
+	let nc = git(CHROM + "/v8");
+	nc.force_head();
+
+	// breakpad
+	let nc = git(CHROM + "/third_party/breakpad/breakpad");
+	nc.force_head();
 }
 
 fn clean(target) {
