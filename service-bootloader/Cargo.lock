@@ -210,12 +210,15 @@ checksum = "8521a1b57e76b1ec69af7599e75e38e7b7fad6610f037db8c79b127201b5d119"
 
 [[package]]
 name = "linux-info"
-version = "0.1.6"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a48e4ca38a63921ed3c250a6a935942873f48a073beed1a887266edfa653f0ae"
+checksum = "b92bd3608d7885199ee6132d1f965d6866c8ea0002a81b85f48c3fd249a80baf"
 dependencies = [
  "byte-parser",
  "libc",
+ "memchr",
+ "simple-bytes",
+ "uuid",
 ]
 
 [[package]]
@@ -226,6 +229,12 @@ checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
  "cfg-if",
 ]
+
+[[package]]
+name = "memchr"
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 
 [[package]]
 name = "opaque-debug"
@@ -375,6 +384,12 @@ name = "signature"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02658e48d89f2bec991f9a78e69cfa4c316f8d6a6c4ec12fae1aeb263d486788"
+
+[[package]]
+name = "simple-bytes"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbe6af60dc5bf58cc981fccdc1eb04b05bf6dce6545480af54a918e03d1d0376"
 
 [[package]]
 name = "stdio-api"

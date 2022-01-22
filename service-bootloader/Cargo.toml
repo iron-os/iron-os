@@ -11,7 +11,7 @@ lto = true
 [dependencies]
 file-db = { version = "0.1", path = "./../file-db" }
 serde = { version = "1.0", features = ["derive"] }
-linux-info = "0.1.6"
+linux-info = "0.1.8"
 gpt = { version = "2.0", git = "https://github.com/soerenmeier/gpt", branch = "tmp_master" }
 uuid = "0.8"
 # stdio-api = { version = "0.1", path = "./../stdio-api" }

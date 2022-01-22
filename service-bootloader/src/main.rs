@@ -4,8 +4,10 @@ mod service;
 mod disks;
 mod version_info;
 mod util;
+mod hardware_fixes;
 
 use command::Command;
+use hardware_fixes::hardware_fixes;
 
 use std::{io, fs};
 use std::error::Error as StdError;
@@ -14,6 +16,8 @@ use std::time::Duration;
 
 // get's started as root
 fn main() {
+
+	hardware_fixes();
 
 	Command::new("systemctl")
 		.args(&["start", "weston"])
