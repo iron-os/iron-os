@@ -9,6 +9,8 @@ use std::fs::{self, File, read_to_string, create_dir_all, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
+use std::time::Duration;
+use std::thread;
 
 use gpt::{GptConfig, GptDisk};
 use gpt::partition::{Partition as GptPartition};
@@ -31,6 +33,16 @@ const BOOT_SIZE: u64 = 52_396_032;
 // in bytes
 // is divisable by 512 and 4096
 const ROOTFS_SIZE: u64 = 524_288_000;
+
+#[cfg(target_arch = "x86_64")]
+const IMAGE_NAME: &str = "bzImage";
+#[cfg(target_arch = "x86_64")]
+const IMAGE_NAME_B: &str = "bzImageB";
+
+#[cfg(target_arch = "aarch64")]
+const IMAGE_NAME: &str = "Image.gz";
+#[cfg(target_arch = "aarch64")]
+const IMAGE_NAME_B: &str = "ImageB.gz";
 
 pub fn api_disks() -> io::Result<Vec<ApiDisk>> {
 	let mut list = vec![];
@@ -249,15 +261,13 @@ impl Disk {
 
 	pub fn part_path(&self, name: &str) -> Option<PathBuf> {
 		// get partition number
-		let id = self.gpt_disk.as_ref()?
+		let uuid = self.gpt_disk.as_ref()?
 			.partitions()
-			.iter()
-			.find(|(_, v)| v.name == name)
-			.map(|(id, _)| *id)?;
-		let mut os_str = self.path.clone().into_os_string();
-		let id_str = format!("{}", id);
-		os_str.push(id_str);
-		Some(os_str.into())
+			.values()
+			.find(|v| v.name == name)
+			.map(|v| v.part_guid)?;
+
+		Some(Path::new("/dev/disk/by-partuuid").join(uuid.to_string()))
 	}
 
 	pub fn size(&self) -> io::Result<u64> {
@@ -275,6 +285,8 @@ fn install_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Resu
 	// or is it enough to 
 
 	write_gpt_to_new_disk(install_disk, new_disk)?;
+
+	thread::sleep(Duration::from_secs(2));
 
 	copy_to_new_disk(install_disk, new_disk)?;
 
@@ -410,7 +422,7 @@ fn copy_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<
 	// for this we need to first create a filesystem
 	// 
 	let data_path = new_disk.part_path("data")
-		.ok_or_else(|| io_other("could not data path"))?;
+		.ok_or_else(|| io_other("could not get data partition path"))?;
 
 	// create data filesystem
 	Command::new("mkfs")
@@ -514,7 +526,7 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	mount(&boot_path, "/mnt")?;
 	let grub = read_to_string("/mnt/EFI/BOOT/grub.templ")?;
 	let grub = grub.replace("ROOTFS_UUID", &root_uuid);
-	let grub = grub.replace("KERNEL_NAME", "bzImage");
+	let grub = grub.replace("KERNEL_NAME", IMAGE_NAME);
 	fs::write("/mnt/EFI/BOOT/grub.tmp", grub)?;
 	fs::rename("/mnt/EFI/BOOT/grub.tmp", "/mnt/EFI/BOOT/grub.cfg")?;
 
@@ -573,12 +585,12 @@ pub fn update(path: &str) -> io::Result<()> {
 
 	umount(&part_path)?;
 
-	let bz_image_path = format!("{}/bzImage", path);
+	let kernel_image_path = format!("{}/{}", path, IMAGE_NAME);
 
-	let other_kernel = if boot_img == "/bzImage" {
-		"bzImageB"
-	} else if boot_img == "/bzImageB" {
-		"bzImage"
+	let other_kernel = if boot_img.strip_prefix("/") == Some(IMAGE_NAME) {
+		IMAGE_NAME_B
+	} else if boot_img.strip_prefix("/") == Some(IMAGE_NAME_B) {
+		IMAGE_NAME
 	} else {
 		return Err(io_other("kernel image not found"))
 	};
@@ -586,7 +598,7 @@ pub fn update(path: &str) -> io::Result<()> {
 	let other_path = format!("/boot/{}", other_kernel);
 	let _ = fs::remove_file(&other_path);
 
-	fs::copy(&bz_image_path, &other_path)?;
+	fs::copy(&kernel_image_path, &other_path)?;
 
 	// now change the grub settings
 	let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
