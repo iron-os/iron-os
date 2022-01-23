@@ -42,6 +42,8 @@ fn patch_internal(buildroot, board, channel) {
 	fs::create_dir(br_out_dir);
 	let full_br_out_dir = fs::full_path(br_out_dir);
 
+	print("creating configuration");
+
 	let defconfig = full_br_out_dir + "/defconfig";
 	let linuxconfig = full_br_out_dir + "/linux.config";
 	let images = full_br_out_dir + "/images";
@@ -58,6 +60,8 @@ fn patch_internal(buildroot, board, channel) {
 		defconfig,
 		"\nBR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES=\"" + full_linuxconfig + "\""
 	);
+
+	print("apply patches");
 
 	let full_buildroot = fs::full_path(buildroot);
 	let patch_riji = cmd([
@@ -178,21 +182,17 @@ fn download_packages() {
 fn download_packages(product, board, channel) {
 	patch_internal("./buildroot", board, channel);
 
-	let publisher = cmd([
-		"publisher", "download", "./products/" + product + ".toml"
-	]);
-	publisher.execute();
+	let product_file = fs::full_path("./products/" + product + ".toml");
 
 	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
 	let images = br_out_dir + "/images";
 	fs::create_dir(images);
 
-	let packages_dir = images + "/packages";
-
-	fs::delete(packages_dir);
-
-	fs::copy("./packages", packages_dir);
-	fs::delete("./packages");
+	let publisher = cmd([
+		"publisher", "download", product_file, "--arch", arch_by_board(board)
+	]);
+	publisher.dir(images);
+	publisher.execute();
 }
 
 fn config() {
@@ -307,6 +307,20 @@ fn rebuild(board, channel, pack) {
 	let make = cmd(["make", pack + "-dirclean", pack + "-rebuild"]);
 	make.dir(br_out_dir);
 	make.execute();
+}
+
+fn arch_by_board(board) {
+	if board == "intel" {
+		return "Amd64";
+	} else if board == "intel-headless" {
+		return "Amd64";
+	} else if board == "pi4" {
+		return "Arm64";
+	} else if board == "pi4-headless" {
+		return "Arm64";
+	} else {
+		panic("board " + board + " not found")
+	}
 }
 
 fn board_by_arch(arch) {

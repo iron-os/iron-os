@@ -153,6 +153,22 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	let uuid = fs_uuid(host_dir, binaries_dir + "/rootfs.ext2");
 
+	if fs::is_file(binaries_dir + "/Image") {
+		// gzip the image
+		let gzip = cmd(["gzip", "-k", "-f", "Image"]);
+		gzip.dir(binaries_dir);
+		gzip.execute();
+	}
+
+	let image_file;
+	if fs::is_file(binaries_dir + "/bzImage") {
+		image_file = "bzImage";
+	} else if fs::is_file(binaries_dir + "/Image.gz") {
+		image_file = "Image.gz";
+	} else {
+		panic("Image bzImage or Image.gz not found");
+	}
+
 	// fill grub.cfg
 	let efi_dir = binaries_dir + "/efi-part/EFI/BOOT";
 	let grub_cfg = efi_dir + "/grub.cfg";
@@ -161,10 +177,15 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	let uuid_tmp_reg = regex("ROOTFS_UUID");
 	uuid_tmp_reg.replace_file(grub_cfg, uuid);
 	let kernel_reg = regex("KERNEL_NAME");
-	kernel_reg.replace_file(grub_cfg, "bzImage");
+	kernel_reg.replace_file(grub_cfg, image_file);
 	// fill genimage-efi.cfg
 	fs::copy("./genimage-efi.cfg", binaries_dir + "/");
 	uuid_tmp_reg.replace_file(binaries_dir + "/genimage-efi.cfg", uuid);
+
+	// kernel name
+	kernel_reg.replace_file(binaries_dir + "/genimage-efi.cfg", image_file);
+	// todo fix this
+	kernel_reg.replace_file(binaries_dir + "/genimage-efi.cfg", image_file);
 
 	// boot uuid
 	let boot_uuid = fs::read(binaries_dir + "/boot_uuid");
@@ -176,10 +197,6 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	let data_uuid_reg = regex("DATA_UUID");
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", data_uuid);
 
-	if fs::is_file(binaries_dir + "/Image") == true {
-		fs::copy(binaries_dir + "/Image", binaries_dir + "/bzImage");
-	}
-
 	let publisher = cmd([
 		binaries_dir + "/publisher", "pack-image"
 	]);
@@ -188,6 +205,16 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	// now we need to create the image package +
 	// version.fdb file
 
+	// let's create the startup.nsh file
+	let efi_file;
+	if fs::is_file(efi_dir + "/bootx64.efi") {
+		efi_file = "bootx64.efi";
+	} else if fs::is_file(efi_dir + "/bootaa64.efi") {
+		efi_file = "bootaa64.efi";
+	} else {
+		panic("did not file the correct efi file");
+	}
+	fs::write(binaries_dir + "/efi-part/startup.nsh", efi_file);
 
 	// now run genimage
 	let genimage = cmd([
