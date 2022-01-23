@@ -34,7 +34,7 @@ pub struct SourceToml {
 pub struct PackagesToml {
 	/// a list of all packages that should be downloaded
 	list: Vec<String>,
-	arch: BoardArch,
+	arch: Option<BoardArch>,
 	/// the channel from which it should be downloaded
 	channel: Channel,
 	/// what package to execute on running (the first parameter will be the state)
@@ -49,13 +49,22 @@ pub struct PackagesToml {
 #[derive(clap::Parser)]
 pub struct Download {
 	/// the location of packages.toml
-	config: String
+	config: String,
+	/// If set, overrides the packages.toml file setting
+	#[clap(long)]
+	arch: Option<BoardArch>
 }
 
 pub async fn download(opts: Download) -> Result<()> {
 
 	// read packages.toml
 	let cfg: PackagesToml = read_toml(opts.config).await?;
+
+	let arch = match (opts.arch, cfg.arch) {
+		(Some(arch), _) => arch,
+		(None, Some(arch)) => arch,
+		_ => return Err(err!("Arch not found", "No arch defined"))
+	};
 
 	let local_packages = "./packages";
 
@@ -78,7 +87,7 @@ pub async fn download(opts: Download) -> Result<()> {
 		download_from_source(
 			&mut list,
 			&mut packs,
-			&cfg.arch,
+			&arch,
 			&cfg.channel,
 			&source,
 			&local_packages

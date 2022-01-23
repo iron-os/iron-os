@@ -2,6 +2,8 @@
 use crate::error::{Result};
 use crate::util::{create_dir, hash_file, read_toml, remove_dir, compress, copy};
 
+use tokio::fs;
+
 use file_db::FileDb;
 
 use bootloader_api::{VersionInfo, Architecture};
@@ -29,21 +31,42 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 	let tmp_path = format!("./image_tmp/{}", cfg.name);
 	create_dir(&tmp_path).await?;
 
-	copy("./bzImage", &format!("{}/bzImage", tmp_path)).await?;
 	copy("./rootfs.ext2", &format!("{}/rootfs.ext2", tmp_path)).await?;
-	match cfg.arch {
+	let kernel_img = match cfg.arch {
 		Architecture::Amd64 => {
+			let img_path = format!("{}/bzImage", tmp_path);
+			copy("./bzImage", &img_path).await?;
 			copy(
 				"./efi-part/EFI/BOOT/bootx64.efi",
 				&format!("{}/bootx64.efi", tmp_path)
 			).await?;
+
+			img_path
 		},
 		Architecture::Arm64 => {
+			let img_path = format!("{}/Image.gz", tmp_path);
+			copy("./Image.gz", &img_path).await?;
 			copy(
 				"./efi-part/EFI/BOOT/bootaa64.efi",
 				&format!("{}/bootaa64.efi", tmp_path)
 			).await?;
+
+			img_path
 		}
+	};
+
+	let kernel_image_size = fs::metadata(kernel_img).await
+		.map_err(|e| {
+			err!(format!("{:?}", e), "could not read kernel image metadata")
+		})?
+		.len();
+
+	// 20mb
+	if kernel_image_size > 20 * 1_000_000 {
+		return Err(err!(
+			format!("{:.0}mb", kernel_image_size / 1_000_000),
+			"kernel image size to big"
+		));
 	}
 
 	// todo: maybe use the version as a name?
