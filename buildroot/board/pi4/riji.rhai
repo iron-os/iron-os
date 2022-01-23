@@ -9,6 +9,9 @@ fn create_config(channel, defconfig, linuxconfig, images) {
 	let buildroot = fs::read("./buildroot.config");
 	fs::append(defconfig, "\n" + buildroot);
 
+	let linux = fs::read("./linux.config");
+	fs::append(linuxconfig, "\n" + linux);
+
 	// need to add the image.toml
 	let image = images + "/image.toml";
 	fs::copy("./../../package.toml", image);
