@@ -44,11 +44,12 @@ chrome.webRequest.onBeforeSendHeaders.addListener(info => {
 only allow whitelisted urls
 */
 
+// todo: add api to modify the whitelist
 const whitelist = [
 	// main 
-	'127.0.0.1:8888',
-	// client
-	// '127.0.0.1:8080',
+	'127.0.0.1',
+	'localhost',
+	'server2.lvgd.ch'
 	// to test speed in debug view
 	// 'www.speedtest.net', 'speedtest.net',
 	// 'livgood.ch', 'fonts.googleapis.com',
@@ -78,9 +79,13 @@ function blockRequests() {
 		// 	return { cancel: false };
 
 		//console.log(info);
-		const domain = info.url.split('/')[2];
+		const addr = info.url.split('/')[2];
+		const parts = addr.split(':');
+		let port = null;
+		if (parts.length > 1)
+			port = parts[parts.length - 1];
 
-		console.log('domain', domain);
+		let domain = addr.slice(0, addr.length - (port ? port.length + 1: 0));
 
 		return {
 			cancel: whitelist.indexOf(domain) === -1

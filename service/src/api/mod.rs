@@ -65,6 +65,7 @@ request_handler!(
 		req: OpenPageReq,
 		ui_api: ApiSender
 	) -> ApiResult<OpenPage> {
+		eprintln!("opening page {}", req.url);
 		ui_api.open_page(req.url);
 		Ok(OpenPage)
 	}
