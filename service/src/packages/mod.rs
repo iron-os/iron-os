@@ -271,6 +271,7 @@ pub async fn start(
 				Err(e) => {
 					eprintln!("update error {:?}", e);
 					failed = true;
+					continue
 				}
 			}
 
