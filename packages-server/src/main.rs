@@ -12,60 +12,42 @@ use error::Result;
 use auth::AuthDb;
 use crate::packages::PackagesDb;
 
-use std::env;
+use clap::Parser;
 use crypto::signature::Keypair;
 
-
-
-/*
-Todo: use clap
-*/
-
-
-fn help() {
-	println!("unkown command");
-	println!("use `create` to create a configuration file");
-	println!("use `` or `serve` to run the server");
+#[derive(Parser)]
+struct Args {
+	#[clap(subcommand)]
+	subcmd: Option<SubCommand>
 }
 
-
-pub enum Command {
+#[derive(Parser)]
+pub enum SubCommand {
+	/// create a configuration file
 	Create,
-	Serve,
+	/// Print out the keys
 	Keys
-}
-
-impl Command {
-	fn from_args() -> Option<Self> {
-		let mut args = env::args();
-		// ignore filename
-		let _ = args.next();
-		let cmd = args.next();
-		match cmd.as_ref().map(|a| a.as_str()) {
-			Some("create") => Some(Self::Create),
-			Some("serve") => Some(Self::Serve),
-			Some("keys") => Some(Self::Keys),
-			None => Some(Self::Serve),
-			_ => None
-		}
-	}
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+	let args = Args::parse();
 
-	let cmd = match Command::from_args() {
-		Some(cmd) => cmd,
-		None => {
-			help();
+	match args.subcmd {
+		Some(SubCommand::Create) => {
+			println!("creating config files if they dont exist");
+
+			let cfg = Config::create().await?;
+
+			let _pack_db = PackagesDb::create().await?;
+
+			let _files = Files::create(&cfg).await?;
+
+			let _auths = AuthDb::create().await?;
+
 			return Ok(())
-		}
-	};
-
-	match cmd {
-		Command::Create => create().await,
-		Command::Serve => server::serve().await,
-		Command::Keys => {
+		},
+		Some(SubCommand::Keys) => {
 			// get connection public key
 			let cfg = Config::read().await?;
 			println!("Connection public key: {}", cfg.con_key.public());
@@ -78,22 +60,10 @@ async fn main() -> Result<()> {
 			println!("New signature private key: {}", sign);
 			println!("New signature public key: {}", sign.public());
 
-			Ok(())
-		}
+			return Ok(())
+		},
+		None => {}
 	}
-}
 
-
-async fn create() -> Result<()> {
-	println!("creating config.toml file if it doesn't exist");
-
-	let cfg = Config::create().await?;
-
-	let _pack_db = PackagesDb::create().await?;
-
-	let _files = Files::create(&cfg).await?;
-
-	let _auths = AuthDb::create().await?;
-
-	Ok(())
+	server::serve().await
 }
