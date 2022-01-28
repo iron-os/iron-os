@@ -1,5 +1,6 @@
 
 use std::fs;
+use std::path::Path;
 use std::io::{self, Write};
 
 use linux_info::bios::Bios;
@@ -21,6 +22,10 @@ pub fn hardware_fixes() {
 			if let Err(e) = mask_gpe07_interrupt() {
 				eprintln!("masking gpe07 failed with {:?}", e);
 			}
+
+			if let Err(e) = change_sim7600e_mode() {
+				eprintln!("changing sim7600e mode failed with {:?}", e);
+			}
 		},
 		_ => {}
 	}
@@ -39,4 +44,28 @@ fn mask_gpe07_interrupt() -> io::Result<()> {
 		.write(true)
 		.open("/sys/firmware/acpi/interrupts/gpe07")?
 		.write_all(b"mask\n")
+}
+
+fn change_sim7600e_mode() -> io::Result<()> {
+	// set 1e0e:9011 to 1e0e:9001
+	const PATH: &str = "/sys/bus/usb/devices/usb1/1-6";
+
+	let vendor = fs::read_to_string(Path::new(PATH).join("idVendor"))?;
+	let product = fs::read_to_string(Path::new(PATH).join("idProduct"))?;
+
+	if vendor.trim() != "1e0e" || product.trim() != "9011" {
+		return Ok(())
+	}
+
+	eprintln!("applying fix: change sim7600e mode");
+
+	// change mode
+	let mut file = fs::OpenOptions::new()
+		.write(true)
+		.open("/dev/ttyUSB3")?;
+
+	file.write_all(b"AT+CUSBPIDSWITCH=9001,1,1\r\n")?;
+
+	// we should receive OK but don't liste, since we could listen forever
+	Ok(())
 }
