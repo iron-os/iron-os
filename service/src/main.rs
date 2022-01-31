@@ -78,7 +78,7 @@ async fn main() {
 	).await.expect("service api failed");
 
 	// start display api
-	let display_bg_task = display::start(display).await;
+	let display_bg_task = display::start(display);
 
 	// detect what package should be run
 	// and run it
