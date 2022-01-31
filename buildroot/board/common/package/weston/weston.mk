@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-WESTON_VERSION = 9.0.93-kiosk-sleep
+WESTON_VERSION = 9.0.93-kiosk-sleep-2
 WESTON_SITE = https://gitlab.freedesktop.org/soerenmeier/weston/-/archive/v$(WESTON_VERSION)
 WESTON_SOURCE = weston-v$(WESTON_VERSION).tar.gz
 WESTON_LICENSE = MIT
