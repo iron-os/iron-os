@@ -84,6 +84,11 @@ To get a report:
 sudo perf report > perf.report.txt
 ```
 
+## Custom Package source
+create `local.mk` in output/`<board>`/`<channel>`
+
+with the content: `<package>_OVERRIDE_SRCDIR=<dir>`
+
 ## Data partition
 - var
 - etc (for configs)
