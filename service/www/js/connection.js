@@ -1,87 +1,32 @@
 
-import { timeout, randomToken } from './util.js';
-import Websocket from './websocket.js';
-
-/*
-struct Message {
-	id: RandomToken,
-	kind: Request|Push|Response,
-	name: String, // the name that identifiers this message
-				// for example DisksInfo
-				// or InstallTo
-	data: T
-}
-*/
+import { timeout } from './util.js';
 
 export default class Connection {
 	constructor() {
-		// fn(name, data)
-		this.onFn = () => {};
-
-		// contains {id: fn(data)}
-		this.requests = {};
-		// contains {id: fn(data)}
-		this.streams = {};
-
-		this.ws = new Websocket;
+		this.openPageFn = () => {};
 	}
 
-	async connect() {
-		await this.ws.connect();
+	onOpenPage(fn) {
+		this.openPageFn = fn;
+	}
 
-		this.ws.on(msg => {
-			console.log('client: receive data: ', msg);
+	// does not throw
+	connect() {
+		const ws = new WebSocket('ws://127.0.0.1:8888/onopenpage');
 
-			// let's just fail if the give values are not found
-			let fn;
-			switch (msg.kind) {
-				case 'Request':
-					throw new Error('Request not allowed');
-					break;
-				case 'Push':
-					fn = this.streams[msg.id];
-					if (!fn)
-						throw new Error('request with id not found: ' + msg.id);
-					fn(msg.data);
-					break;
-				case 'Response':
-					fn = this.requests[msg.id];
-					if (!fn)
-						throw new Error('request with id not found: ' + msg.id);
-					fn(msg.data);
-					delete this.requests[msg.id];
-					break;
-			}
+		ws.addEventListener('close', async e => {
+			console.log('connection failed');
+			// wait 2s before retrying
+			await timeout(2000);
+			this.connect();
 		});
-	}
 
-	async request(name, data) {
-		return new Promise(resolve => {
-			const id = randomToken(12);
-			const msg = {
-				id,
-				kind: 'Request',
-				name,
-				data
-			};
-
-			this.requests[id] = resolve;
-
-			this.ws.send(msg);
+		ws.addEventListener('message', msg => {
+			const data = msg.data;
+			if (typeof data === 'string')
+				this.openPageFn(data);
+			else
+				console.log('received unknown data', data);
 		});
-	}
-
-	requestStream(name, data, fn) {
-		const id = randomToken(12);
-		const msg = {
-			id,
-			kind: 'RequestStream',
-			name,
-			data
-		};
-
-		this.streams[id] = fn;
-
-		this.ws.send(msg);
 	}
 }

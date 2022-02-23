@@ -1,7 +1,5 @@
 
 mod chromium;
-#[macro_use]
-mod ws_api;
 mod ws;
 
 use crate::context;
@@ -58,21 +56,6 @@ receive
 
 data_struct!{
 	pub struct Data {
-		ws_con: ws_api::Connection<WsData>,
-		ws_data: WsData
-	}
-}
-
-impl Data {
-	#[allow(dead_code)]
-	pub fn bootloader(&self) -> &Bootloader {
-		&self.ws_data.bootloader
-	}
-}
-
-data_struct!{
-	#[derive(Clone)]
-	pub struct WsData {
 		bootloader: Bootloader,
 		api: ApiReceiver
 	}
@@ -97,11 +80,9 @@ pub struct ApiSender {
 }
 
 impl ApiSender {
-
 	pub fn open_page(&self, url: String) {
 		self.page.send(url).expect("ui api receiver closed")
 	}
-
 }
 
 #[derive(Debug, Clone)]
@@ -127,11 +108,8 @@ pub fn start_server(
 ) -> JoinHandle<()> {
 
 	let data = Data {
-		ws_con: ws::build(),
-		ws_data: WsData {
-			bootloader,
-			api: receiver
-		}
+		bootloader,
+		api: receiver
 	};
 
 

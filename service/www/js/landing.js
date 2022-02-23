@@ -33,15 +33,4 @@ export default class Landing {
 		this.iframe.src = url;
 		this.active = url;
 	}
-
-	async prepare(con) {
-
-		con.requestStream('OpenPageStream', '', url => {
-			if (url === '')
-				return;
-			// todo maybe check if that page really could be opened
-			this.openPage(url);
-		});
-
-	}
 }
