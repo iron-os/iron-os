@@ -31,3 +31,11 @@ fn apply_patch(channel, buildroot) {
 	common.dir("./../common");
 	common.execute();
 }
+
+fn create_image(channel, images, buildroot) {
+	let common = cmd([
+		"riji", "create_image", images, buildroot
+	]);
+	common.dir("./../common-headless");
+	common.execute();
+}

@@ -85,43 +85,20 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	ln.dir(target_dir + "/etc/systemd/system/multi-user.target.wants/");
 	ln.execute();
 
-	// copy data folder
-	fs::copy("./data", target_dir + "/");
+	// copy data folder (from common-headless)
+	fs::delete(binaries_dir + "/data");
+	fs::copy("./data", binaries_dir + "/");
 
 	// copy var folder
-	fs::copy(target_dir + "/var", target_dir + "/data/");
+	fs::copy(target_dir + "/var", binaries_dir + "/data/");
 	fs::delete(target_dir + "/var");
 
 	// delete home folder
 	fs::delete(target_dir + "/home");
 
-	if fs::is_dir(binaries_dir + "/packages") == true {
-		fs::delete(target_dir + "/data/packages");
-		fs::copy(binaries_dir + "/packages", target_dir + "/data/packages");
-		print("using existing packages");
-	}
-
-	// set corrects rights
-	chown("14:15", target_dir + "/data/home");
-	chown("0:0", target_dir + "/data/etc");
-	chown("14:15", target_dir + "/data/packages");
+	// the rights for the home folder are given in create_image_fakeroot
 
 	chmod("700", target_dir + "/etc/NetworkManager/system-connections");
-
-	// execute gen_image
-	fs::delete(binaries_dir + "/data.ext2");
-	let mkfs = cmd([
-		host_dir + "/sbin/mkfs.ext4",
-		"-d", target_dir + "/data",
-		// "-r", "0",
-		"-N", "0",
-		"-m", "5",
-		"-L", "data",
-		binaries_dir + "/data.ext2",
-		"400M"
-	]);
-	mkfs.dir(binaries_dir);
-	mkfs.execute();
 
 	// check that lvm2-monitor.service does not exist
 	if fs::is_file(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service") == true {
@@ -134,7 +111,8 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	fs::create_dir(target_dir + "/var");
 	fs::create_dir(target_dir + "/home");
 
-	let data_uuid = fs_uuid(host_dir, binaries_dir + "/data.ext2");
+	let data_uuid = uuid_v4();
+	fs::write(binaries_dir + "/data_uuid", data_uuid);
 
 	let data_uuid_reg = regex("DATA_UUID");
 	fs::copy("./rootfs/fstab", target_dir + "/etc/fstab");
@@ -188,22 +166,14 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	kernel_reg.replace_file(binaries_dir + "/genimage-efi.cfg", image_file);
 
 	// boot uuid
-	let boot_uuid = fs::read(binaries_dir + "/boot_uuid");
+	let boot_uuid = trim(fs::read(binaries_dir + "/boot_uuid"));
 	let boot_uuid_reg = regex("EFI_UUID");
 	boot_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", boot_uuid);
 
 	// data uuid
-	let data_uuid = fs_uuid(host_dir, binaries_dir + "/data.ext2");
+	let data_uuid = trim(fs::read(binaries_dir + "/data_uuid"));
 	let data_uuid_reg = regex("DATA_UUID");
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", data_uuid);
-
-	let publisher = cmd([
-		binaries_dir + "/publisher", "pack-image"
-	]);
-	publisher.dir(binaries_dir);
-	publisher.execute();
-	// now we need to create the image package +
-	// version.fdb file
 
 	// let's create the startup.nsh file
 	let efi_file;
@@ -215,12 +185,72 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 		panic("did not file the correct efi file");
 	}
 	fs::write(binaries_dir + "/efi-part/startup.nsh", efi_file);
+}
+
+fn create_image_fakeroot(host_dir, binaries_dir, buildroot_dir) {
+	if !fs::is_dir(binaries_dir + "/packages") {
+		panic("you need to download the packages first");
+	}
+
+	fs::delete(binaries_dir + "/data/packages");
+	fs::copy(binaries_dir + "/packages", binaries_dir + "/data/packages");
+
+	// set corrects rights
+	chown("14:15", binaries_dir + "/data/home");
+	chown("0:0", binaries_dir + "/data/etc");
+	chown("14:15", binaries_dir + "/data/packages");
+
+	let data_uuid = trim(fs::read(binaries_dir + "/data_uuid"));
+
+	// execute gen_image
+	fs::delete(binaries_dir + "/data.ext2");
+	let mkfs = cmd([
+		host_dir + "/sbin/mkfs.ext4",
+		"-d", binaries_dir + "/data",
+		// "-r", "0",
+		"-U", data_uuid,
+		"-N", "0",
+		"-m", "5",
+		"-L", "data",
+		binaries_dir + "/data.ext2",
+		"400M"
+	]);
+	mkfs.dir(binaries_dir);
+	mkfs.execute();
+}
+
+fn create_image(binaries_dir, buildroot_dir) {
+	// first create the data partition
+	print(binaries_dir + "/../host");
+	let host_dir = fs::full_path(binaries_dir + "/../host");
+	let current_dir = fs::full_path("./");
+	let build_dir = fs::full_path(binaries_dir + "/../build");
+
+	// execute create_image_fakeroot
+	let fakeroot = cmd([
+		host_dir + "/bin/fakeroot",
+		"riji", "create_image_fakeroot",
+		host_dir, binaries_dir, buildroot_dir
+	]);
+	fakeroot.dir(current_dir);
+	fakeroot.execute();
+
+	let publisher = cmd([
+		binaries_dir + "/publisher", "pack-image"
+	]);
+	publisher.dir(binaries_dir);
+	publisher.execute();
+	// now we need to create the image package +
+	// version.fdb file
 
 	// now run genimage
 	let genimage = cmd([
 		buildroot_dir + "/support/scripts/genimage.sh",
 		"-c", binaries_dir + "/genimage-efi.cfg"
 	]);
+	genimage.env("BUILD_DIR", binaries_dir);
+	genimage.env("BINARIES_DIR", binaries_dir);
+	genimage.env("PATH", host_dir + "/bin:" + env_var("PATH"));
 	genimage.execute();
 }
 

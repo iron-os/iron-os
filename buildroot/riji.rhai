@@ -32,6 +32,8 @@ fn patch(board, channel) {
 	patch_internal("./buildroot", board, channel);
 }
 
+// patch creates a combined configuration for the given board and channel
+// and it applys patches to code if needed
 fn patch_internal(buildroot, board, channel) {
 	let buildroot_git = git(buildroot);
 	buildroot_git.force_head();
@@ -95,6 +97,7 @@ fn new_br_out_dir(buildroot, board, channel) {
 }
 
 // channel: Debug|Release
+/// build calls patch and then runs make build
 fn build_internal(board, channel, buildroot) {
 	print("building " + board + " " + channel);
 
@@ -124,23 +127,64 @@ fn build_internal(board, channel, buildroot) {
 		images + "/publisher"
 	);
 
-	// download packages
-	//let publish = cmd([
-	//	pack_pub, "download"
-	//]);
-	//print("download packages");
-	//publish.execute();
-
-	//fs::delete(images + "/packages");
-	//fs::move("./packages", images + "/packages");
-
 	// build buildroot
 	let make = cmd("make");
 	make.dir(br_out_dir);
 	print("build buildroot");
 	make.execute();
 
+	print("run riji publish to get the image");
+}
+
+fn download_packages() {
+	print("download_packages <product> <board> <channel>");
+}
+
+// channel is only used for the board
+//
+// download packages downloads the packages and prepares the publish step
+fn download_packages(product, board, channel) {
+	patch_internal("./buildroot", board, channel);
+
+	let product_file = fs::full_path("./products/" + product + ".toml");
+
+	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
+	let images = br_out_dir + "/images";
+	if !fs::is_dir(images) {
+		panic("cannot download packages, you first need to build an image");
+	}
+
+	let publisher = cmd([
+		"publisher", "download", product_file
+	]);
+	publisher.dir(images);
+	publisher.execute();
+}
+
+fn publish() {
+	print("publish <board> <channel> <pub-channel>");
+}
+
+/// Generates the image creates the output dir and then uploads
+fn publish(board, channel, pub_channel) {
+	let buildroot = "./buildroot";
+	let full_buildroot = fs::full_path(buildroot);
+
+	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
+	let images = br_out_dir + "/images";
+	if !fs::is_dir(images) {
+		panic("cannot publish, you first need to build an image");
+	}
+	let full_images = fs::full_path(images);
+
+	let board_riji = cmd([
+		"riji", "create_image", channel, full_images, full_buildroot
+	]);
+	board_riji.dir("./board/" + board);
+	board_riji.execute();
+
 	// create output
+	let out_dir = "./output/" + board + "/" + channel;
 	fs::create_dir(out_dir);
 
 	// now copy the image
@@ -159,39 +203,12 @@ fn build_internal(board, channel, buildroot) {
 		vbox.execute();
 		// the reverse is VBoxManage clonemedium --format RAW debian.vdi debian.img
 	}
-}
 
-fn publish() {
-	print("publish <board> <channel> <pub-channel>");
-}
-
-fn publish(board, channel, pub_channel) {
-	let out_dir = "./output/" + board + "/" + channel;
+	// upload
 	let publisher = cmd([
 		"publisher", "upload", pub_channel
 	]);
 	publisher.dir(out_dir);
-	publisher.execute();
-}
-
-fn download_packages() {
-	print("download_packages <product> <board> <channel>");
-}
-
-// channel is only used for the board
-fn download_packages(product, board, channel) {
-	patch_internal("./buildroot", board, channel);
-
-	let product_file = fs::full_path("./products/" + product + ".toml");
-
-	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
-	let images = br_out_dir + "/images";
-	fs::create_dir(images);
-
-	let publisher = cmd([
-		"publisher", "download", product_file, "--arch", arch_by_board(board)
-	]);
-	publisher.dir(images);
 	publisher.execute();
 }
 
