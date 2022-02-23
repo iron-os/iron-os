@@ -18,6 +18,12 @@ pub struct ImageToml {
 	pub name: String
 }
 
+/// The toml file which get's used between the download and pack-image command
+#[derive(Debug, Clone, Deserialize)]
+pub struct ProductToml {
+	product: String
+}
+
 /// Downloads and fills a full packages folder
 /// with the packages listed in `packages.toml`
 /// the address and the channel should be in `packages.toml`
@@ -27,6 +33,8 @@ pub struct PackImage {}
 pub async fn pack_image(_: PackImage) -> Result<()> {
 
 	let cfg: ImageToml = read_toml("./image.toml").await?;
+
+	let product: ProductToml = read_toml("./product.toml").await?;
 
 	let tmp_path = format!("./image_tmp/{}", cfg.name);
 	create_dir(&tmp_path).await?;
@@ -78,6 +86,7 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 	let version = VersionInfo {
 		board: cfg.board,
 		arch: cfg.arch,
+		product: product.product,
 		version_str: cfg.version,
 		version: hash,
 		signature: None,

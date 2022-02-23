@@ -1,6 +1,6 @@
 
-use crate::error::{Result};
-use crate::util::{create_dir, remove_dir, read_toml, extract};
+use crate::error::Result;
+use crate::util::{create_dir, remove_dir, read_toml, write_toml, extract};
 
 use tokio::fs;
 
@@ -16,7 +16,7 @@ use packages::packages::{
 use packages::client::Client;
 use packages::requests::{PackageInfoReq, GetFileReq};
 
-use serde::{Deserialize};
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourceToml {
@@ -34,7 +34,8 @@ pub struct SourceToml {
 pub struct PackagesToml {
 	/// a list of all packages that should be downloaded
 	list: Vec<String>,
-	arch: Option<BoardArch>,
+	/// the product name for which this image is meant
+	product: String,
 	/// the channel from which it should be downloaded
 	channel: Channel,
 	/// what package to execute on running (the first parameter will be the state)
@@ -44,15 +45,25 @@ pub struct PackagesToml {
 	sources: Vec<SourceToml>
 }
 
+/// The toml in which the buildsystem stores information about the image
+#[derive(Debug, Clone, Deserialize)]
+pub struct ImageToml {
+	arch: BoardArch
+}
+
+/// The toml file which get's used between the download and pack-image command
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductToml {
+	product: String
+}
+
 /// Downloads and fills a full packages folder `./packages`
 /// with the packages listed in the provided configuration file
 #[derive(clap::Parser)]
 pub struct Download {
-	/// the location of packages.toml
-	config: String,
-	/// If set, overrides the packages.toml file setting
-	#[clap(long)]
-	arch: Option<BoardArch>
+	/// the location of packages.toml  
+	/// should be an absolute path
+	config: String
 }
 
 pub async fn download(opts: Download) -> Result<()> {
@@ -60,11 +71,15 @@ pub async fn download(opts: Download) -> Result<()> {
 	// read packages.toml
 	let cfg: PackagesToml = read_toml(opts.config).await?;
 
-	let arch = match (opts.arch, cfg.arch) {
-		(Some(arch), _) => arch,
-		(None, Some(arch)) => arch,
-		_ => return Err(err!("Arch not found", "No arch defined"))
+	let product_toml = ProductToml {
+		product: cfg.product.clone()
 	};
+
+	// store the product name
+	write_toml("./product.toml", &product_toml).await?;
+
+	// read image.toml
+	let image_cfg: ImageToml = read_toml("./image.toml").await?;
 
 	let local_packages = "./packages";
 
@@ -87,7 +102,7 @@ pub async fn download(opts: Download) -> Result<()> {
 		download_from_source(
 			&mut list,
 			&mut packs,
-			&arch,
+			&image_cfg.arch,
 			&cfg.channel,
 			&source,
 			&local_packages

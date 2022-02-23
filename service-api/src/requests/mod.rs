@@ -34,12 +34,18 @@ pub mod system {
 		"image".into()
 	}
 
+	fn default_product() -> String {
+		"sputnik".into()
+	}
+
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct SystemInfo {
 		// equivalent of version_str
 		pub version: String,
 		#[serde(default = "default_board")]
 		pub board: String,
+		#[serde(default = "default_product")]
+		pub product: String,
 		pub packages: Vec<ShortPackage>,
 		pub channel: Channel,
 		pub installed: bool

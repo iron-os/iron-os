@@ -346,6 +346,10 @@ fn default_arch() -> Architecture {
 	Architecture::Amd64
 }
 
+fn default_product() -> String {
+	"sputnik".into()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionInfo {
 	// todo: should this be an enum
@@ -355,6 +359,8 @@ pub struct VersionInfo {
 	// todo: remove default at the end of 2021
 	#[serde(default = "default_arch")]
 	pub arch: Architecture,
+	#[serde(default = "default_product")]
+	pub product: String,
 	pub version_str: String,
 	pub version: Hash,
 	pub signature: Option<Signature>,
