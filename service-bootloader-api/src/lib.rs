@@ -347,7 +347,7 @@ fn default_arch() -> Architecture {
 }
 
 fn default_product() -> String {
-	"sputnik".into()
+	"explorer".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
