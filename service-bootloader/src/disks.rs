@@ -286,11 +286,15 @@ fn install_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Resu
 
 	write_gpt_to_new_disk(install_disk, new_disk)?;
 
+	// wait until linux reads the new gpt table
 	thread::sleep(Duration::from_secs(2));
 
 	copy_to_new_disk(install_disk, new_disk)?;
 
 	configure_disk(new_disk)?;
+
+	// wait until really all files are written to disk
+	thread::sleep(Duration::from_secs(10));
 
 	// success
 	// after a reboot we should boot on the new rootfs
@@ -423,6 +427,14 @@ fn copy_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<
 	// 
 	let data_path = new_disk.part_path("data")
 		.ok_or_else(|| io_other("could not get data partition path"))?;
+
+	// wait max 10s until the path exists
+	for _ in 0..10 {
+		thread::sleep(Duration::from_secs(1));
+		if data_path.exists() {
+			break
+		}
+	}
 
 	// create data filesystem
 	Command::new("mkfs")

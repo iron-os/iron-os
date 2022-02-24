@@ -1,5 +1,5 @@
 diff --git a/package/mesa3d-headers/mesa3d-headers.mk b/package/mesa3d-headers/mesa3d-headers.mk
-index 233292ab0a..1cdfff50c9 100644
+index 233292ab0a..c8573fafad 100644
 --- a/package/mesa3d-headers/mesa3d-headers.mk
 +++ b/package/mesa3d-headers/mesa3d-headers.mk
 @@ -12,7 +12,7 @@ endif
@@ -7,99 +7,10 @@ index 233292ab0a..1cdfff50c9 100644
  # Not possible to directly refer to mesa3d variables, because of
  # first/second expansion trickery...
 -MESA3D_HEADERS_VERSION = 21.1.8
-+MESA3D_HEADERS_VERSION = 21.3.3
++MESA3D_HEADERS_VERSION = 21.3.6
  MESA3D_HEADERS_SOURCE = mesa-$(MESA3D_HEADERS_VERSION).tar.xz
  MESA3D_HEADERS_SITE = https://archive.mesa3d.org
  MESA3D_HEADERS_DL_SUBDIR = mesa3d
-diff --git a/package/mesa3d/0006-fix-valist.patch b/package/mesa3d/0006-fix-valist.patch
-new file mode 100644
-index 0000000000..84a254cec5
---- /dev/null
-+++ b/package/mesa3d/0006-fix-valist.patch
-@@ -0,0 +1,37 @@
-+From f6892df8eb115fa712fd69068432b48b028e1e54 Mon Sep 17 00:00:00 2001
-+From: Bernd Kuhls <bernd.kuhls@t-online.de>
-+Date: Sat, 20 Nov 2021 22:48:54 +0100
-+Subject: [PATCH] util/u_printf.h: fix build
-+MIME-Version: 1.0
-+Content-Type: text/plain; charset=UTF-8
-+Content-Transfer-Encoding: 8bit
-+
-+Fixes build error with uClibc and gcc-9.3.0:
-+
-+In file included from ../src/util/u_printf.cpp:24:
-+../src/util/u_printf.h:43:41: error: ‘va_list’ has not been declared
-+   43 | size_t u_printf_length(const char *fmt, va_list untouched_args);
-+
-+Patch sent upstream:
-+https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13897
-+
-+Signed-off-by: Bernd Kuhls <bernd.kuhls@t-online.de>
-+---
-+ src/util/u_printf.h | 1 +
-+ 1 file changed, 1 insertion(+)
-+
-+diff --git a/src/util/u_printf.h b/src/util/u_printf.h
-+index 44dcce5529f..14f324de10c 100644
-+--- a/src/util/u_printf.h
-++++ b/src/util/u_printf.h
-+@@ -25,6 +25,7 @@
-+ #ifdef __cplusplus
-+ 
-+ #include <string>
-++#include <stdarg.h>
-+ 
-+ /* find next valid printf specifier in a C++ std::string */
-+ size_t util_printf_next_spec_pos(const std::string &s, size_t pos);
-+-- 
-+GitLab
-+
-diff --git a/package/mesa3d/0007-fix-cpp-detection.patch b/package/mesa3d/0007-fix-cpp-detection.patch
-new file mode 100644
-index 0000000000..2e097277de
---- /dev/null
-+++ b/package/mesa3d/0007-fix-cpp-detection.patch
-@@ -0,0 +1,40 @@
-+From ab5519971a090863f8c559907766e0b2382e0471 Mon Sep 17 00:00:00 2001
-+From: Bernd Kuhls <bernd.kuhls@t-online.de>
-+Date: Sat, 20 Nov 2021 23:02:18 +0100
-+Subject: [PATCH] c11_compat.h: fix uClibc build
-+MIME-Version: 1.0
-+Content-Type: text/plain; charset=UTF-8
-+Content-Transfer-Encoding: 8bit
-+
-+Fixes build error with uClibc and gcc-9.3.0:
-+
-+../src/egl/main/egldisplay.c: In function ‘_eglGetNativePlatformFromEnv’:
-+../src/egl/main/egldisplay.c:101:4: error: implicit declaration of function ‘static_assert’ [-Werror=implicit-function-declaration]
-+  101 |    static_assert(ARRAY_SIZE(egl_platforms) == _EGL_NUM_PLATFORMS,
-+
-+CC: 21.3 <mesa-stable>
-+
-+Patch sent upstream:
-+https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13898
-+
-+Signed-off-by: Bernd Kuhls <bernd.kuhls@t-online.de>
-+---
-+ include/c11_compat.h | 2 --
-+ 1 file changed, 2 deletions(-)
-+
-+diff --git a/include/c11_compat.h b/include/c11_compat.h
-+index d35740f47a4..cdcd3f1f52f 100644
-+--- a/include/c11_compat.h
-++++ b/include/c11_compat.h
-+@@ -8,8 +8,6 @@
-+ 
-+ #if defined(__cplusplus)
-+    /* This is C++ code, not C */
-+-#elif (__STDC_VERSION__ >= 201112L)
-+-   /* Already C11 */
-+ #else
-+ 
-+ 
-+-- 
-+GitLab
-+
 diff --git a/package/mesa3d/Config.in b/package/mesa3d/Config.in
 index 7da9ca4f5b..e41da562dc 100644
 --- a/package/mesa3d/Config.in
@@ -276,21 +187,21 @@ index 7da9ca4f5b..e41da562dc 100644
  config BR2_PACKAGE_PROVIDES_LIBOPENCL
  	default "mesa3d" if BR2_PACKAGE_MESA3D_OPENCL
 diff --git a/package/mesa3d/mesa3d.hash b/package/mesa3d/mesa3d.hash
-index 26176b85b7..235a1b55bb 100644
+index 26176b85b7..d64b833100 100644
 --- a/package/mesa3d/mesa3d.hash
 +++ b/package/mesa3d/mesa3d.hash
 @@ -1,6 +1,6 @@
 -# From https://lists.freedesktop.org/archives/mesa-announce/2021-September/000644.html
 -sha256  5cd32f5d089dca75300578a3d771a656eaed652090573a2655fe4e7022d56bfc  mesa-21.1.8.tar.xz
 -sha512  80fcf2b1d59b49e384e9aa1ae63a3ce709833059af1ffd8eb821054c1976709134098cfc79fac1578a2f08a003223f1c96b38e2e650c5be49821c6f2fe1047af  mesa-21.1.8.tar.xz
-+# From https://lists.freedesktop.org/archives/mesa-announce/2021-December/000658.html
-+sha256  ad7f4613ea7c5d08d9fcb5025270199e6ceb9aa99fd72ee572b70342240a8121  mesa-21.3.3.tar.xz
-+sha512  0263d75435f8c16d40eba3eae29bf372e8994816718deec153c582a17c4dd6ef1c67b3236ed31e63f98bf4e1089fac5cfafae9fb84d3e1fa919b274f43e7e673  mesa-21.3.3.tar.xz
++# From https://lists.freedesktop.org/archives/mesa-announce/2022-February/000663.html
++sha256  96bb761fd546e9aa41d025fcc025225c5668443839dae21e3731959beb096736  mesa-21.3.6.tar.xz
++sha512  8c930e04eade29f689384ee7d6e2f178acbbf30fa6c9fdf132281279658c3c221ec7f9b1318e3c0a654c6136f925a5c0a35eaf849b65db7674641127c71e8a4f  mesa-21.3.6.tar.xz
  
  # License
  sha256  998437f3f75f0c542046f83c1cb349408122268168fb13eb4ae6967aa18b7d98  docs/license.rst
 diff --git a/package/mesa3d/mesa3d.mk b/package/mesa3d/mesa3d.mk
-index dc63d8c9f4..aa365838ab 100644
+index dc63d8c9f4..95618b2072 100644
 --- a/package/mesa3d/mesa3d.mk
 +++ b/package/mesa3d/mesa3d.mk
 @@ -5,7 +5,7 @@
@@ -298,10 +209,19 @@ index dc63d8c9f4..aa365838ab 100644
  
  # When updating the version, please also update mesa3d-headers
 -MESA3D_VERSION = 21.1.8
-+MESA3D_VERSION = 21.3.3
++MESA3D_VERSION = 21.3.6
  MESA3D_SOURCE = mesa-$(MESA3D_VERSION).tar.xz
  MESA3D_SITE = https://archive.mesa3d.org
  MESA3D_LICENSE = MIT, SGI, Khronos
+@@ -20,7 +20,7 @@ MESA3D_PROVIDES =
+ MESA3D_DEPENDENCIES = \
+ 	host-bison \
+ 	host-flex \
+-	host-python3-mako \
++	host-python-mako \
+ 	expat \
+ 	libdrm \
+ 	zlib
 @@ -35,6 +35,15 @@ ifeq ($(BR2_TOOLCHAIN_EXTERNAL_CODESOURCERY_ARM),y)
  MESA3D_CONF_OPTS += -Db_asneeded=false
  endif
@@ -323,7 +243,7 @@ index dc63d8c9f4..aa365838ab 100644
  #  xlib         : xlib conflicts with any dri driver
  #  gallium-xlib : Gallium-xlib based GLX requires at least one gallium driver || Gallium-xlib based GLX requires softpipe or llvmpipe || gallium-xlib conflicts with any dri driver.
 -MESA3D_CONF_OPTS += -Dglx=dri
-+# Always enable glx-direct; without it, amy GLX applications don't work.
++# Always enable glx-direct; without it, many GLX applications don't work.
 +MESA3D_CONF_OPTS += \
 +	-Dglx=dri \
 +	-Dglx-direct=true
@@ -397,75 +317,19 @@ index dc63d8c9f4..aa365838ab 100644
  MESA3D_CONF_OPTS += -Dgles1=enabled -Dgles2=enabled
  else
  MESA3D_CONF_OPTS += -Dgles1=disabled -Dgles2=disabled
-@@ -266,4 +270,11 @@ ifeq ($(BR2_m68k),y)
+@@ -266,4 +270,15 @@ ifeq ($(BR2_m68k),y)
  MESA3D_CFLAGS += -mlong-jump-table-offsets
  endif
  
 +ifeq ($(BR2_PACKAGE_LIBGLVND),y)
++ifneq ($(BR2_PACKAGE_MESA3D_OPENGL_GLX)$(BR2_PACKAGE_MESA3D_OPENGL_EGL),)
 +MESA3D_DEPENDENCIES += libglvnd
 +MESA3D_CONF_OPTS += -Dglvnd=true
 +else
 +MESA3D_CONF_OPTS += -Dglvnd=false
 +endif
++else
++MESA3D_CONF_OPTS += -Dglvnd=false
++endif
 +
  $(eval $(meson-package))
-diff --git a/package/opengl/libgbm/Config.in b/package/opengl/libgbm/Config.in
-index 7aa3efb97a..6eb39761c4 100644
---- a/package/opengl/libgbm/Config.in
-+++ b/package/opengl/libgbm/Config.in
-@@ -5,20 +5,21 @@ config BR2_PACKAGE_PROVIDES_LIBGBM
- 	string
- 	depends on BR2_PACKAGE_HAS_LIBGBM
- 
-+# gbm implementations should select
-+# BR2_PACKAGE_LIBGBM_HAS_FEATURE_FORMAT_MODIFIER_PLANE_COUNT if they
-+# provide the format modifier plane count feature. This API was
-+# initially introduced in mesa3d version 17. A gbm implementation
-+# provides this feature if it is implement function
-+# gbm_device_get_format_modifier_plane_count.
- config BR2_PACKAGE_LIBGBM_HAS_FEATURE_FORMAT_MODIFIER_PLANE_COUNT
- 	bool
- 	depends on BR2_PACKAGE_HAS_LIBGBM
- 
--# gbm implementations should select this option if they provide the
--# format modifier plane count feature. This API was initially introduced
--# in mesa3d version 17. A gbm implementation provides this feature if it
--# is implement function gbm_device_get_format_modifier_plane_count.
--
-+# gbm implementations should select
-+# BR2_PACKAGE_LIBGBM_HAS_FEATURE_DMA_BUF if they provide the dma
-+# buffer feature. This API was initially introduced in mesa3d version
-+# 10. A gbm implementation provides this feature if it is implement
-+# function gbm_bo_get_fd.
- config BR2_PACKAGE_LIBGBM_HAS_FEATURE_DMA_BUF
- 	bool
- 	depends on BR2_PACKAGE_HAS_LIBGBM
--
--# gbm implementations should select this option if they provide the
--# dma buffer feature. This API was initially introduced in mesa3d
--# version 10. A gbm implementation provides this feature if it
--# is implement function gbm_bo_get_fd.
-diff --git a/package/sdl2/sdl2.hash b/package/sdl2/sdl2.hash
-index 6dee461258..9fa95270c3 100644
---- a/package/sdl2/sdl2.hash
-+++ b/package/sdl2/sdl2.hash
-@@ -1,4 +1,4 @@
--# Locally calculated after checking http://www.libsdl.org/release/SDL2-2.0.16.tar.gz.sig
--sha256  65be9ff6004034b5b2ce9927b5a4db1814930f169c4b2dae0a1e4697075f287b  SDL2-2.0.16.tar.gz
-+# Locally calculated after checking http://www.libsdl.org/release/SDL2-2.0.18.tar.gz.sig
-+sha256  94d40cd73dbfa10bb6eadfbc28f355992bb2d6ef6761ad9d4074eff95ee5711c  SDL2-2.0.18.tar.gz
- # Locally calculated
- sha256  52d41d0c82507721ca1fd92c20dc2bf9ca531b3a288ef845a8275c550f118804  LICENSE.txt
-diff --git a/package/sdl2/sdl2.mk b/package/sdl2/sdl2.mk
-index 1708180626..54eec85f5e 100644
---- a/package/sdl2/sdl2.mk
-+++ b/package/sdl2/sdl2.mk
-@@ -4,7 +4,7 @@
- #
- ################################################################################
- 
--SDL2_VERSION = 2.0.16
-+SDL2_VERSION = 2.0.18
- SDL2_SOURCE = SDL2-$(SDL2_VERSION).tar.gz
- SDL2_SITE = http://www.libsdl.org/release
- SDL2_LICENSE = Zlib

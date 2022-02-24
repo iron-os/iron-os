@@ -7,11 +7,6 @@ fn create_config(channel, defconfig, linuxconfig) {
 	common_headless.execute();
 
 	let buildroot = fs::read("./buildroot.config");
-	let psplash_img = regex("PSPLASH_IMAGE=null");
-	buildroot = psplash_img.replace(
-		buildroot,
-		"PSPLASH_IMAGE=\"" + fs::full_path("./assets/psplash-iron-os.png") + "\""
-	);
 	fs::append(defconfig, "\n" + buildroot);
 
 	let linux = fs::read("./linux.config");
