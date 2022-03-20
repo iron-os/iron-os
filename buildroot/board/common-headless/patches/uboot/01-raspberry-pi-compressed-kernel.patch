@@ -1,0 +1,15 @@
+diff --git a/include/configs/rpi.h b/include/configs/rpi.h
+index 522b41c02d..8e3a26433a 100644
+--- a/include/configs/rpi.h
++++ b/include/configs/rpi.h
+@@ -159,7 +159,9 @@
+ 	"scriptaddr=0x02400000\0" \
+ 	"pxefile_addr_r=0x02500000\0" \
+ 	"fdt_addr_r=0x02600000\0" \
+-	"ramdisk_addr_r=0x02700000\0"
++	"ramdisk_addr_r=0x02700000\0" \
++	"kernel_comp_addr_r=0x0A00000\0" \
++	"kernel_comp_size=0x2C00000\0"
+ 
+ #if CONFIG_IS_ENABLED(CMD_MMC)
+ 	#define BOOT_TARGET_MMC(func) \

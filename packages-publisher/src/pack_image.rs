@@ -55,8 +55,8 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 			let img_path = format!("{}/Image.gz", tmp_path);
 			copy("./Image.gz", &img_path).await?;
 			copy(
-				"./efi-part/EFI/BOOT/bootaa64.efi",
-				&format!("{}/bootaa64.efi", tmp_path)
+				"./u-boot.bin",
+				&format!("{}/u-boot.bin", tmp_path)
 			).await?;
 
 			img_path

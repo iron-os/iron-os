@@ -1,19 +1,24 @@
 
 fn help() {
 	print([
-		"Custom OS Riji help:",
-		"	- download // downloads buildroot",
-		"	- config // opens menuconfig",
-		"	- build // builds the os",
-		"	- patch // apply the patches",
-		"	- clean // prepares for a fresh build"
-	])
+		"Iron OS Riji help:",
+		"	- download",
+		"	- patch <board> <channel>",
+		"	- build <board> <channel>",
+		"	- download_packages <product> <board> <channel>",
+		"	- publish <board> <channel> <pub-channel>",
+		"	- config <board> <channel>",
+		"	- linux_config <board> <channel>",
+		"	- rebuild <board> <channel> <package>",
+		"	- rust_build <arch> <channel> <path> <binary>",
+		"	- sysroot <arch> <board>"
+	]);
 }
 
 fn download() {
 	// download buildroot
 	let buildroot = git_clone("git://git.buildroot.net/buildroot", "./buildroot");
-	buildroot.checkout_tag("2021.11.1");
+	buildroot.checkout_tag("2021.11.2");
 
 }
 

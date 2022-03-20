@@ -129,7 +129,10 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 }
 
 fn post_image(buildroot_dir, host_dir, binaries_dir) {
-	let uuid = fs_uuid(host_dir, binaries_dir + "/rootfs.ext2");
+	let rootfs_uuid = fs_uuid(host_dir, binaries_dir + "/rootfs.ext2");
+	let boot_uuid = trim(fs::read(binaries_dir + "/boot_uuid"));
+	let data_uuid = trim(fs::read(binaries_dir + "/data_uuid"));
+
 
 	if fs::is_file(binaries_dir + "/Image") {
 		// gzip the image
@@ -147,18 +150,46 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 		panic("Image bzImage or Image.gz not found");
 	}
 
+	if fs::is_file(binaries_dir + "/using_grub") {
+		post_image_using_grub(
+			image_file,
+			boot_uuid,
+			rootfs_uuid,
+			data_uuid,
+			binaries_dir
+		);
+	} else if fs::is_file(binaries_dir + "/using_uboot") {
+		post_image_using_uboot(
+			image_file,
+			boot_uuid,
+			rootfs_uuid,
+			data_uuid,
+			binaries_dir
+		);
+	} else {
+		panic("unkown bootloader");
+	}
+}
+
+fn post_image_using_grub(
+	image_file,
+	boot_uuid,
+	rootfs_uuid,
+	data_uuid,
+	binaries_dir
+) {
 	// fill grub.cfg
 	let efi_dir = binaries_dir + "/efi-part/EFI/BOOT";
 	let grub_cfg = efi_dir + "/grub.cfg";
 	fs::copy("./grub-efi.cfg", grub_cfg);
 	fs::copy("./grub-efi.cfg", efi_dir + "/grub.templ");
 	let uuid_tmp_reg = regex("ROOTFS_UUID");
-	uuid_tmp_reg.replace_file(grub_cfg, uuid);
+	uuid_tmp_reg.replace_file(grub_cfg, rootfs_uuid);
 	let kernel_reg = regex("KERNEL_NAME");
 	kernel_reg.replace_file(grub_cfg, image_file);
 	// fill genimage-efi.cfg
 	fs::copy("./genimage-efi.cfg", binaries_dir + "/");
-	uuid_tmp_reg.replace_file(binaries_dir + "/genimage-efi.cfg", uuid);
+	uuid_tmp_reg.replace_file(binaries_dir + "/genimage-efi.cfg", rootfs_uuid);
 
 	// kernel name
 	kernel_reg.replace_file(binaries_dir + "/genimage-efi.cfg", image_file);
@@ -166,12 +197,10 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	kernel_reg.replace_file(binaries_dir + "/genimage-efi.cfg", image_file);
 
 	// boot uuid
-	let boot_uuid = trim(fs::read(binaries_dir + "/boot_uuid"));
 	let boot_uuid_reg = regex("EFI_UUID");
 	boot_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", boot_uuid);
 
 	// data uuid
-	let data_uuid = trim(fs::read(binaries_dir + "/data_uuid"));
 	let data_uuid_reg = regex("DATA_UUID");
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", data_uuid);
 
@@ -185,6 +214,47 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 		panic("did not file the correct efi file");
 	}
 	fs::write(binaries_dir + "/efi-part/startup.nsh", efi_file);
+}
+
+fn post_image_using_uboot(
+	image_file,
+	boot_uuid,
+	rootfs_uuid,
+	data_uuid,
+	binaries_dir
+) {
+	let extl_dir = binaries_dir + "/extlinux";
+	// create extlinux folder
+	fs::create_dir(extl_dir);
+
+	let uboot_cfg = extl_dir + "/extlinux.conf";
+	fs::copy("./extlinux-uboot.cfg", uboot_cfg);
+	fs::copy("./extlinux-uboot.cfg", extl_dir + "/extlinux.templ");
+	let uuid_tmp_reg = regex("ROOTFS_UUID");
+	uuid_tmp_reg.replace_file(uboot_cfg, rootfs_uuid);
+	let kernel_reg = regex("KERNEL_NAME");
+	kernel_reg.replace_file(uboot_cfg, image_file);
+
+	let args = trim(fs::read(binaries_dir + "/using_uboot"));
+
+	// fill genimage-uboot.cfg
+	if args != "dont_copy_genimage" {
+		fs::copy("./genimage-uboot.cfg", binaries_dir + "/");
+	}
+	uuid_tmp_reg.replace_file(binaries_dir + "/genimage-uboot.cfg", rootfs_uuid);
+
+	// kernel name
+	kernel_reg.replace_file(binaries_dir + "/genimage-uboot.cfg", image_file);
+	// todo fix this
+	kernel_reg.replace_file(binaries_dir + "/genimage-uboot.cfg", image_file);
+
+	// boot uuid
+	let boot_uuid_reg = regex("EFI_UUID");
+	boot_uuid_reg.replace_file(binaries_dir + "/genimage-uboot.cfg", boot_uuid);
+
+	// data uuid
+	let data_uuid_reg = regex("DATA_UUID");
+	data_uuid_reg.replace_file(binaries_dir + "/genimage-uboot.cfg", data_uuid);
 }
 
 fn create_image_fakeroot(host_dir, binaries_dir, buildroot_dir) {
@@ -243,10 +313,19 @@ fn create_image(binaries_dir, buildroot_dir) {
 	// now we need to create the image package +
 	// version.fdb file
 
+	let genimage_cfg;
+	if fs::is_file(binaries_dir + "/genimage-efi.cfg") {
+		genimage_cfg = binaries_dir + "/genimage-efi.cfg";
+	} else if fs::is_file(binaries_dir + "/genimage-uboot.cfg") {
+		genimage_cfg = binaries_dir + "/genimage-uboot.cfg";
+	} else {
+		panic("no genimage config found");
+	}
+
 	// now run genimage
 	let genimage = cmd([
 		buildroot_dir + "/support/scripts/genimage.sh",
-		"-c", binaries_dir + "/genimage-efi.cfg"
+		"-c", genimage_cfg
 	]);
 	genimage.env("BUILD_DIR", binaries_dir);
 	genimage.env("BINARIES_DIR", binaries_dir);
