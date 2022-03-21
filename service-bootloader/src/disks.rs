@@ -536,11 +536,29 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 		.part_guid.to_string();
 
 	mount(&boot_path, "/mnt")?;
-	let grub = read_to_string("/mnt/EFI/BOOT/grub.templ")?;
-	let grub = grub.replace("ROOTFS_UUID", &root_uuid);
-	let grub = grub.replace("KERNEL_NAME", IMAGE_NAME);
-	fs::write("/mnt/EFI/BOOT/grub.tmp", grub)?;
-	fs::rename("/mnt/EFI/BOOT/grub.tmp", "/mnt/EFI/BOOT/grub.cfg")?;
+	// update bootloader
+	if Path::new("/mnt/EFI/BOOT/grub.templ").is_file() {
+		// update grub
+		let grub = read_to_string("/mnt/EFI/BOOT/grub.templ")?;
+		let grub = grub.replace("ROOTFS_UUID", &root_uuid);
+		let grub = grub.replace("KERNEL_NAME", IMAGE_NAME);
+		fs::write("/mnt/EFI/BOOT/grub.tmp", grub)?;
+		fs::rename("/mnt/EFI/BOOT/grub.tmp", "/mnt/EFI/BOOT/grub.cfg")?;
+
+	} else if Path::new("/mnt/extlinux/extlinux.templ").is_file() {
+		// is uboot
+		let uboot = read_to_string("/mnt/extlinux/extlinux.templ")?;
+		let uboot = uboot.replace("ROOTFS_UUID", &root_uuid);
+		let uboot = uboot.replace("KERNEL_NAME", IMAGE_NAME);
+		fs::write("/mnt/extlinux/extlinux.tmp", uboot)?;
+		fs::rename("/mnt/extlinux/extlinux.tmp", "/mnt/extlinux/extlinux.conf")?;
+
+	} else {
+		return Err(io::Error::new(
+			io::ErrorKind::NotFound,
+			"bootloader not identified"
+		))
+	}
 
 	// update version info
 	update_version_info()?;
@@ -612,12 +630,29 @@ pub fn update(path: &str) -> io::Result<()> {
 
 	fs::copy(&kernel_image_path, &other_path)?;
 
-	// now change the grub settings
-	let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
-	let grub = grub.replace("KERNEL_NAME", other_kernel);
-	let grub = grub.replace("ROOTFS_UUID", &other_uuid.to_string());
-	fs::write("/boot/EFI/BOOT/grub.tmp", grub)?;
-	fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
+	// update bootloader
+	if Path::new("/boot/EFI/BOOT/grub.templ").is_file() {
+		// update grub
+		let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
+		let grub = grub.replace("ROOTFS_UUID", &&other_uuid.to_string());
+		let grub = grub.replace("KERNEL_NAME", other_kernel);
+		fs::write("/boot/EFI/BOOT/grub.tmp", grub)?;
+		fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
+
+	} else if Path::new("/boot/extlinux/extlinux.templ").is_file() {
+		// is uboot
+		let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
+		let uboot = uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
+		let uboot = uboot.replace("KERNEL_NAME", other_kernel);
+		fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
+		fs::rename("/boot/extlinux/extlinux.tmp", "/boot/extlinux/extlinux.conf")?;
+
+	} else {
+		return Err(io::Error::new(
+			io::ErrorKind::NotFound,
+			"bootloader not identified"
+		))
+	}
 
 	Ok(())
 }

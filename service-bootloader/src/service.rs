@@ -141,11 +141,17 @@ pub fn start() -> io::Result<()> {
 	let curr_path = service_package.join(package.current());
 	let bin_path = curr_path.join(&package.pack().binary);
 
-	let mut child = Command::new(bin_path)
-		.current_dir(curr_path)
+	let mut child = Command::new(bin_path);
+
+	child.current_dir(curr_path)
 		.as_user()
 		.env("XDG_RUNTIME_DIR", "/run/user/14")
-		.env("WAYLAND_DISPLAY", "wayland-0")
+		.env("WAYLAND_DISPLAY", "wayland-0");
+	
+	#[cfg(feature = "headless")]
+	child.env("HEADLESS", "yes");
+
+	let mut child = child
 		.stdin_piped()
 		.stdout_piped()
 		.spawn()?;

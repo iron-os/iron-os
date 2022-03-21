@@ -6,6 +6,7 @@ mod version_info;
 mod util;
 mod hardware_fixes;
 
+#[cfg(not(feature = "headless"))]
 use command::Command;
 use hardware_fixes::hardware_fixes;
 
@@ -19,10 +20,13 @@ fn main() {
 
 	hardware_fixes();
 
-	Command::new("systemctl")
-		.args(&["start", "weston"])
-		.exec()
-		.expect("could not start weston");
+	#[cfg(not(feature = "headless"))]
+	{
+		Command::new("systemctl")
+			.args(&["start", "weston"])
+			.exec()
+			.expect("could not start weston");
+	}
 
 	// make sure /data is owned by the user
 	if let Ok(f) = fs::File::open("/data") {
