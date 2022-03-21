@@ -1,7 +1,5 @@
 [Unit]
 Description=Run Sub Process
-Wants=chromium.service
-After=chromium.service
 
 [Service]
 ExecStart=/data/packages/service/start-subprocess.sh

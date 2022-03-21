@@ -218,7 +218,7 @@ index dc63d8c9f4..95618b2072 100644
  	host-bison \
  	host-flex \
 -	host-python3-mako \
-+	host-python-mako \
++	host-python3-mako \
  	expat \
  	libdrm \
  	zlib
