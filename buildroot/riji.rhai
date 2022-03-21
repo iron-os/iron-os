@@ -149,8 +149,6 @@ fn download_packages() {
 //
 // download packages downloads the packages and prepares the publish step
 fn download_packages(product, board, channel) {
-	patch_internal("./buildroot", board, channel);
-
 	let product_file = fs::full_path("./products/" + product + ".toml");
 
 	let br_out_dir = new_br_out_dir("./buildroot", board, channel);

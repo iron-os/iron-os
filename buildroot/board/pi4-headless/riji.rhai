@@ -28,7 +28,7 @@ fn create_config(channel, defconfig, linuxconfig, images) {
 	fs::copy("./config.txt", images + "/");
 
 	// setting dont_copy here so that common-headless does not copy
-	// it's own geimage-uboot file
+	// it's own genimage-uboot file
 	fs::write(images + "/using_uboot", "dont_copy_genimage");
 }
 
