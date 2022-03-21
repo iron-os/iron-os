@@ -14,25 +14,15 @@ mod api;
 mod subprocess;
 mod display;
 
-/// Todo
-/// make it possible to run without a ui
-
-use context::Context;
 use bootloader::Bootloader;
 
-use std::env;
+
 
 #[tokio::main]
 async fn main() {
 
-	let mut args = env::args();
-	let _ = args.next();
-	let ctx = args.next();
-	if matches!(ctx, Some(a) if a == "debug") || cfg!(debug_assertions) {
-		unsafe {
-			// safe because multithreading hasn't started
-			context::set(Context::Debug);
-		}
+	unsafe {
+		context::init();
 	}
 
 	// initialize api
@@ -43,7 +33,7 @@ async fn main() {
 	let display = display::Display::new();
 
 	// if we are in debug only start the ui
-	if context::get().is_debug() {
+	if context::is_debug() {
 		eprintln!("Service started in Debug context, chromium will not start");
 		if !cfg!(debug_assertions) {
 			// only show address in release since in debug fire-http displays it

@@ -17,15 +17,28 @@ use fire::{data_struct, static_file, static_files};
 // but then return a task which contains the serevr
 pub async fn start(
 	client: Bootloader,
-	receiver: ApiReceiver
+	mut receiver: ApiReceiver
 ) -> io::Result<JoinHandle<()>> {
+
+	if context::is_headless() {
+		// if we are in headless mode don't start the ui
+		// just spawn a mockup task
+		return Ok(tokio::spawn(async move {
+			eprintln!("running headless, ui will not get started");
+			// wait until the ui sender closes
+			// then close also the ui task
+			while !receiver.on_maybe_closed().await {}
+		}))
+	}
+
+
 
 	// let's first start the server and then chromium
 	// so when chromes loads the page already exists
 	let server = start_server(8888, client.clone(), receiver);
 
 	// only start chromium if we have a context
-	if context::get().is_release() {
+	if context::is_release() {
 		chromium::start("http://127.0.0.1:8888", &client).await?;
 	}
 
@@ -91,13 +104,18 @@ pub struct ApiReceiver {
 }
 
 impl ApiReceiver {
-	pub fn open_page(&self) -> String {
+	fn open_page(&self) -> String {
 		self.page.borrow().clone()
 	}
 
-	pub async fn on_open_page(&mut self) -> String {
+	async fn on_open_page(&mut self) -> String {
 		self.page.changed().await.expect("ui sender closed");
 		self.open_page()
+	}
+
+	// returns true if the connection was closed
+	async fn on_maybe_closed(&mut self) -> bool {
+		self.page.changed().await.is_err()
 	}
 }
 

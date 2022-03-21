@@ -1,6 +1,7 @@
 
 use crate::Bootloader;
 use crate::packages::Packages;
+use crate::context;
 
 use std::io;
 use std::os::unix::fs::PermissionsExt;
@@ -22,8 +23,14 @@ pub async fn start(packages: Packages, client: Bootloader) -> io::Result<()> {
 	// create file start-subprocess.sh
 	// in /data/packages/service/
 
-	let cmd = CMD.replace("CURRENT_DIR", &on_run_dir)
+	let mut cmd = CMD.replace("CURRENT_DIR", &on_run_dir)
 		.replace("BINARY", &on_run_binary);
+
+	if context::is_headless() {
+		cmd = cmd.replace("MORE_CMD", "export HEADLESS=\"yes\"");
+	} else {
+		cmd = cmd.replace("MORE_CMD", "");
+	}
 
 	// create start script
 	let mut script = File::create(

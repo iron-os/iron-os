@@ -5,7 +5,9 @@
 //! The protocol allows to received notification if the screen state is changed
 //! either by us or by user input.
 //!
-//! Todo: maybe this can be made nice
+//! Todo: maybe this can be made nicer
+
+use crate::context;
 
 mod kiosk_api;
 
@@ -95,7 +97,15 @@ impl Display {
 // 	}
 // }
 
-pub fn start(display: Display) -> JoinHandle<()> {
+pub fn start(mut display: Display) -> JoinHandle<()> {
+	if context::is_headless() {
+		// if we are in headless
+		// no display is available so just make a mok display
+		return tokio::spawn(async move {
+			while !display.rx.changed().await.is_err() {}
+		});
+	}
+
 	tokio::spawn(async move {
 		// needs to be the same as Display::new()
 		let mut state = State::On;
