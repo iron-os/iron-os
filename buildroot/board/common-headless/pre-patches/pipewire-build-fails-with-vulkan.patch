@@ -2,7 +2,7 @@ diff --git a/package/pipewire/pipewire.mk b/package/pipewire/pipewire.mk
 index cbf24dd0ec..e51d7572dd 100644
 --- a/package/pipewire/pipewire.mk
 +++ b/package/pipewire/pipewire.mk
-@@ -135,13 +135,6 @@ else
+@@ -143,13 +143,6 @@ else
  PIPEWIRE_CONF_OPTS += -Dlibusb=disabled
  endif
  

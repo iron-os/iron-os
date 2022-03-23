@@ -398,10 +398,4 @@ fn apply_patch(channel, buildroot) {
 	print("patch pipewire");
 	let pipwire_diff = diff_from_file("./pre-patches/pipewire-build-fails-with-vulkan.patch");
 	buildroot_repo.apply_diff(pipwire_diff);
-	print("patch wayland");
-	let wayland_diff = diff_from_file("./pre-patches/update-wayland.patch");
-	buildroot_repo.apply_diff(wayland_diff);
-	print("patch mesa3d");
-	let mesa3d_diff = diff_from_file("./pre-patches/mesa3d-update.patch");
-	buildroot_repo.apply_diff(mesa3d_diff);
 }

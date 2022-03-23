@@ -22,6 +22,8 @@ fn create_config(channel, defconfig, linuxconfig, images) {
 		"arch = \"Amd64\"",
 		"single-arch = \"Amd64\""
 	]);
+
+	fs::write(images + "/using_grub", "using_grub");
 }
 
 fn apply_patch(channel, buildroot) {
