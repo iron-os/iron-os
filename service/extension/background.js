@@ -50,7 +50,8 @@ const whitelist = [
 	'127.0.0.1',
 	'localhost',
 	'server2.lvgd.ch',
-	'api.server2.lvgd.ch'
+	'api.server2.lvgd.ch',
+	'api.beta.lvgd.ch',
 	// to test speed in debug view
 	// 'www.speedtest.net', 'speedtest.net',
 	// 'livgood.ch', 'fonts.googleapis.com',

@@ -19,7 +19,6 @@ fn download() {
 	// download buildroot
 	let buildroot = git_clone("git://git.buildroot.net/buildroot", "./buildroot");
 	buildroot.checkout_tag("2022.02");
-
 }
 
 fn validate_channel(channel) {
@@ -389,6 +388,8 @@ fn rust_build(arch, channel, path, binary) {
 	let cargo = cmd([cargo_bin, "build", "--release"]);
 	cargo.dir(path);
 	cargo.env_clear();
+	cargo.env("BUILD_CHANNEL", channel);
+	cargo.env("BUILD_SYSROOT", sysroot);
 	cargo.env("PATH", host + "/bin" + ":" + "/usr/bin");
 	cargo.env("CARGO_HOME", cargo_home);
 	cargo.env("__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS", "nightly");
