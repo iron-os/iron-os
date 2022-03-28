@@ -12,8 +12,8 @@ fn help() {
 	print([
 		"Chromium Riji help:",
 		"	- download",
-		" - update // download branch infos and tags (can take a while)",
-		" - checkout // checkout to the current stable tag",
+		"	- update // download branch infos and tags (can take a while)",
+		"	- checkout // checkout to the current stable tag",
 		"	- configure <release>",
 		"	- build <release>",
 		"	- create // creates a patch",

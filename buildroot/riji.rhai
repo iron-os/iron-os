@@ -378,22 +378,24 @@ fn rust_build(arch, channel, path, binary) {
 		panic("unknown " + arch + " architecture");
 	}
 
+	let minus_sign = regex("-");
+	let upper_target = minus_sign.replace(uppercase(target), "_");
+
 	let host = full_host_path(board);
 	let sysroot = host + "/" + buildroot_target + "/sysroot";
 	let cargo_bin = host + "/bin/cargo";
 	let cargo_home = host + "/share/cargo";
 
-	let cargo = cmd([
-		cargo_bin, "-Z", "target-applies-to-host",
-		"build", "--release", "--target", target,
-		
-	]);
+	let cargo = cmd([cargo_bin, "build", "--release"]);
 	cargo.dir(path);
 	cargo.env_clear();
 	cargo.env("PATH", host + "/bin" + ":" + "/usr/bin");
 	cargo.env("CARGO_HOME", cargo_home);
 	cargo.env("__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS", "nightly");
+	cargo.env("CARGO_UNSTABLE_TARGET_APPLIES_TO_HOST", "true");
 	cargo.env("CARGO_TARGET_APPLIES_TO_HOST", "false");
+	cargo.env("CARGO_BUILD_TARGET", target);
+	cargo.env("CARGO_TARGET_" + upper_target + "_LINKER", buildroot_target + "-gcc");
 	cargo.execute();
 
 	// where is the executable??
