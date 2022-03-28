@@ -11,6 +11,9 @@ fn start_chrome() {
 }
 
 fn start_chrome(url) {
+	let cargo = cmd(["cargo", "build"]);
+	cargo.execute();
+
 	let extension = fs::full_path("./extension");
 	print("extension " + extension);
 	let chrome = cmd([
