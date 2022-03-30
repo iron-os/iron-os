@@ -19,8 +19,4 @@ fn apply_patch(channel, buildroot) {
 	]);
 	common_headless.dir("./../common-headless");
 	common_headless.execute();
-
-	// patch weston
-	fs::delete(buildroot + "/package/weston");
-	fs::copy("./package/weston", buildroot + "/package/");
 }
