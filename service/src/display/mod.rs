@@ -107,8 +107,8 @@ pub fn start(mut display: Display) -> JoinHandle<()> {
 	}
 
 	tokio::spawn(async move {
-		// needs to be the same as Display::new()
-		let mut state = State::On;
+		// needs to be the oposite as Display::new()
+		let mut state = State::Off;
 
 		for _ in 0..10 {
 
@@ -181,7 +181,7 @@ async fn handle_display(
 			// let's just skip calling the thread
 			continue
 		} else {
-			// we got a notification from tokio to read events
+			// we got a notification from the wayland fd to read events
 			thread_tx.send((ThreadWork::Read, finished_tx)).await
 		};
 
