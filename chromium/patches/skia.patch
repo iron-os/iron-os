@@ -9,5 +9,5 @@ index 5f800a67ca..610079f208 100644
 -is_linux = current_os == "linux"
 +is_linux = current_os == "linux" || current_os == "ironos"
  is_mac = current_os == "mac"
+ is_wasm = target_os == "wasm"
  is_win = current_os == "win"
- 

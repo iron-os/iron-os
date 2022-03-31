@@ -22,32 +22,32 @@ index fcc7e12834733..7798f73b73c05 100644
  is_nacl = current_os == "nacl"
  is_win = current_os == "win" || current_os == "winuwp"
 diff --git a/build/config/sanitizers/sanitizers.gni b/build/config/sanitizers/sanitizers.gni
-index 2940bfc37f264..86b86039b2e55 100644
+index ded87a56715b0..b9f8861920e21 100644
 --- a/build/config/sanitizers/sanitizers.gni
 +++ b/build/config/sanitizers/sanitizers.gni
-@@ -57,7 +57,7 @@ declare_args() {
-   # TODO(crbug.com/1159424): Reassess the validity of the next expression.
-   is_cfi =
-       is_official_build && is_clang &&
--      (((target_os == "linux" || is_chromeos_lacros) && target_cpu == "x64") ||
-+      (((target_os == "linux" || target_os == "ironos" || is_chromeos_lacros) && target_cpu == "x64") ||
-        ((is_chromeos_ash || is_chromeos_lacros) && is_chromeos_device))
+@@ -51,14 +51,14 @@ declare_args() {
+   #
+   # TODO(pcc): Remove this flag if/when CFI is enabled in all official builds.
+   is_cfi = is_official_build && is_clang &&
+-           ((target_os == "linux" && target_cpu == "x64") ||
++           (((target_os == "linux" || target_os == "ironos") && target_cpu == "x64") ||
+             (is_chromeos && is_chromeos_device))
  
    # Enable checks for indirect function calls via a function pointer.
-@@ -65,7 +65,7 @@ declare_args() {
+   # TODO(pcc): remove this when we're ready to add these checks by default.
    # https://crbug.com/701919
-   #
-   # TODO(crbug.com/1159424): Reassess the validity of the next expression.
--  use_cfi_icall = (target_os == "linux" || is_chromeos_lacros) &&
-+  use_cfi_icall = (target_os == "linux" || target_os == "ironos" || is_chromeos_lacros) &&
-                   target_cpu == "x64" && is_official_build
+-  use_cfi_icall =
+-      target_os == "linux" && target_cpu == "x64" && is_official_build
++  use_cfi_icall = (target_os == "linux" || target_os == "ironos") &&
++    target_cpu == "x64" && is_official_build
  
    # Print detailed diagnostics when Control Flow Integrity detects a violation.
+   use_cfi_diag = false
 diff --git a/build/config/ui.gni b/build/config/ui.gni
-index 55478b02cd0fe..b936947e368d2 100644
+index 83ec3d7e226db..fec7ed5bbbfa7 100644
 --- a/build/config/ui.gni
 +++ b/build/config/ui.gni
-@@ -37,7 +37,7 @@ declare_args() {
+@@ -41,7 +41,7 @@ declare_args() {
  
  assert(!use_glib || (is_linux && !is_chromecast))
  
@@ -56,44 +56,6 @@ index 55478b02cd0fe..b936947e368d2 100644
            current_toolchain == default_toolchain
  
  # Whether using Xvfb to provide a display server for a test might be
-diff --git a/build/toolchain/ironos/BUILD.gn b/build/toolchain/ironos/BUILD.gn
-new file mode 100644
-index 0000000000000..99d91182f4f31
---- /dev/null
-+++ b/build/toolchain/ironos/BUILD.gn
-@@ -0,0 +1,31 @@
-+# Copyright 2013 The Chromium Authors. All rights reserved.
-+# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE file.
-+
-+import("//build/config/ozone.gni")
-+import("//build/config/sysroot.gni")
-+import("//build/toolchain/gcc_toolchain.gni")
-+
-+clang_toolchain("clang_arm") {
-+  toolchain_args = {
-+    current_cpu = "arm"
-+    current_os = "linux"
-+  }
-+}
-+
-+clang_toolchain("clang_arm64") {
-+  toolchain_args = {
-+    current_cpu = "arm64"
-+    current_os = "linux"
-+  }
-+}
-+
-+clang_toolchain("clang_x64") {
-+  # Output linker map files for binary size analysis.
-+  enable_linker_map = true
-+
-+  toolchain_args = {
-+    current_cpu = "x64"
-+    current_os = "linux"
-+  }
-+}
-\ No newline at end of file
 diff --git a/components/policy/BUILD.gn b/components/policy/BUILD.gn
 index 998af332de4a3..c2eccb0bc813a 100644
 --- a/components/policy/BUILD.gn
@@ -153,19 +115,34 @@ index db317cd4e3260..f14ca81db306c 100644
    args = [
      "--target-os=$target_os",
      "--depfile",
+diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
+index f28855f738e3b..cf8865393b0b4 100644
+--- a/content/browser/web_contents/web_contents_impl.cc
++++ b/content/browser/web_contents/web_contents_impl.cc
+@@ -5805,10 +5805,7 @@ void WebContentsImpl::DidNavigateAnyFramePostCommit(
+ 
+ bool WebContentsImpl::CanOverscrollContent() const {
+   OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::CanOverscrollContent");
+-  // Disable overscroll when touch emulation is on. See crbug.com/369938.
+-  if (force_disable_overscroll_content_)
+-    return false;
+-  return delegate_ && delegate_->CanOverscrollContent();
++  return false;
+ }
+ 
+ void WebContentsImpl::OnThemeColorChanged(PageImpl& page) {
 diff --git a/third_party/widevine/cdm/widevine.gni b/third_party/widevine/cdm/widevine.gni
-index 1a833ae57589c..b50ee8889628a 100644
+index 8c2d16bd54c9d..15c9f3d273c01 100644
 --- a/third_party/widevine/cdm/widevine.gni
 +++ b/third_party/widevine/cdm/widevine.gni
-@@ -25,7 +25,7 @@ if (is_chromeos && !is_chromeos_device) {
- # supported via Android MediaDrm API.
+@@ -26,6 +26,7 @@ if (is_chromeos && !is_chromeos_device) {
  library_widevine_cdm_available =
-     (is_chromeos_ash && (target_cpu == "x64" || target_cpu == "arm")) ||
--    ((target_os == "linux" || is_chromeos_lacros) &&
-+    ((target_os == "linux" || is_chromeos_lacros || is_ironos) &&
-      (target_cpu == "x86" || target_cpu == "x64")) ||
+     (is_chromeos && (target_cpu == "x64" || target_cpu == "arm")) ||
+     (target_os == "linux" && target_cpu == "x64") ||
++    (is_ironos && (target_cpu == "x64" || target_cpu == "arm64")) ||
      (target_os == "mac" && (target_cpu == "x64" || target_cpu == "arm64")) ||
      (target_os == "win" && (target_cpu == "x86" || target_cpu == "x64"))
+ 
 diff --git a/tools/variations/fieldtrial_to_struct.py b/tools/variations/fieldtrial_to_struct.py
 index 9ecf38974795f..3afde792b94d5 100755
 --- a/tools/variations/fieldtrial_to_struct.py
@@ -188,69 +165,41 @@ index 9ecf38974795f..3afde792b94d5 100755
    description_filename = os.path.normpath(args[0])
    shortroot = opts.output
    if opts.destdir:
-   
-diff --git a/sandbox/linux/services/credentials.cc b/sandbox/linux/services/credentials.cc
-index ca6b5954798e4..1c1ee422768ad 100644
---- a/sandbox/linux/services/credentials.cc
-+++ b/sandbox/linux/services/credentials.cc
-@@ -11,6 +11,7 @@
- #include <stddef.h>
- #include <stdint.h>
- #include <stdio.h>
-+#include <string.h>
- #include <sys/syscall.h>
- #include <sys/types.h>
- #include <sys/wait.h>
-@@ -100,7 +101,8 @@ bool ChrootToSafeEmptyDir() {
-   // TODO(crbug.com/1247458) Broken in MSan builds after LLVM f1bb30a4956f.
-   clone_flags |= CLONE_VM | CLONE_VFORK | CLONE_SETTLS;
- 
--  char tls_buf[PTHREAD_STACK_MIN] = {0};
-+  char tls_buf[PTHREAD_STACK_MIN];
-+  memset(tls_buf, 0, PTHREAD_STACK_MIN);
-   tls = tls_buf;
- #endif
- 
-diff --git a/base/memory/tagging.cc b/base/memory/tagging.cc
-index a848c2eff1db5..c7e334b13e75d 100644
---- a/base/memory/tagging.cc
-+++ b/base/memory/tagging.cc
-@@ -16,14 +16,14 @@
- #define HWCAP2_MTE (1 << 18)
- #define PR_SET_TAGGED_ADDR_CTRL 55
- #define PR_GET_TAGGED_ADDR_CTRL 56
--#define PR_TAGGED_ADDR_ENABLE (1UL << 0)
--#define PR_MTE_TCF_SHIFT 1
--#define PR_MTE_TCF_NONE (0UL << PR_MTE_TCF_SHIFT)
--#define PR_MTE_TCF_SYNC (1UL << PR_MTE_TCF_SHIFT)
--#define PR_MTE_TCF_ASYNC (2UL << PR_MTE_TCF_SHIFT)
--#define PR_MTE_TCF_MASK (3UL << PR_MTE_TCF_SHIFT)
--#define PR_MTE_TAG_SHIFT 3
--#define PR_MTE_TAG_MASK (0xffffUL << PR_MTE_TAG_SHIFT)
-+// #define PR_TAGGED_ADDR_ENABLE (1UL << 0)
-+// #define PR_MTE_TCF_SHIFT 1
-+// #define PR_MTE_TCF_NONE (0UL << PR_MTE_TCF_SHIFT)
-+// #define PR_MTE_TCF_SYNC (1UL << PR_MTE_TCF_SHIFT)
-+// #define PR_MTE_TCF_ASYNC (2UL << PR_MTE_TCF_SHIFT)
-+// #define PR_MTE_TCF_MASK (3UL << PR_MTE_TCF_SHIFT)
-+// #define PR_MTE_TAG_SHIFT 3
-+// #define PR_MTE_TAG_MASK (0xffffUL << PR_MTE_TAG_SHIFT)
- #endif
- 
- #if defined(OS_ANDROID)
-diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
-index 03b7c24726c2a..4f9254a7bc867 100644
---- a/content/browser/web_contents/web_contents_impl.cc
-+++ b/content/browser/web_contents/web_contents_impl.cc
-@@ -5735,10 +5735,7 @@ void WebContentsImpl::DidNavigateAnyFramePostCommit(
- 
- bool WebContentsImpl::CanOverscrollContent() const {
-   OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::CanOverscrollContent");
--  // Disable overscroll when touch emulation is on. See crbug.com/369938.
--  if (force_disable_overscroll_content_)
--    return false;
--  return delegate_ && delegate_->CanOverscrollContent();
-+  return false;
- }
- 
- void WebContentsImpl::OnThemeColorChanged(PageImpl& page) {
+diff --git a/build/toolchain/ironos/BUILD.gn b/build/toolchain/ironos/BUILD.gn
+new file mode 100644
+index 0000000000000..99d91182f4f31
+--- /dev/null
++++ b/build/toolchain/ironos/BUILD.gn
+@@ -0,0 +1,31 @@
++# Copyright 2013 The Chromium Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
++import("//build/config/ozone.gni")
++import("//build/config/sysroot.gni")
++import("//build/toolchain/gcc_toolchain.gni")
++
++clang_toolchain("clang_arm") {
++  toolchain_args = {
++    current_cpu = "arm"
++    current_os = "linux"
++  }
++}
++
++clang_toolchain("clang_arm64") {
++  toolchain_args = {
++    current_cpu = "arm64"
++    current_os = "linux"
++  }
++}
++
++clang_toolchain("clang_x64") {
++  # Output linker map files for binary size analysis.
++  enable_linker_map = true
++
++  toolchain_args = {
++    current_cpu = "x64"
++    current_os = "linux"
++  }
++}
+\ No newline at end of file

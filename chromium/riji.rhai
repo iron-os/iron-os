@@ -4,8 +4,7 @@ const PATCH_FILE = "./patches.patch";
 const DEPOT = "./depot_tools";
 const CHROM_DEPOT = "../../depot_tools";
 const CHROM = "./chromium/src";
-// const STABLE = "96.0.4664.110";
-const BETA = "98.0.4758.54";
+const STABLE = "100.0.4896.60";
 
 
 fn help() {
@@ -40,7 +39,7 @@ fn download() {
 
 	_add_pgo(CHROM_DEPOT, CHROM);
 
-	_checkout(CHROM_DEPOT, CHROM, BETA);
+	_checkout(CHROM_DEPOT, CHROM, STABLE);
 }
 
 fn update() {
@@ -55,7 +54,7 @@ fn update() {
 }
 
 fn checkout() {
-	_checkout(CHROM_DEPOT, CHROM, BETA);
+	_checkout(CHROM_DEPOT, CHROM, STABLE);
 }
 
 fn _checkout(depot, chrome, stable) {
@@ -290,10 +289,6 @@ fn _patch(chrome) {
 	// v8
 	print("patch v8");
 	patch_git(chrome + "/v8", "./patches/v8.patch");
-
-	// breakpad
-	print("patch breakpad");
-	patch_git(chrome + "/third_party/breakpad/breakpad", "./patches/breakpad.patch");
 }
 
 fn patch_git(git_dir, patch) {
