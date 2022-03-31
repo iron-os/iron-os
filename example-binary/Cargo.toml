@@ -11,4 +11,4 @@ lto = true
 [dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time"] }
 service-api = { version = "0.1", path = "./../service-api" }
-clap = { version = "3.0.10", features = ["derive"] }
+clap = { version = "3.1", features = ["derive"] }

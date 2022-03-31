@@ -5,7 +5,10 @@ use service_api::error::Result;
 use service_api::client::Client as ApiClient;
 
 use service_api::requests::ui::OpenPageReq;
-use service_api::requests::device::{DisksReq, Disk};
+use service_api::requests::device::{
+	DisksReq, Disk,
+	DeviceInfoReq, DeviceInfo
+};
 use service_api::requests::system::InstallOnReq;
 
 /// This does not reconnect, since if the connection closes we expect
@@ -36,5 +39,9 @@ impl Client {
 	pub async fn install_on(&self, disk: String) -> Result<()> {
 		self.inner.request(InstallOnReq { name: disk }).await
 			.map(|_| ())
+	}
+
+	pub async fn device_info(&self) -> Result<DeviceInfo> {
+		self.inner.request(DeviceInfoReq).await
 	}
 }
