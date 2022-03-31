@@ -1,4 +1,6 @@
 
+mod device_info;
+
 use crate::Bootloader;
 use crate::ui::{ApiSender};
 use crate::util::io_other;
@@ -20,7 +22,8 @@ use api::requests::{
 	},
 	packages::{
 		ListPackagesReq, ListPackages, AddPackage, AddPackageReq
-	}
+	},
+	device::{DeviceInfoReq, DeviceInfo}
 };
 use api::request_handler;
 use api::error::{Result as ApiResult, Error as ApiError};
@@ -53,6 +56,7 @@ pub async fn start(
 	server.register_request(install_on);
 	server.register_request(list_packages);
 	server.register_request(add_package);
+	server.register_request(device_info_req);
 
 	Ok(tokio::spawn(async move {
 		server.run().await
@@ -156,6 +160,16 @@ request_handler!(
 				})
 				.collect()
 		))
+	}
+);
+
+request_handler!(
+	async fn device_info_req(
+		_req: DeviceInfoReq,
+		bootloader: Bootloader
+	) -> ApiResult<DeviceInfo> {
+		device_info::read(bootloader).await
+			.map_err(ApiError::io)
 	}
 );
 

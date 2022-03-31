@@ -55,10 +55,17 @@ function blockRequests() {
 
 		const url = new URL(info.url);
 
-		// console.log('hostname', url.hostname);
+		const matches = config.whitelist.some(wUrl => {
+			if (wUrl.startsWith('*')) {
+				wUrl = wUrl.slice(1);
+				return url.hostname.endsWith(wUrl);
+			} else {
+				return url.hostname === wUrl;
+			}
+		});
 
 		return {
-			cancel: config.whitelist.indexOf(url.hostname) === -1
+			cancel: !matches
 		};
 	}, {
 		urls: [ '<all_urls>' ]

@@ -19,9 +19,9 @@ serde_req!(Action::DeviceInfo, DeviceInfoReq, DeviceInfo);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeviceInfo {
 	pub cpu: CpuLoad,
-	pub ram: RamUsage,
-	pub full_disk: DiskUsage,
-	pub data: DiskUsage,
+	pub memory: MemoryUsage,
+	pub active_disk: ActiveDisk,
+	pub data: DataDisk
 	// display
 	// touch
 	// network
@@ -32,23 +32,40 @@ serde_res!(DeviceInfo);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CpuLoad {
-	pub load_avg: (f32, f32, f32),
-	pub cores: usize
-	// tasks
+	pub cores: usize,
+	/// Get the average of jobs in the queue or waiting for disk I/O.
+	/// The values are averaged over (1 min, 5 min, 15 min).
+	pub load_avg_1min: f32,
+	pub load_avg_5min: f32,
+	pub load_avg_15min: f32,
+	pub runnable_threads: usize,
+	pub running_threads: usize,
+	/// uptime in seconds
+	pub uptime: u64,
+	/// Get the sum of how much time each core has spent idle.
+	/// Should be idletime / cores to get the real idle time.
+	pub idletime: u64
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RamUsage {// in bytes
-	pub total: u32,
-	pub avail: u32
+pub struct MemoryUsage {// in bytes
+	pub total: u64,
+	pub available: u64
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DiskUsage {
-	pub used: u32,
-	pub avail: u32
+pub struct ActiveDisk {// in bytes
+	pub name: String,
+	pub size: u64
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DataDisk {// in bytes
+	pub total: u64,
+	pub used: u64
+}
+
+/// not implemented
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SetPowerStateReq {
 	pub state: PowerState
