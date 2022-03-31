@@ -41,8 +41,8 @@ pub async fn read(bootloader: &Bootloader) -> io::Result<DeviceInfo> {
 		load_avg_1min: load_avg.0,
 		load_avg_5min: load_avg.1,
 		load_avg_15min: load_avg.2,
-		runnable_threads: threads.0,
-		running_threads: threads.1,
+		running_threads: threads.0,
+		runnable_threads: threads.1,
 		uptime: uptime.as_secs(),
 		idletime: idletime.as_secs()
 	};
