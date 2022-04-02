@@ -11,6 +11,11 @@
       <arg name="state" type="uint"/>
     </request>
 
+    <request name="set_brightness">
+      <!-- should be 0-255 -->
+      <arg name="brightness" type="uint"/>
+    </request>
+
     <enum name="state">
       <entry name="off" value="0"/>
       <entry name="on" value="1"/>

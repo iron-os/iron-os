@@ -43,6 +43,7 @@ fn write_extension_config(values: &ConfigValues) {
 }
 
 fn main() {
+	println!("cargo:rerun-if-changed={}", PROTO_FILE);
 	println!("cargo:rerun-if-changed=./build-config.toml");
 	println!("cargo:rerun-if-env-changed=BUILD_CHANNEL");
 

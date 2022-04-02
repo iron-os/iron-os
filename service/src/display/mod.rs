@@ -54,65 +54,74 @@ impl From<GlobalError> for WaylandError {
 
 #[derive(Debug, Clone, Copy)]
 enum Message {
-	Request(State),
-	Notification(State)
+	ChangeState(State),
+	ChangeBrightness(u8)
 }
 
 #[derive(Clone)]
 pub struct Display {
-	tx: Arc<watch::Sender<Message>>,
-	rx: watch::Receiver<Message>
+	tx: mpsc::Sender<Message>,
+	// subscribe to state change
+	rx: watch::Receiver<State>
 }
 
 impl Display {
-	pub fn new() -> Self {
-		let (tx, rx) = watch::channel(Message::Request(State::On));
 
-		Self { tx: Arc::new(tx), rx }
-	}
-
-	pub fn set_state(&self, state: State) -> Option<()> {
+	pub async fn set_state(&self, state: State) -> Option<()> {
 		eprintln!("Display: set_state {:?}", state);
-		self.tx.send(Message::Request(state)).ok()
+		self.tx.send(Message::ChangeState(state)).await.ok()
 	}
 
-	fn message(&self) -> Message {
+	pub async fn set_brightness(&self, brightness: u8) -> Option<()> {
+		eprintln!("Display: set_brightness {:?}", brightness);
+		self.tx.send(Message::ChangeBrightness(brightness)).await.ok()
+	}
+
+	#[allow(dead_code)]
+	pub async fn state_change(&mut self) -> State {
+		self.rx.changed().await.expect("display thread failed");
 		*self.rx.borrow()
 	}
-
-	// pub fn state(&self) -> State {
-	// 	match *self.rx.borrow() {
-	// 		Message::Request(s) => s,
-	// 		Message::Notification(s) => s
-	// 	}
-	// }
 }
 
-// impl Clone for Display {
-// 	fn clone(&self) -> Self {
-// 		Self {
-// 			tx: self.tx.clone(),
-// 			rx: self.tx.subscribe()
-// 		}
-// 	}
-// }
+const MPSC_CAP: usize = 10;
 
-pub fn start(mut display: Display) -> JoinHandle<()> {
+pub fn start() -> (JoinHandle<()>, Display) {
+	let (w_tx, w_rx) = watch::channel(State::On);
+	let (tx, rx) = mpsc::channel(MPSC_CAP);
+
+	let display = Display {
+		tx: tx.clone(), rx: w_rx
+	};
+
 	if context::is_headless() {
 		// if we are in headless
 		// no display is available so just make a mok display
-		return tokio::spawn(async move {
-			while !display.rx.changed().await.is_err() {}
+		let task = tokio::spawn(async move {
+			let mut rx = rx;
+			while !rx.recv().await.is_none() {}
 		});
+
+		return (task, display);
 	}
 
-	tokio::spawn(async move {
-		// needs to be the oposite as Display::new()
-		let mut state = State::Off;
+	let task = tokio::spawn(async move {
+		let w_tx = Arc::new(w_tx);
+		let mut rx = rx;
+		let tx = tx;
 
 		for _ in 0..10 {
 
-			if let Err(e) = handle_display(display.clone(), &mut state).await {
+			// no message in the channel
+			// create one to power on the screen
+			if MPSC_CAP == tx.capacity() {
+				let _ = tx.try_send(Message::ChangeState(State::On));
+			}
+
+			if let Err(e) = handle_display(
+				w_tx.clone(),
+				&mut rx
+			).await {
 				eprintln!("handle display error {:?}", e);
 			}
 
@@ -121,29 +130,30 @@ pub fn start(mut display: Display) -> JoinHandle<()> {
 		}
 
 		panic!("display failed to many times")
-	})
+	});
+
+	(task, display)
 }
 
 async fn handle_display(
-	mut rx: Display,
-	state: &mut State
+	tx: Arc<watch::Sender<State>>,
+	rx: &mut mpsc::Receiver<Message>
 ) -> Result<(), WaylandError> {
-
 	let display = WlDisplay::connect_to_env()?;
 	let display_fd = AsyncFd::new(display.get_connection_fd())?;
 	let (thread_tx, thread_rx) = mpsc::channel(5);
-	let thread = spawn_thread(display.clone(), rx.tx.clone(), thread_rx);
+	let thread = spawn_thread(display.clone(), tx, thread_rx);
 
 	loop {
 
-		let ready_guard = tokio::select!{
-			r = rx.rx.changed() => {
-				r.expect("channel closed");
-				None
+		let (ready_guard, msg) = tokio::select!{
+			msg = rx.recv() => {
+				let msg = msg.expect("channel closed");
+				(None, Some(msg))
 			},
 			r = display_fd.readable() => {
 				match r {
-					Ok(r) => Some(r),
+					Ok(r) => (Some(r), None),
 					Err(e) => {
 						eprintln!("Display: readable failed {:?}", e);
 						return Err(e.into())
@@ -154,40 +164,27 @@ async fn handle_display(
 
 		let (finished_tx, finished_rx) = oneshot::channel();
 
-		// None if state should not change
-		let n_state = match rx.message() {
-			Message::Request(s) if s != *state => {
-				*state = s;
-				Some(s)
+		let thread_work = match (ready_guard.is_some(), msg) {
+			// we got a notification from the wayland fd to read events
+			(true, None) => ThreadWork::Read,
+			(false, Some(Message::ChangeState(s))) => {
+				ThreadWork::ChangeState(s)
 			},
-			// already set
-			Message::Request(_) => None,
-			Message::Notification(s) => {
-				*state = s;
-				// nothing to tell weston since this message is from him
-				None
-			}
+			(false, Some(Message::ChangeBrightness(b))) => {
+				ThreadWork::ChangeBrightness(b)
+			},
+			(true, Some(_)) => unreachable!(),
+			(false, None) => unreachable!()
 		};
 
-		let thread_send_result = if let Some(state) = n_state {
-			let r = thread_tx.send((
-				ThreadWork::ReadWrite(state),
-				finished_tx
-			)).await;
-			r
-		} else if ready_guard.is_none() {
-			// since this event is triggered from rx.changed()
-			// and we don't need to change the state
-			// let's just skip calling the thread
-			continue
-		} else {
-			// we got a notification from the wayland fd to read events
-			thread_tx.send((ThreadWork::Read, finished_tx)).await
-		};
+		let thread_send_result = thread_tx.send((
+			thread_work,
+			finished_tx
+		)).await;
 
 		if thread_send_result.is_err() {
 			// could not send to thread
-			// the thread has probably fail let's se why
+			// the thread has probably fail let's see why
 			let r = thread.join();
 			eprintln!("Display: thread error {:?}", r);
 			return Err(WaylandError::ThreadError)
@@ -201,22 +198,22 @@ async fn handle_display(
 			},
 			Ok(WouldBlock::No) => {},
 			Err(_) => {
-				// could not send to thread
-			// the thread has probably fail let's see why
-			let r = thread.join();
-			eprintln!("Display: thread error {:?}", r);
-			return Err(WaylandError::ThreadError)
+				// could not receive from thread
+				// the thread has probably fail let's see why
+				let r = thread.join();
+				eprintln!("Display: thread error {:?}", r);
+				return Err(WaylandError::ThreadError)
 			}
 		}
 	
 	}
-
 }
 
 #[derive(Debug, Clone)]
 enum ThreadWork {
 	Read,
-	ReadWrite(State)
+	ChangeState(State),
+	ChangeBrightness(u8)
 }
 
 #[derive(Debug, Clone)]
@@ -231,7 +228,7 @@ enum WouldBlock {
 /// block only waiting on new work from `handle_display`
 fn spawn_thread(
 	display: WlDisplay,
-	tx: Arc<watch::Sender<Message>>,
+	tx: Arc<watch::Sender<State>>,
 	mut rx: mpsc::Receiver<(ThreadWork, oneshot::Sender<WouldBlock>)>
 ) -> thread::JoinHandle<Result<(), WaylandError>> {
 	thread::spawn(move || {
@@ -249,7 +246,7 @@ fn spawn_thread(
 			match ev {
 				Event::StateChange { state } => {
 					let state = State::from_raw(state).unwrap_or(State::Off);
-					tx.send(Message::Notification(state))
+					tx.send(state)
 						.expect("display tokio task failed");
 				}
 			}
@@ -261,8 +258,11 @@ fn spawn_thread(
 				.expect("display tokio task failed");
 
 			match work {
-				ThreadWork::ReadWrite(state) => {
+				ThreadWork::ChangeState(state) => {
 					kiosk.set_state(state.to_raw());
+				},
+				ThreadWork::ChangeBrightness(brightness) => {
+					kiosk.set_brightness(brightness as u32);
 				},
 				ThreadWork::Read => {
 					// maybe we could ommit the flush??

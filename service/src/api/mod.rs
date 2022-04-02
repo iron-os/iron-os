@@ -17,7 +17,7 @@ use api::requests::{
 		InstallOnReq
 	},
 	device::{
-		SetDisplayStateReq,
+		SetDisplayStateReq, SetDisplayBrightnessReq,
 		DisksReq, Disk as ApiDisk, Disks as ApiDisks
 	},
 	packages::{
@@ -50,6 +50,7 @@ pub async fn start(
 	server.register_request(open_page);
 	server.register_request(system_info);
 	server.register_request(set_display_state);
+	server.register_request(set_display_brightness);
 	server.register_request(disks);
 	server.register_request(install_on);
 	server.register_request(list_packages);
@@ -118,7 +119,6 @@ request_handler!(
 /*
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SetDisplayStateReq {
-	// 0-1
 	pub on: bool
 }
 */
@@ -131,7 +131,18 @@ request_handler!(
 		display.set_state(match on {
 			true => State::On,
 			false => State::Off
-		}).ok_or_else(|| ApiError::internal("could not set display state"))
+		}).await
+			.ok_or_else(|| ApiError::internal("could not set display state"))
+	}
+);
+
+request_handler!(
+	async fn set_display_brightness<Action>(
+		req: SetDisplayBrightnessReq,
+		display: Display
+	) -> ApiResult<()> {
+		display.set_brightness(req.brightness).await
+			.ok_or_else(|| ApiError::internal("could not set display state"))
 	}
 );
 

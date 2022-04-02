@@ -30,8 +30,6 @@ async fn main() {
 
 	let (ui_api_tx, ui_api_rx) = ui::api_new();
 
-	let display = display::Display::new();
-
 	// if we are in debug only start the ui
 	if context::is_debug() {
 		eprintln!("Service started in Debug context, chromium will not start");
@@ -59,16 +57,16 @@ async fn main() {
 	let (packages, packages_bg_task) = packages::start(bootloader.clone()).await
 		.expect("packages failed");
 
+	// start display api
+	let (display_bg_task, display) = display::start();
+
 	// start service api
 	let service_bg_task = crate::api::start(
 		bootloader.clone(),
 		ui_api_tx,
-		display.clone(),
+		display,
 		packages.clone()
 	).await.expect("service api failed");
-
-	// start display api
-	let display_bg_task = display::start(display);
 
 	// detect what package should be run
 	// and run it

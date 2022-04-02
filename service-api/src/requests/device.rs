@@ -139,7 +139,6 @@ impl<B> Request<Action, B> for SetDisplayStateReq {
 }
 
 
-/// not implemented
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetDisplayBrightnessReq {
