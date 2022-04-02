@@ -1,7 +1,7 @@
 
 use std::io;
 
-use bootloader_api::VersionInfo;
+use bootloader_api::requests::VersionInfo;
 use file_db::FileDb;
 
 pub fn version_info() -> io::Result<VersionInfo> {

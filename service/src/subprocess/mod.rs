@@ -9,8 +9,6 @@ use std::os::unix::fs::PermissionsExt;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-use bootloader_api::SystemdRestart;
-
 const CMD: &str = include_str!("start_process.templ");
 const SERVICE_PACKAGE: &str = "/data/packages/service";
 
@@ -45,7 +43,8 @@ pub async fn start(packages: Packages, client: Bootloader) -> io::Result<()> {
 	drop(script);
 
 	// now restart service
-	client.request(&SystemdRestart { name: "subprocess".into() }).await?;
+	client.systemd_restart("subprocess").await
+		.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
 	Ok(())
 }

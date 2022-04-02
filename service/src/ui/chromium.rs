@@ -1,7 +1,7 @@
 
 use crate::Bootloader;
 
-use std::{io, env};
+use std::{io, env, fmt};
 use std::os::unix::fs::PermissionsExt;
 
 use tokio::fs::File;
@@ -10,12 +10,14 @@ use tokio::time::{sleep, Duration};
 
 use file_db::FileDb;
 
-use bootloader_api::{SystemdRestart, MakeRoot};
-
 use packages::packages::PackageCfg;
 
 const CMD: &str = include_str!("start_chrome.templ");
 const CHROME_PACKAGE: &str = "/data/packages/chromium";
+
+fn io_other(s: impl fmt::Display) -> io::Error {
+	io::Error::new(io::ErrorKind::Other, s.to_string())
+}
 
 // the url needs https or http
 pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
@@ -31,7 +33,7 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 
 	let my_curr_path = env::current_dir()?
 		.into_os_string().into_string()
-		.map_err(|_| io::Error::new(io::ErrorKind::Other, "invalid package path"))?;
+		.map_err(|_| io_other("invalid package path"))?;
 	let extension_path = format!("{}/{}", my_curr_path, "extension");
 
 
@@ -57,12 +59,12 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 	}
 
 	// now make chrome-sandbox root
-	client.request(&MakeRoot {
-		path: format!("{}/chrome-sandbox", curr_path)
-	}).await?;
+	client.make_root(format!("{}/chrome-sandbox", curr_path)).await
+		.map_err(|e| io_other(format!("make root failed {:?}", e)))?;
 
 	// now restart service
-	client.request(&SystemdRestart { name: "chromium".into() }).await?;
+	client.systemd_restart("chromium").await
+		.map_err(|e| io_other(format!("could not restart chromium {:?}", e)))?;
 
 	// wait until chromium is loaded (does probably not take that long)
 	sleep(Duration::from_millis(400)).await;

@@ -14,7 +14,7 @@ use packages::packages::{Package, Source};
 use packages::client::Client;
 use packages::requests::{PackageInfoReq, GetFileReq};
 
-use bootloader_api::{UpdateReq};
+use bootloader_api::requests::UpdateReq;
 
 pub(super) async fn update(
 	sources: &[Source],
@@ -239,7 +239,8 @@ async fn update_image(
 		signature: package.signature.clone(),
 		path: img_path.clone()
 	};
-	let version = bootloader.request(&req).await?;
+	let version = bootloader.update(&req).await
+		.map_err(io_other)?;
 
 	// remove the folder
 	let _ = fs::remove_dir_all(&img_path).await;

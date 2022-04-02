@@ -7,8 +7,6 @@ use api::requests::device::{
 	DeviceInfo, CpuLoad, MemoryUsage, ActiveDisk, DataDisk
 };
 
-use bootloader_api::Disks;
-
 use linux_info::system::{LoadAvg, Uptime};
 use linux_info::cpu::Cpu;
 use linux_info::memory::Memory;
@@ -60,7 +58,8 @@ pub async fn read(bootloader: &Bootloader) -> io::Result<DeviceInfo> {
 	};
 
 	// read disk
-	let disks = bootloader.request(&Disks).await?;
+	let disks = bootloader.disks().await
+		.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 	let active_disk = disks.into_iter().find(|d| d.active)
 		.ok_or_else(|| other_err("active disk not found"))?;
 	let active_disk = ActiveDisk {

@@ -1,31 +1,52 @@
 
-use std::{io, fmt, error};
-use stream::StreamError;
+use std::{fmt, error};
+
+pub use stream_api::error::{ApiError, Error as ErrorTrait};
+
+use serde::{Serialize, Deserialize};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Error {
-	Stream(StreamError)
+	ConnectionClosed,
+	RequestDropped,
+	Internal(String),
+	Request(String),
+	Response(String),
+	Other(String)
 }
 
 impl Error {
+	pub fn internal_display(e: impl fmt::Display) -> Self {
+		Self::Internal(e.to_string())
+	}
+}
 
-	pub fn io(e: io::Error) -> Self {
-		Self::Stream(e.into())
+impl ApiError for Error {
+	fn connection_closed() -> Self {
+		Self::ConnectionClosed
 	}
 
-	pub fn io_other<E>(e: E) -> Self
-	where E: Into<Box<dyn std::error::Error + Send + Sync>> {
-		Self::Stream(StreamError::io_other(e))
+	fn request_dropped() -> Self {
+		Self::RequestDropped
 	}
 
-	pub fn into_stream(self) -> StreamError {
-		match self {
-			Self::Stream(s) => s
-		}
+	fn internal<E: ErrorTrait>(e: E) -> Self {
+		Self::Internal(e.to_string())
 	}
 
+	fn request<E: ErrorTrait>(e: E) -> Self {
+		Self::Request(e.to_string())
+	}
+
+	fn response<E: ErrorTrait>(e: E) -> Self {
+		Self::Response(e.to_string())
+	}
+
+	fn other<E: ErrorTrait>(e: E) -> Self {
+		Self::Other(e.to_string())
+	}
 }
 
 impl fmt::Display for Error {

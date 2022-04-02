@@ -6,7 +6,7 @@ use tokio::fs;
 
 use file_db::FileDb;
 
-use bootloader_api::{VersionInfo, Architecture};
+use bootloader_api::requests::{VersionInfo, Architecture};
 
 use serde::{Deserialize};
 

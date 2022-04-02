@@ -1,6 +1,7 @@
-/*
-
-*/
+//! A mini protocol based on stdio  
+//! a request consists of the following: `:>:<key> <data>\n`  
+//! a response consists of the following: `:<:<key> <data>\n`  
+//! 
 
 use std::mem;
 
@@ -12,11 +13,19 @@ mod r#async;
 #[cfg(any(feature = "async", test))]
 pub use r#async::*;
 
+#[cfg(feature = "serde")]
+mod serde;
+#[cfg(feature = "serde")]
+pub use serde::{serialize, deserialize};
+#[cfg(feature = "serde")]
+pub use serde::Error as SerdeError;
+
 // Represents an api line
 // <kind><key> <data>\n
 #[derive(Debug, Clone)]
 pub struct Line {
 	kind: Kind,
+	/// contains the length of the key
 	key: usize,
 	inner: String
 }
@@ -25,7 +34,7 @@ impl Line {
 
 	pub fn new(kind: Kind, key: &str, data: &str) -> Self {
 		Self {
-			key: key.len() + 3,
+			key: key.len(),
 			inner: format!("{}{} {}\n", kind.as_str(), key, data),
 			kind
 		}
@@ -37,7 +46,7 @@ impl Line {
 		debug_assert!(inner.len() > 3);
 		let key = inner.find(' ')
 			.unwrap_or(0)
-			.max(3);// skips the first 3 chars
+			.max(3) - 3;// skips the first 3 bytes
 
 		Self { kind, key, inner }
 	}
@@ -47,11 +56,11 @@ impl Line {
 	}
 
 	pub fn key(&self) -> &str {
-		&self.inner[3..self.key]
+		&self.inner[Kind::LEN..][..self.key]
 	}
 
 	pub fn data(&self) -> &str {
-		&self.inner[self.key..].trim()
+		&self.inner[Kind::LEN + self.key..].trim()
 	}
 
 	// return a line with the newline
@@ -64,59 +73,8 @@ impl Line {
 // stdin represents the request
 // stdout represents the response
 
-
-
 //:>:Request
 //:<:Response
-
-#[cfg(feature = "serde")]
-mod serde {
-
-	use std::fmt;
-	use std::ops::Not;
-
-	use _serde::{Serialize, Deserialize};
-
-	#[derive(Debug)]
-	pub enum Error {
-		Json(serde_json::Error),
-		ContainsInvalidChars
-	}
-
-	impl fmt::Display for Error {
-		fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-			match self {
-				Self::Json(e) => e.fmt(f),
-				Self::ContainsInvalidChars => f.write_str("ContainsInvalidChars")
-			}
-		}
-	}
-
-	impl std::error::Error for Error {}
-
-	// not allowed to contain \n
-	pub fn serialize<T>(value: &T) -> Result<String, Error>
-	where T: Serialize + ?Sized {
-		let s = serde_json::to_string(value)
-			.map_err(Error::Json)?;
-		s.contains('\n').not()
-			.then(|| s)
-			.ok_or(Error::ContainsInvalidChars)
-	}
-
-	pub fn deserialize<'a, T>(s: &'a str) -> Result<T, Error>
-	where T: Deserialize<'a> {
-		serde_json::from_str(s)
-			.map_err(Error::Json)
-	}
-
-}
-#[cfg(feature = "serde")]
-pub use serde::{serialize, deserialize};
-#[cfg(feature = "serde")]
-pub use serde::Error as SerdeError;
-
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -125,13 +83,15 @@ pub enum Kind {
 }
 
 impl Kind {
+	pub const LEN: usize = 3;
+
+	/// only looks at the first 3 bytes
 	pub fn from_str(s: &str) -> Option<Self> {
-		if s.starts_with(":>:") {
-			Some(Self::Request)
-		} else if s.starts_with(":<:") {
-			Some(Self::Response)
-		} else {
-			None
+		let start = s.get(..3)?;
+		match start {
+			":>:" => Some(Self::Request),
+			":<:" => Some(Self::Response),
+			_ => None
 		}
 	}
 

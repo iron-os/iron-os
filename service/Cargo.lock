@@ -273,6 +273,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fire-stream-api"
+version = "0.1.0"
+dependencies = [
+ "fire-stream",
+ "serde",
+ "serde_json",
+ "simple-bytes",
+ "tokio",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -747,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "1.0.0-beta.1"
+version = "1.0.1"
 dependencies = [
  "file-db",
  "fire-http",
@@ -767,9 +778,10 @@ dependencies = [
 
 [[package]]
 name = "service-api"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "fire-stream",
+ "fire-stream-api",
  "packages-api",
  "serde",
  "simple-bytes",
@@ -778,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "service-bootloader-api"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "fire-crypto",
  "serde",

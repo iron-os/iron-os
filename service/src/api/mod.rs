@@ -11,13 +11,13 @@ use std::io;
 
 use api::server::Server;
 use api::requests::{
-	ui::{OpenPageReq, OpenPage},
+	ui::OpenPageReq,
 	system::{
 		SystemInfoReq, SystemInfo, ShortPackage,
-		InstallOnReq, InstallOn as ApiInstallOn
+		InstallOnReq
 	},
 	device::{
-		SetDisplayStateReq, SetDisplayState,
+		SetDisplayStateReq,
 		DisksReq, Disk as ApiDisk, Disks as ApiDisks
 	},
 	packages::{
@@ -25,13 +25,11 @@ use api::requests::{
 	},
 	device::{DeviceInfoReq, DeviceInfo}
 };
-use api::request_handler;
+use api::{request_handler, Action};
 use api::error::{Result as ApiResult, Error as ApiError};
 
 use tokio::fs;
 use tokio::task::JoinHandle;
-
-use bootloader_api::{VersionInfoReq, Disks, InstallOn};
 
 pub async fn start(
 	client: Bootloader,
@@ -65,13 +63,13 @@ pub async fn start(
 }
 
 request_handler!(
-	async fn open_page(
+	async fn open_page<Action>(
 		req: OpenPageReq,
 		ui_api: ApiSender
-	) -> ApiResult<OpenPage> {
+	) -> ApiResult<()> {
 		eprintln!("opening page {}", req.url);
 		ui_api.open_page(req.url);
-		Ok(OpenPage)
+		Ok(())
 	}
 );
 
@@ -84,14 +82,14 @@ pub struct SystemInfo {
 */
 
 request_handler!(
-	async fn system_info(
+	async fn system_info<Action>(
 		_req: SystemInfoReq,
 		bootloader: Bootloader,
 		packages: Packages
 	) -> ApiResult<SystemInfo> {
 
-		let version_info = bootloader.request(&VersionInfoReq).await
-			.map_err(ApiError::io)?;
+		let version_info = bootloader.version_info().await
+			.map_err(ApiError::internal)?;
 
 		let cfg = packages.config().await;
 
@@ -121,34 +119,29 @@ request_handler!(
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SetDisplayStateReq {
 	// 0-1
-	pub brightness: f32,
 	pub on: bool
 }
 */
 request_handler!(
-	async fn set_display_state(
+	async fn set_display_state<Action>(
 		req: SetDisplayStateReq,
 		display: Display
-	) -> ApiResult<SetDisplayState> {
-		let SetDisplayStateReq { brightness: _, on } = req;
+	) -> ApiResult<()> {
+		let SetDisplayStateReq { on } = req;
 		display.set_state(match on {
 			true => State::On,
 			false => State::Off
-		})
-			.map(|_| SetDisplayState)
-			.ok_or_else(|| {
-				ApiError::io_other("could not set display state")
-			})
+		}).ok_or_else(|| ApiError::internal("could not set display state"))
 	}
 );
 
 request_handler!(
-	async fn disks(
+	async fn disks<Action>(
 		_req: DisksReq,
 		bootloader: Bootloader
 	) -> ApiResult<ApiDisks> {
-		let disks_list = bootloader.request(&Disks).await
-			.map_err(ApiError::io)?;
+		let disks_list = bootloader.disks().await
+			.map_err(ApiError::internal)?;
 
 		Ok(ApiDisks(
 			disks_list.into_iter()
@@ -164,25 +157,21 @@ request_handler!(
 );
 
 request_handler!(
-	async fn device_info_req(
+	async fn device_info_req<Action>(
 		_req: DeviceInfoReq,
 		bootloader: Bootloader
 	) -> ApiResult<DeviceInfo> {
 		device_info::read(bootloader).await
-			.map_err(ApiError::io)
+			.map_err(ApiError::internal_display)
 	}
 );
 
 request_handler!(
-	async fn install_on(
+	async fn install_on<Action>(
 		req: InstallOnReq,
 		bootloader: Bootloader
-	) -> ApiResult<ApiInstallOn> {
-		bootloader.request(&InstallOn {
-			name: req.name
-		}).await
-			.map(|_| ApiInstallOn)
-			.map_err(ApiError::io)
+	) -> ApiResult<()> {
+		bootloader.install_on(req.disk).await.map_err(ApiError::internal)
 	}
 );
 
@@ -193,7 +182,7 @@ request_handler!(
 // removePackage
 
 request_handler!(
-	async fn list_packages(
+	async fn list_packages<Action>(
 		_req: ListPackagesReq,
 		packages: Packages
 	) -> ApiResult<ListPackages> {
@@ -211,7 +200,7 @@ request_handler!(
 );
 
 request_handler!(
-	async fn add_package(
+	async fn add_package<Action>(
 		req: AddPackageReq,
 		packages: Packages
 	) -> ApiResult<AddPackage> {

@@ -20,7 +20,7 @@ use linux_info::storage::{sector_size};
 
 use uuid::Uuid;
 
-use bootloader_api::Disk as ApiDisk;
+use bootloader_api::requests::{Disk as ApiDisk};
 
 // the size is set in genimage-efi.cfg
 // bzImage max size is 20m which allows to have a bzImage tmp

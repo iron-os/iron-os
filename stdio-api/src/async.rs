@@ -1,7 +1,9 @@
 
 use crate::{Buffer, Line};
 
-use tokio::io::{self, AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{
+	self, AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader
+};
 use tokio::process::{Child, ChildStdin, ChildStdout};
 
 pub struct AsyncHandle<H> {

@@ -5,13 +5,14 @@
 // - 
 // - DisplayState (turn on off)
 
-#[macro_use]
-mod macros;
-
 pub mod device;
 
-use crate::message::{Action, Message};
+use crate::Action;
+use crate::error::Error;
+
 use serde::{Serialize, Deserialize};
+
+use stream_api::request::Request;
 
 // todo maybe rename os? or system
 pub mod system {
@@ -28,51 +29,48 @@ pub mod system {
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct SystemInfoReq;
 
-	serde_req!(Action::SystemInfo, SystemInfoReq, SystemInfo);
-
-	fn default_board() -> String {
-		"image".into()
-	}
-
-	fn default_product() -> String {
-		"explorer".into()
-	}
-
 	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct SystemInfo {
 		// equivalent of version_str
 		pub version: String,
-		#[serde(default = "default_board")]
 		pub board: String,
-		#[serde(default = "default_product")]
 		pub product: String,
 		pub packages: Vec<ShortPackage>,
 		pub channel: Channel,
 		pub installed: bool
 	}
 
-	serde_res!(SystemInfo);
-
 	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct ShortPackage {
 		pub name: String,
 		pub version: String,
 		pub path: String
 	}
 
-	/// This request should only be used if `SystemInfo.installed == false`
-	#[derive(Debug, Serialize, Deserialize)]
-	pub struct InstallOnReq {
-		/// The name of a disk that is returned from DisksReq
-		pub name: String
+	impl<B> Request<Action, B> for SystemInfoReq {
+		type Response = SystemInfo;
+		type Error = Error;
+
+		const ACTION: Action = Action::SystemInfo;
 	}
 
-	serde_req!(Action::InstallOn, InstallOnReq, InstallOn);
 
+	/// This request should only be used if `SystemInfo.installed == false`
 	#[derive(Debug, Serialize, Deserialize)]
-	pub struct InstallOn;
+	#[serde(rename_all = "camelCase")]
+	pub struct InstallOnReq {
+		/// The name of a disk that is returned from DisksReq
+		pub disk: String
+	}
 
-	serde_res!(InstallOn);
+	impl<B> Request<Action, B> for InstallOnReq {
+		type Response = ();
+		type Error = Error;
+
+		const ACTION: Action = Action::InstallOn;
+	}
 
 }
 
@@ -85,16 +83,17 @@ pub mod ui {
 	use super::*;
 
 	#[derive(Debug, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct OpenPageReq {
 		pub url: String
 	}
 
-	serde_req!(Action::OpenPage, OpenPageReq, OpenPage);
+	impl<B> Request<Action, B> for OpenPageReq {
+		type Response = ();
+		type Error = Error;
 
-	#[derive(Debug, Serialize, Deserialize)]
-	pub struct OpenPage;
-
-	serde_res!(OpenPage);
+		const ACTION: Action = Action::OpenPage;
+	}
 
 }
 
@@ -114,10 +113,9 @@ pub mod packages {
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct ListPackagesReq;
 
-	serde_req!(Action::ListPackages, ListPackagesReq, ListPackages);
-
 	/// if you need a detailed list of packages
 	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct ListPackages {
 		pub packages: Vec<Package>,
 		pub sources: Vec<Source>,
@@ -131,10 +129,9 @@ pub mod packages {
 		}
 	}
 
-	serde_res!(ListPackages);
-
 	/// practically the same as packages_api
 	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct Package {
 		pub name: String,
 		pub version_str: String,
@@ -145,31 +142,46 @@ pub mod packages {
 		pub path: String
 	}
 
+	impl<B> Request<Action, B> for ListPackagesReq {
+		type Response = ListPackages;
+		type Error = Error;
+
+		const ACTION: Action = Action::ListPackages;
+	}
+
+
 	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct AddPackageReq {
 		pub name: String
 	}
 
-	serde_req!(Action::AddPackage, AddPackageReq, AddPackage);
-
 	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct AddPackage {
 		pub package: Package
 	}
 
-	serde_res!(AddPackage);
+	impl<B> Request<Action, B> for AddPackageReq {
+		type Response = AddPackage;
+		type Error = Error;
+
+		const ACTION: Action = Action::AddPackage;
+	}
+
 
 	/// Not implemented
 	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
 	pub struct RemovePackageReq {
 		pub name: String
 	}
 
-	serde_req!(Action::RemovePackage, RemovePackageReq, RemovePackage);
+	impl<B> Request<Action, B> for RemovePackageReq {
+		type Response = ();
+		type Error = Error;
 
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct RemovePackage;
-
-	serde_res!(RemovePackage);
+		const ACTION: Action = Action::RemovePackage;
+	}
 
 }

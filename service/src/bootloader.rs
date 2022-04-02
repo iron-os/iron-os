@@ -1,8 +1,8 @@
 
-use std::io;
 use std::sync::Arc;
 
-use bootloader_api::{AsyncClient, Request};
+use bootloader_api::{AsyncClient, error::Result};
+use bootloader_api::requests::{Disk, VersionInfo, UpdateReq};
 
 use tokio::sync::Mutex;
 
@@ -20,10 +20,46 @@ impl Bootloader {
 		}
 	}
 
-	pub async fn request<R>(&self, req: &R) -> io::Result<R::Response>
-	where R: Request {
-		let mut client = self.inner.lock().await;
-		client.request(req).await
+	pub async fn systemd_restart(
+		&self,
+		name: impl Into<String>
+	) -> Result<()> {
+		self.inner.lock().await
+			.systemd_restart(name).await
 	}
+
+	pub async fn disks(&self) -> Result<Vec<Disk>> {
+		self.inner.lock().await.disks().await
+	}
+
+	pub async fn install_on(
+		&self,
+		disk: impl Into<String>
+	) -> Result<()> {
+		self.inner.lock().await.install_on(disk).await
+	}
+
+	pub async fn version_info(&self) -> Result<VersionInfo> {
+		self.inner.lock().await.version_info().await
+	}
+
+	pub async fn make_root(
+		&self,
+		path: impl Into<String>
+	) -> Result<()> {
+		self.inner.lock().await.make_root(path).await
+	}
+
+	pub async fn update(&self, req: &UpdateReq) -> Result<VersionInfo> {
+		self.inner.lock().await.update(req).await
+	}
+
+	pub async fn restart(&self) -> Result<()> {
+		self.inner.lock().await.restart().await
+	}
+
+	// pub async fn shutdown(&self) -> Result<()> {
+	// 	self.inner.lock().await.shutdown().await
+	// }
 
 }

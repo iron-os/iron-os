@@ -4,9 +4,12 @@
 //! - set [DisplayState](struct.SetDisplayStateReq.html)  
 //! - set [PowerState](struct.SetPowerStateReq.html)
 
-use crate::message::{Action, Message};
+use crate::Action;
+use crate::error::Error;
 
 use serde::{Serialize, Deserialize};
+
+use stream_api::request::Request;
 
 /// ## Important!!
 ///
@@ -14,9 +17,8 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeviceInfoReq;
 
-serde_req!(Action::DeviceInfo, DeviceInfoReq, DeviceInfo);
-
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DeviceInfo {
 	pub cpu: CpuLoad,
 	pub memory: MemoryUsage,
@@ -28,9 +30,8 @@ pub struct DeviceInfo {
 	// todo complete
 }
 
-serde_res!(DeviceInfo);
-
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CpuLoad {
 	pub cores: usize,
 	/// Get the average of jobs in the queue or waiting for disk I/O.
@@ -48,35 +49,40 @@ pub struct CpuLoad {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MemoryUsage {// in bytes
 	pub total: u64,
 	pub available: u64
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ActiveDisk {// in bytes
 	pub name: String,
 	pub size: u64
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DataDisk {// in bytes
 	pub total: u64,
 	pub used: u64
 }
 
+impl<B> Request<Action, B> for DeviceInfoReq {
+	type Response = DeviceInfo;
+	type Error = Error;
+
+	const ACTION: Action = Action::DeviceInfo;
+}
+
+
 /// not implemented
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SetPowerStateReq {
 	pub state: PowerState
 }
-
-serde_req!(Action::SetPowerState, SetPowerStateReq, SetPowerState);
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SetPowerState;
-
-serde_res!(SetPowerState);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PowerState {
@@ -84,19 +90,25 @@ pub enum PowerState {
 	Restart
 }
 
+impl<B> Request<Action, B> for SetPowerStateReq {
+	type Response = ();
+	type Error = Error;
+
+	const ACTION: Action = Action::SetPowerState;
+}
+
+
 /// This request should only be used if `SystemInfo.installed == false`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DisksReq;
 
-serde_req!(Action::Disks, DisksReq, Disks);
-
 /// The active disk will not be returned
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Disks(pub Vec<Disk>);
 
-serde_res!(Disks);
-
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Disk {
 	pub name: String,
 	/// if this disk already has a valid gpt header
@@ -105,16 +117,39 @@ pub struct Disk {
 	pub size: u64
 }
 
+impl<B> Request<Action, B> for DisksReq {
+	type Response = Disks;
+	type Error = Error;
+
+	const ACTION: Action = Action::Disks;
+}
+
+
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SetDisplayStateReq {
-	// 0-1
-	pub brightness: f32,
 	pub on: bool
 }
 
-serde_req!(Action::SetDisplayState, SetDisplayStateReq, SetDisplayState);
+impl<B> Request<Action, B> for SetDisplayStateReq {
+	type Response = ();
+	type Error = Error;
 
+	const ACTION: Action = Action::SetDisplayState;
+}
+
+
+/// not implemented
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SetDisplayState;
+#[serde(rename_all = "camelCase")]
+pub struct SetDisplayBrightnessReq {
+	// 0-255
+	pub brightness: u8
+}
 
-serde_res!(SetDisplayState);
+impl<B> Request<Action, B> for SetDisplayBrightnessReq {
+	type Response = ();
+	type Error = Error;
+
+	const ACTION: Action = Action::SetDisplayBrightness;
+}

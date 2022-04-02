@@ -35,17 +35,13 @@ use tokio::sync::{mpsc, watch, RwLock};
 
 use rand::{thread_rng, Rng};
 
-use bootloader_api::{
-	VersionInfoReq, VersionInfo, SystemdRestart, Architecture
-};
+use bootloader_api::requests::{VersionInfo, Architecture};
 use packages::packages::{
 	PackagesCfg, PackageCfg, Package as PackPackage, BoardArch,
 	Channel, Hash, Source
 };
 use api::requests::packages::Package;
 use file_db::FileDb;
-
-use bootloader_api::{RestartReq};
 
 const PACKAGES_DIR: &str = "/data/packages";
 
@@ -198,7 +194,7 @@ pub async fn start(
 
 	let task = tokio::spawn(async move {
 		// get version info so we know if we should update or not
-		let version_info = client.request(&VersionInfoReq).await
+		let version_info = client.version_info().await
 			.expect("fetching version failed");
 
 		if !version_info.installed {
@@ -284,13 +280,11 @@ pub async fn start(
 
 			// if image was updated
 			if update_data.image.was_updated() {
-				client.request(&RestartReq).await
+				client.restart().await
 					.expect("could not restart the system");
 			// if packages updated
 			} else if update_data.package_was_updated() {
-				client.request(&SystemdRestart {
-					name: "service-bootloader".into()
-				}).await
+				client.systemd_restart("service-bootloader").await
 					.expect("could not restart service-bootloader");
 			}
 
