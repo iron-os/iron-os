@@ -1,2 +1,3 @@
-# add to /etc/udev/rules.d
-ACTION=="add",ENV{ID_INPUT_MOUSE}=="1",ENV{ID_VENDOR}=="eGalax_Inc.",ENV{ID_INPUT}="",ENV{ID_INPUT_MOUSE}=""
+# remove egalaxy simulated mouse
+# so the touch interface is the default input
+ACTION=="add", ENV{ID_INPUT_MOUSE}=="1", ENV{ID_VENDOR}=="eGalax_Inc.", ENV{ID_INPUT}="", ENV{ID_INPUT_MOUSE}=""
