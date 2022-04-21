@@ -128,7 +128,6 @@ impl Request for RestartReq {
 	fn kind() -> Kind { Kind::Restart }
 }
 
-// not implemnted
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ShutdownReq;
 
