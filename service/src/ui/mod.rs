@@ -14,7 +14,7 @@ use tokio::sync::watch;
 use fire::{data_struct, static_file, static_files};
 
 // start chromium and the server manually
-// but then return a task which contains the serevr
+// but then return a task which contains the server
 pub async fn start(
 	client: Bootloader,
 	mut receiver: ApiReceiver
