@@ -58,8 +58,8 @@ impl Bootloader {
 		self.inner.lock().await.restart().await
 	}
 
-	// pub async fn shutdown(&self) -> Result<()> {
-	// 	self.inner.lock().await.shutdown().await
-	// }
+	pub async fn shutdown(&self) -> Result<()> {
+		self.inner.lock().await.shutdown().await
+	}
 
 }

@@ -74,7 +74,6 @@ impl Client {
 		self.inner.request(DeviceInfoReq).await
 	}
 
-	// not implemented
 	pub async fn set_power_state(&self, state: PowerState) -> Result<()> {
 		self.inner.request(SetPowerStateReq { state }).await
 	}

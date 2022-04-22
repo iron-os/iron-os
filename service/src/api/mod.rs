@@ -23,7 +23,7 @@ use api::requests::{
 	packages::{
 		ListPackagesReq, ListPackages, AddPackage, AddPackageReq
 	},
-	device::{DeviceInfoReq, DeviceInfo}
+	device::{DeviceInfoReq, DeviceInfo, SetPowerStateReq, PowerState}
 };
 use api::{request_handler, Action};
 use api::error::{Result as ApiResult, Error as ApiError};
@@ -53,6 +53,7 @@ pub async fn start(
 	server.register_request(set_display_brightness);
 	server.register_request(disks);
 	server.register_request(install_on);
+	server.register_request(set_power_state);
 	server.register_request(list_packages);
 	server.register_request(add_package);
 	server.register_request(device_info_req);
@@ -183,6 +184,19 @@ request_handler!(
 		bootloader: Bootloader
 	) -> ApiResult<()> {
 		bootloader.install_on(req.disk).await.map_err(ApiError::internal)
+	}
+);
+
+request_handler!(
+	async fn set_power_state<Action>(
+		req: SetPowerStateReq,
+		bootloader: Bootloader
+	) -> ApiResult<()> {
+		let r = match req.state {
+			PowerState::Shutdown => bootloader.shutdown().await,
+			PowerState::Restart => bootloader.restart().await
+		};
+		r.map_err(ApiError::internal)
 	}
 );
 
