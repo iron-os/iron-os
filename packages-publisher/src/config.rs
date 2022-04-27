@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use crypto::signature::{Keypair, PublicKey};
 
-use packages::auth::AuthKey;
+use packages::requests::AuthKey;
 use packages::packages::Channel;
 
 use serde::{Serialize, Deserialize};

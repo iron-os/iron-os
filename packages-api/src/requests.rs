@@ -17,27 +17,31 @@ image info (contains bzImage and rootfs)
 get file
 - by hash (returns the file + a signature)
 */
-#[macro_use]
-mod macros;
 
 use crate::error::{Error, Result};
-use crate::message::{Action, Message};
+use crate::action::Action;
 use crate::packages::{Channel, Package, BoardArch};
-use crate::auth::AuthKey;
+
+use std::collections::HashSet;
 
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
-use stream::basic::request::{Request, Response};
-use stream::packet::{EncryptedBytes, PacketError};
+use stream_api::derive_serde_message;
+use stream_api::message::{SerdeMessage, EncryptedBytes};
+use stream_api::request::{Request, RawRequest};
 
 use serde::{Serialize, Deserialize};
 
 use crypto::signature::Signature;
 use crypto::hash::{Hasher, Hash};
+use crypto::token::Token;
 
 use bytes::{BytesRead, BytesWrite};
 
+type Message = stream_api::message::Message<Action, EncryptedBytes>;
+
+pub type DeviceId = Token<32>;
 
 // All packages
 
@@ -57,66 +61,66 @@ use bytes::{BytesRead, BytesWrite};
 
 
 // Package Info
-fn default_board_arch() -> BoardArch {
-	BoardArch::Amd64
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PackageInfoReq {
 	pub channel: Channel,
-	#[serde(default = "default_board_arch")]
 	pub arch: BoardArch,
-	pub name: String
+	pub name: String,
+	/// device_id gives the possibility to target an update
+	/// specific for only one device
+	pub device_id: Option<DeviceId>
 }
 
-serde_req!(Action::PackageInfo, PackageInfoReq, PackageInfo);
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PackageInfo {
 	// there may not exist any info
 	pub package: Option<Package>
 }
 
-serde_res!(PackageInfo);
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SetPackageInfoReq {
-	pub channel: Channel,
-	pub package: Package
+impl<B> Request<Action, B> for PackageInfoReq {
+	type Response = PackageInfo;
+	type Error = Error;
+	const ACTION: Action = Action::PackageInfo;
 }
 
-serde_req!(Action::SetPackageInfo, SetPackageInfoReq, SetPackageInfo);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPackageInfoReq {
+	pub channel: Channel,
+	pub package: Package,
+	// if empty no whitelist is applied
+	pub whitelist: HashSet<DeviceId>
+}
 
-#[derive(Debug)]
-pub struct SetPackageInfo;
-
-impl Response<Action, EncryptedBytes> for SetPackageInfo {
-	fn into_message(self) -> stream::Result<Message> {
-		Ok(Message::new())
-	}
-	fn from_message(_: Message) -> stream::Result<Self> {
-		Ok(Self)
-	}
+impl<B> Request<Action, B> for SetPackageInfoReq {
+	type Response = ();
+	type Error = Error;
+	const ACTION: Action = Action::SetPackageInfo;
 }
 
 // Get File
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetFileReq {
 	pub hash: Hash,
 	// pub start: Option<u64>,
 	// pub end: Option<u64>
 }
 
-serde_req!(Action::GetFile, GetFileReq, GetFile);
+derive_serde_message!(GetFileReq);
 
 #[derive(Debug)]
 pub struct GetFile {
+	// we keep the message so no new allocation is done
 	inner: Message
 }
 
 impl GetFile {
-	pub async fn new(_req: GetFileReq, mut file: File) -> Result<Self> {
+	/// Before sending this response you should check the hash
+	pub async fn from_file(mut file: File) -> Result<Self> {
 
 		let mut msg = Message::new();
 
@@ -132,7 +136,9 @@ impl GetFile {
 			// safe because file.read_to_end only appends
 			let v = body.as_mut_vec();
 			file.read_to_end(v).await
-				.map_err(Error::io)?;
+				.map_err(|e| Error::Other(
+					format!("could not read file {}", e)
+				))?;
 		}
 
 		Ok(Self { inner: msg })
@@ -156,13 +162,20 @@ impl GetFile {
 	}
 }
 
-impl Response<Action, EncryptedBytes> for GetFile {
-	fn into_message(self) -> stream::Result<Message> {
+impl SerdeMessage<Action, EncryptedBytes, Error> for GetFile {
+	fn into_message(self) -> Result<Message> {
 		Ok(self.inner)
 	}
-	fn from_message(msg: Message) -> stream::Result<Self> {
+
+	fn from_message(msg: Message) -> Result<Self> {
 		Ok(Self { inner: msg })
 	}
+}
+
+impl RawRequest<Action, EncryptedBytes> for GetFileReq {
+	type Response = GetFile;
+	type Error = Error;
+	const ACTION: Action = Action::GetFile;
 }
 
 /// This is temporary will be replaced with streams
@@ -174,7 +187,6 @@ pub struct SetFileReq {
 }
 
 impl SetFileReq {
-
 	pub async fn new(sign: Signature, mut file: File) -> Result<Self> {
 
 		let mut msg = Message::new();
@@ -193,7 +205,9 @@ impl SetFileReq {
 			// safe because file.read_to_end only appends
 			let v = body.as_mut_vec();
 			file.read_to_end(v).await
-				.map_err(Error::io)?;
+				.map_err(|e| Error::Other(
+					format!("could not read file {}", e)
+				))?;
 		}
 
 		Ok(Self {
@@ -218,18 +232,14 @@ impl SetFileReq {
 
 }
 
-impl Request<Action, EncryptedBytes> for SetFileReq {
-	type Response = SetFile;
-
-	fn action() -> Action {
-		Action::SetFile
-	}
-	fn into_message(self) -> stream::Result<Message> {
+impl SerdeMessage<Action, EncryptedBytes, Error> for SetFileReq {
+	fn into_message(self) -> Result<Message> {
 		Ok(self.message)
 	}
-	fn from_message(msg: Message) -> stream::Result<Self> {
+
+	fn from_message(msg: Message) -> Result<Self> {
 		if msg.body().len() <= Signature::LEN {
-			return Err(PacketError::Body("no signature".into()).into());
+			return Err(Error::Request("no signature".into()))
 		}
 
 		let sign = Signature::from_slice(
@@ -243,38 +253,30 @@ impl Request<Action, EncryptedBytes> for SetFileReq {
 	}
 }
 
-#[derive(Debug)]
-pub struct SetFile;
-
-impl Response<Action, EncryptedBytes> for SetFile {
-	fn into_message(self) -> stream::Result<Message> {
-		Ok(Message::new())
-	}
-	fn from_message(_: Message) -> stream::Result<Self> {
-		Ok(Self)
-	}
+impl RawRequest<Action, EncryptedBytes> for SetFileReq {
+	type Response = ();
+	type Error = Error;
+	const ACTION: Action = Action::SetFile;
 }
+
+pub type AuthKey = Token<32>;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthenticationReq {
 	pub key: AuthKey
 }
 
-serde_req!(Action::Authentication, AuthenticationReq, Authentication);
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Authentication {
-	pub valid: bool
+impl<B> Request<Action, B> for AuthenticationReq {
+	type Response = ();
+	type Error = Error;
+	const ACTION: Action = Action::Authentication;
 }
 
-serde_res!(Authentication);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewAuthKeyReq {
 	pub sign: Option<Signature>
 }
-
-serde_req!(Action::NewAuthKey, NewAuthKeyReq, NewAuthKey);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewAuthKey {
@@ -288,4 +290,8 @@ pub enum NewAuthKeyKind {
 	NewKey
 }
 
-serde_res!(NewAuthKey);
+impl<B> Request<Action, B> for NewAuthKeyReq {
+	type Response = NewAuthKey;
+	type Error = Error;
+	const ACTION: Action = Action::NewAuthKey;
+}

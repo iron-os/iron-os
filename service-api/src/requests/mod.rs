@@ -25,6 +25,7 @@ pub mod system {
 	use super::*;
 
 	pub use packages_api::packages::Channel;
+	pub use packages_api::requests::DeviceId;
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct SystemInfoReq;
@@ -38,6 +39,7 @@ pub mod system {
 		pub product: String,
 		pub packages: Vec<ShortPackage>,
 		pub channel: Channel,
+		pub device_id: Option<DeviceId>,
 		pub installed: bool
 	}
 

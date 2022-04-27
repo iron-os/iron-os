@@ -16,3 +16,4 @@ file-db = { version = "0.1", features = ["async"], path = "./../file-db" }
 crypto = { package = "fire-crypto", version = "0.3", features = ["cipher", "signature", "serde", "b64"] }
 toml = "0.5"
 clap = { version = "3.0.10", features = ["derive"] }
+stream-api = { package = "fire-stream-api", version = "0.1.1", features = ["encrypted"], path = "./../../fire-stream-api" }

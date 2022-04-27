@@ -14,7 +14,6 @@ use packages::packages::{
 	Channel, Source, Package, PackageCfg, PackagesCfg, BoardArch
 };
 use packages::client::Client;
-use packages::requests::{PackageInfoReq, GetFileReq};
 
 use serde::{Serialize, Deserialize};
 
@@ -194,14 +193,9 @@ async fn download_from_source(
 
 		paint_act!("checking {}", name);
 
-		let req = PackageInfoReq {
-			channel: *channel,
-			arch: *arch,
-			name: name.clone()
-		};
-		let res = client.request(req).await
+		let pack = client.package_info(*channel, *arch, None, name.clone()).await
 			.map_err(|e| err!(e, "could not get package info"))?;
-		let pack = match res.package {
+		let pack = match pack {
 			Some(p) => p,
 			None => continue
 		};
@@ -211,10 +205,7 @@ async fn download_from_source(
 		paint_act!("downloading {}", pack.name);
 
 		// now get the file
-		let req = GetFileReq {
-			hash: pack.version.clone()
-		};
-		let res = client.request(req).await
+		let res = client.get_file(pack.version.clone()).await
 			.map_err(|e| err!(e, "could not get file"))?;
 		if res.is_empty() {
 			return Err(err!("not found", "file {} not found", pack.name));

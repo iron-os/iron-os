@@ -7,13 +7,17 @@ use crate::script::Script;
 use crate::config::Config;
 
 use std::io;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 use crypto::signature::Keypair;
 
 use tokio::fs::{self, File};
 
 use packages::client::Client;
-use packages::requests::{SetFileReq, SetPackageInfoReq, AuthenticationReq};
+use packages::requests::{
+	SetFileReq, DeviceId
+};
 use packages::packages::{Channel, Package, TargetArch, BoardArch};
 
 use riji::paint_act;
@@ -52,7 +56,9 @@ pub struct Upload {
 	/// 
 	/// Expect for image.
 	#[clap(long)]
-	arch: Option<BoardArch>
+	arch: Option<BoardArch>,
+	#[clap(long)]
+	whitelist: Vec<DeviceId>
 }
 
 pub async fn upload(cfg: Upload) -> Result<()> {
@@ -127,22 +133,9 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	let client = Client::connect(&source.addr, source.public_key.clone()).await
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
-	// athenticate
-	{
-		let req = AuthenticationReq {
-			key: source.auth_key.clone().unwrap()
-		};
-
-		let r = client.request(req).await
-			.map_err(|e| err!(e, "failed to upload file"))?;
-
-		if !r.valid {
-			return Err(err!(
-				"auth key error",
-				"Authentication failed, please create a new auth key"
-			))
-		}
-	}
+	// authenticate
+	client.authenticate(source.auth_key.clone().unwrap()).await
+		.map_err(|e| err!(e, "Authentication failed"))?;
 
 	for (tar_path, package) in packages {
 
@@ -152,15 +145,14 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			.expect("reading tar failed");
 		assert_eq!(file_req.hash(), package.version);
 
-		client.request(file_req).await
+		client.set_file(file_req).await
 			.map_err(|e| err!(e, "failed to upload file"))?;
 
-
-		let pack_req = SetPackageInfoReq {
-			channel: cfg.channel,
-			package
-		};
-		client.request(pack_req).await
+		client.set_package_info(
+			cfg.channel,
+			package,
+			HashSet::from_iter(cfg.whitelist.clone())
+		).await
 			.map_err(|e| err!(e, "failed to upload package"))?;
 
 		fs::remove_file(&tar_path).await

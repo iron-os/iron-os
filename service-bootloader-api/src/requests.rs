@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 
 use crypto::hash::Hash;
 use crypto::signature::Signature;
+use crypto::token::Token;
 
 kind!{
 	SystemdRestart,
@@ -78,6 +79,9 @@ pub enum Architecture {
 	Arm64
 }
 
+// Should be equivalent to the DeviceId in packages-api
+pub type DeviceId = Token<32>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VersionInfo {
@@ -87,6 +91,8 @@ pub struct VersionInfo {
 	pub version_str: String,
 	pub version: Hash,
 	pub signature: Option<Signature>,
+	/// device id should exist if the device is installed
+	pub device_id: Option<DeviceId>,
 	pub installed: bool
 }
 

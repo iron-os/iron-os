@@ -1,11 +1,10 @@
 
-use crate::error::{Result};
+use crate::error::Result;
 use crate::util::get_priv_key;
 use crate::config::Config;
 
 use packages::packages::Channel;
 use packages::client::Client;
-use packages::requests::{NewAuthKeyReq, NewAuthKeyKind};
 
 /// Requests an authentication key from a server.
 /// 
@@ -28,32 +27,14 @@ pub async fn authenticate(opts: AuthOpts) -> Result<()> {
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
 
-	let challenge = {
-
-		let req = NewAuthKeyReq {
-			sign: None
-		};
-		let res = client.request(req).await
-			.map_err(|e| err!(e, "failed to request new auth key"))?;
-
-		assert_eq!(res.kind, NewAuthKeyKind::Challenge);
-		res.key
-	};
+	let challenge = client.auth_challenge().await
+		.map_err(|e| err!(e, "failed to request new authentication challenge"))?;
 
 	// sign the key
 	let sign = priv_key.sign(challenge.as_ref());
 
-	let key = {
-
-		let req = NewAuthKeyReq {
-			sign: Some(sign)
-		};
-		let res = client.request(req).await
-			.map_err(|e| err!(e, "failed to request new auth key"))?;
-
-		assert_eq!(res.kind, NewAuthKeyKind::NewKey);
-		res.key
-	};
+	let key = client.auth_key(sign).await
+		.map_err(|e| err!(e, "failed to request new auth key"))?;
 
 	source.auth_key = Some(key);
 

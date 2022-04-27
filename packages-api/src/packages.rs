@@ -9,7 +9,6 @@ use serde::{Serialize, Deserialize};
 use serde::de::{value, IntoDeserializer};
 
 
-// todo should we use this??
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Channel {
 	Debug,
@@ -41,6 +40,7 @@ impl Channel {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Source {
 	/// example packages.lvgd.ch:9281
 	pub addr: String,
@@ -56,6 +56,7 @@ pub struct Source {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PackagesCfg {
 	/// sources to fetch for updates
 	/// updates are checked in reverse order
@@ -121,20 +122,14 @@ impl fmt::Display for BoardArch {
 	}
 }
 
-fn default_arch() -> TargetArch {
-	TargetArch::Amd64
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Package {
 	pub name: String,
 	pub version_str: String,
 	/// blake2s hash of the full compressed file
 	pub version: Hash,
 	pub signature: Signature,
-	// pub size: u64,
-	/// todo: remove default at the end of 2021
-	#[serde(default = "default_arch")]
 	pub arch: TargetArch,
 	pub binary: Option<String>
 }

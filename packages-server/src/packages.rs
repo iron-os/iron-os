@@ -2,14 +2,18 @@
 use crate::error::{Error, Result};
 
 use std::result::Result as StdResult;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::borrow::Cow;
 
 use tokio::fs;
 use tokio::sync::RwLock;
+
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Error as SerdeError, IntoDeserializer};
+
 use packages::packages::{Package, Channel, TargetArch, BoardArch};
+use packages::requests::DeviceId;
+
 use file_db::FileDb;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -40,26 +44,15 @@ impl<'de> Deserialize<'de> for IndexKey {
 	}
 }
 
-type IndexesV2 = HashMap<IndexKey, PackagesIndex>;
-
-fn default_indexes_v2() -> IndexesV2 {
-	IndexesV2::new()
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesDbFile {
-	// this index is threated as if everyone has TargetArch::Amd64
-	indexes: HashMap<Channel, PackagesIndex>,
-	// todo migrate after all packages where updated at least once
-	#[serde(default = "default_indexes_v2")]
-	indexes_v2: IndexesV2
+	indexes: HashMap<IndexKey, PackagesIndex>
 }
 
 impl PackagesDbFile {
 	fn new() -> Self {
 		Self {
-			indexes: HashMap::new(),
-			indexes_v2: IndexesV2::new()
+			indexes: HashMap::new()
 		}
 	}
 
@@ -67,59 +60,60 @@ impl PackagesDbFile {
 		&self,
 		arch: &BoardArch,
 		channel: &Channel,
-		name: &str
-	) -> Option<&Package> {
-		// first try indexes_v2
-
-		let pack_v2 = self.get_v2(
-			&(*arch).into(),
-			channel,
-			name
-		).or_else(|| {
-			self.get_v2(
-				&TargetArch::Any,
-				channel,
-				name
-			)
-		});
-		if let Some(p) = pack_v2 {
-			return Some(p)
-		}
-
-		// since we introduces arm after we got indexes v2
-		// we don't check v1
-		if matches!(arch, BoardArch::Arm64) {
-			return None
-		}
-
-		self.indexes.get(channel)
-			.and_then(|idx| idx.get(name))
+		name: &str,
+		device_id: &Option<DeviceId>
+	) -> Option<&PackageEntry> {
+		self.get_inner(&(*arch).into(), channel, name, device_id)
+			.or_else(|| {
+				self.get_inner(&TargetArch::Any, channel, name, device_id)
+			})
 	}
 
-	fn get_v2(
+	fn get_inner(
 		&self,
 		arch: &TargetArch,
 		channel: &Channel,
-		name: &str
-	) -> Option<&Package> {
-		self.indexes_v2.get(&IndexKey {
+		name: &str,
+		device_id: &Option<DeviceId>
+	) -> Option<&PackageEntry> {
+		self.indexes.get(&IndexKey {
 			channel: *channel,
 			arch: *arch
-		}).and_then(|idx| idx.get(name))
+		}).and_then(|idx| idx.get_latest(name, device_id))
 	}
 
-	fn set(&mut self, channel: Channel, package: Package) {
-		let index = self.indexes_v2.entry(IndexKey {
+	fn push(&mut self, channel: Channel, entry: PackageEntry) {
+		// entry: PackageEntry
+		let index = self.indexes.entry(IndexKey {
 			channel,
-			arch: package.arch
+			arch: entry.package.arch
 		}).or_insert_with(|| PackagesIndex::new());
-		index.set(package);
+		index.push(entry);
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackageEntry {
+	pub package: Package,
+	// if the whitelist is empty this means that all devices are allowed
+	// to use the package
+	pub whitelist: HashSet<DeviceId>
+}
+
+impl PackageEntry {
+	pub fn in_whitelist(&self, device_id: &Option<DeviceId>) -> bool {
+		match device_id {
+			None => self.whitelist.is_empty(),
+			Some(_) if self.whitelist.is_empty() => true,
+			Some(device_id) => self.whitelist.contains(device_id)
+		}
 	}
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesIndex {
-	list: HashMap<String, Package>
+	// last package Entry is the current entry
+	list: HashMap<String, Vec<PackageEntry>>
 }
 
 impl PackagesIndex {
@@ -130,12 +124,37 @@ impl PackagesIndex {
 		}
 	}
 
-	fn get(&self, name: &str) -> Option<&Package> {
-		self.list.get(name)
+	fn get_latest(
+		&self,
+		name: &str,
+		device_id: &Option<DeviceId>
+	) -> Option<&PackageEntry> {
+		self.list.get(name)?
+			.iter().rev()
+			.find(|e| {
+				e.in_whitelist(device_id)
+			})
 	}
 
-	fn set(&mut self, package: Package) {
-		self.list.insert(package.name.clone(), package);
+	// push or updates a existing Entry
+	fn push(&mut self, entry: PackageEntry) {
+		let name = entry.package.name.clone();
+		let list = self.list.entry(name)
+			.or_insert(vec![]);
+
+		let maybe_entry = list.iter_mut()
+			.find(|e| e.package.version == entry.package.version);
+
+		match maybe_entry {
+			Some(stored_entry) => {
+				// the version is the same
+				// so override the current package
+				*stored_entry = entry;
+			},
+			None => {
+				list.push(entry);
+			}
+		}
 	}
 
 }
@@ -174,18 +193,19 @@ impl PackagesDb {
 		&self,
 		arch: &BoardArch,
 		channel: &Channel,
-		name: &str
-	) -> Option<Package> {
+		name: &str,
+		device_id: &Option<DeviceId>
+	) -> Option<PackageEntry> {
 		let lock = self.inner.read().await;
 		let db = lock.data();
-		db.get(arch, channel, name)
+		db.get(arch, channel, name, device_id)
 			.map(Clone::clone)
 	}
 
-	pub async fn set_package(&self, channel: Channel, package: Package) {
+	pub async fn push_package(&self, channel: Channel, entry: PackageEntry) {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
-		db.set(channel, package);
+		db.push(channel, entry);
 		lock.write().await
 			.expect("writing failed unexpectetly")
 	}

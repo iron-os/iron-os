@@ -17,6 +17,8 @@ pub struct Config {
 	pub sign_key: Option<PublicKey>
 }
 
+const CONF_PATH: &'static str = "./config.toml";
+
 impl Config {
 	fn default() -> Self {
 		Self {
@@ -28,7 +30,7 @@ impl Config {
 	}
 
 	pub async fn create() -> Result<Self> {
-		if fs::metadata("./config.toml").await.is_ok() {
+		if fs::metadata(CONF_PATH).await.is_ok() {
 			return Self::read().await;
 		}
 
@@ -36,14 +38,14 @@ impl Config {
 		let s = toml::to_string(&me)
 			.expect("could not serialize config.toml");
 
-		fs::write("./config.toml", s).await
+		fs::write(CONF_PATH, s).await
 			.map_err(|e| Error::new("could not create config.toml", e))?;
 
 		Ok(me)
 	}
 
 	pub async fn read() -> Result<Self> {
-		let s = fs::read_to_string("./config.toml").await
+		let s = fs::read_to_string(CONF_PATH).await
 			.map_err(|e| Error::new("config.toml not found", e))?;
 		toml::from_str(&s)
 			.map_err(|e| Error::other("config.toml error", e))

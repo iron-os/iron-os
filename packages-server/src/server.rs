@@ -1,20 +1,22 @@
 
 use crate::config::Config;
-use crate::packages::PackagesDb;
+use crate::packages::{PackagesDb, PackageEntry};
 use crate::auth::AuthDb;
 use crate::files::Files;
 use crate::error::{Result, Error};
 
-use packages::{request_handler};
+use stream_api::{request_handler, raw_request_handler};
 use packages::requests::{
 	PackageInfoReq, PackageInfo, GetFileReq, GetFile,
-	SetFileReq, SetFile, SetPackageInfoReq, SetPackageInfo,
-	NewAuthKeyReq, NewAuthKey, NewAuthKeyKind, AuthenticationReq, Authentication
+	SetFileReq, SetPackageInfoReq,
+	NewAuthKeyReq, NewAuthKey, NewAuthKeyKind,
+	AuthenticationReq, AuthKey
 };
-use packages::stream::packet::PacketError;
+use packages::action::Action;
 use packages::error::{Result as ApiResult, Error as ApiError};
-use packages::server::{Server, Session, Configurator, Config as ServerConfig};
-use packages::auth::AuthKey;
+use packages::server::{
+	Server, Session, Configurator, Config as ServerConfig, EncryptedBytes
+	};
 
 pub async fn serve() -> Result<()> {
 
@@ -78,7 +80,7 @@ pub async fn serve() -> Result<()> {
 }
 
 request_handler!(
-	async fn package_info(
+	async fn package_info<Action>(
 		req: PackageInfoReq,
 		packages: PackagesDb
 	) -> ApiResult<PackageInfo> {
@@ -86,17 +88,21 @@ request_handler!(
 			package: packages.get_package(
 				&req.arch,
 				&req.channel,
-				&req.name
-			).await
+				&req.name,
+				&req.device_id
+			).await.map(|e| e.package)
 		})
 	}
 );
 
-request_handler!(
-	async fn get_file(req: GetFileReq, files: Files) -> ApiResult<GetFile> {
+raw_request_handler!(
+	async fn get_file<Action, EncryptedBytes>(
+		req: GetFileReq,
+		files: Files
+	) -> ApiResult<GetFile> {
 		let file = files.get(&req.hash).await;
 		match file {
-			Some(file) => GetFile::new(req, file).await,
+			Some(file) => GetFile::from_file(file).await,
 			None => Ok(GetFile::empty())
 		}
 	}
@@ -109,7 +115,7 @@ struct Challenge(AuthKey);
 // to create a new user we need to get a random value signed by the signature
 // key
 request_handler!(
-	async fn new_auth_key(
+	async fn new_auth_key<Action>(
 		req: NewAuthKeyReq,
 		session: Session,
 		cfg: Config,
@@ -124,10 +130,9 @@ request_handler!(
 				},
 				None => false
 			};
+
 			if !valid {
-				return Err(ApiError::Stream(
-					PacketError::Body("Signature incorrect".into()).into()
-				))
+				return Err(ApiError::Request("Signature incorrect".into()))
 			}
 
 			let key = AuthKey::new();
@@ -153,50 +158,48 @@ request_handler!(
 
 
 request_handler!(
-	async fn auth_req(
+	async fn auth_req<Action>(
 		req: AuthenticationReq,
 		session: Session,
 		auth_db: AuthDb
-	) -> ApiResult<Authentication> {
+	) -> ApiResult<()> {
 		let valid = auth_db.contains(&req.key).await;
-		if valid {
-			session.set(req.key.clone());
-			// need to increase the body limit
-			let conf = session.get::<Configurator<ServerConfig>>().unwrap();
-			let mut cfg = conf.read();
-			// the limit should be 200mb
-			cfg.body_limit = 200_000_000;
-			conf.update(cfg);
+		if !valid {
+			return Err(ApiError::AuthKeyUnknown)
 		}
 
-		Ok(Authentication { valid })
+		session.set(req.key.clone());
+		// need to increase the body limit
+		let conf = session.get::<Configurator<ServerConfig>>().unwrap();
+		let mut cfg = conf.read();
+		// the limit should be 200mb
+		cfg.body_limit = 200_000_000;
+		conf.update(cfg);
+
+		Ok(())
 	}
 );
 
 async fn valid_auth(sess: &Session, auth_db: &AuthDb) -> ApiResult<()> {
-	let valid = match sess.get::<AuthKey>() {
-		Some(k) => auth_db.contains(&k).await,
-		None => false
-	};
-
-	if valid {
-		Ok(())
-	} else {
-		Err(ApiError::Stream(
-			PacketError::Body("Not logged in".into()).into()
-		))
+	match sess.get::<AuthKey>() {
+		Some(k) => if auth_db.contains(&k).await {
+			Ok(())
+		} else {
+			Err(ApiError::NotAuthenticated)
+		},
+		None => Err(ApiError::NotAuthenticated)
 	}
 }
 
 // todo some party could upload an old version
-request_handler!(
-	async fn set_file(
+raw_request_handler!(
+	async fn set_file<Action, EncryptedBytes>(
 		req: SetFileReq,
 		files: Files,
 		session: Session,
 		auth_db: AuthDb,
 		cfg: Config
-	) -> ApiResult<SetFile> {
+	) -> ApiResult<()> {
 		valid_auth(session, auth_db).await?;
 
 		// generate hash of file
@@ -205,53 +208,52 @@ request_handler!(
 		let sign_key = cfg.sign_key.as_ref().unwrap();
 		let signature = req.signature();
 		if !sign_key.verify(&hash, signature) {
-			return Err(ApiError::Stream(
-				PacketError::Body("Signature incorrect".into()).into()
-			))
+			return Err(ApiError::SignatureIncorrect)
 		}
 
 		// now write to disk
 		let file = req.file();
 
 		files.set(&hash, file).await
-			.map_err(ApiError::io)?;
+			.map_err(|e| ApiError::Internal(
+				format!("could not write file {}", e)
+			))?;
 
-		Ok(SetFile)
+		Ok(())
 	}
 );
 
 // todo some party could upload an old version
 request_handler!(
-	async fn set_package_info(
+	async fn set_package_info<Action>(
 		req: SetPackageInfoReq,
 		files: Files,
 		session: Session,
 		auth_db: AuthDb,
 		cfg: Config,
 		packages: PackagesDb
-	) -> ApiResult<SetPackageInfo> {
+	) -> ApiResult<()> {
 		valid_auth(session, auth_db).await?;
 
 		// check that we have a file with that version
 		let hash = &req.package.version;
 		if !files.exists(hash).await {
-			return Err(ApiError::Stream(
-				PacketError::Body("version does not exists".into()).into()
-			))
+			return Err(ApiError::Request(format!("version does not exists")))
 		}
 
 		// validate that the signature is correct
 		let sign_key = cfg.sign_key.as_ref().unwrap();
 		if !sign_key.verify(hash, &req.package.signature) {
-			return Err(ApiError::Stream(
-				PacketError::Body("Signature incorrect".into()).into()
-			))
+			return Err(ApiError::SignatureIncorrect)
 		}
 
 		// now set it
-		packages.set_package(req.channel, req.package).await;
+		packages.push_package(req.channel, PackageEntry {
+			package: req.package,
+			whitelist: req.whitelist
+		}).await;
 
-		Ok(SetPackageInfo)
+		Ok(())
 	}
 );
 

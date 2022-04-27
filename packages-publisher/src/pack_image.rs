@@ -90,6 +90,7 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 		version_str: cfg.version,
 		version: hash,
 		signature: None,
+		device_id: None,
 		installed: false
 	};
 

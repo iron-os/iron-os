@@ -12,7 +12,6 @@ use tokio::fs;
 
 use packages::packages::{Package, Source};
 use packages::client::Client;
-use packages::requests::{PackageInfoReq, GetFileReq};
 
 use bootloader_api::requests::UpdateReq;
 
@@ -51,20 +50,21 @@ async fn update_from_source(
 
 	let arch = update.arch;
 	let channel = update.channel;
+	let device_id = update.device_id.clone();
 
 	for (name, state) in update.to_update() {
 
 		// check package info
-		let req = PackageInfoReq {
-			arch,
+		let package = client.package_info(
 			channel,
-			name: name.to_string()
-		};
-		let info = client.request(req).await
+			arch,
+			device_id.clone(),
+			name.to_string()
+		).await
 			.map_err(io_other)?;
 
 		// skip if the package as not changed
-		let package = match info.package {
+		let package = match package {
 			Some(p) => p,
 			None => continue
 		};
@@ -155,10 +155,7 @@ async fn download_file(
 ) -> io::Result<()> {
 
 	// download new file
-	let req = GetFileReq {
-		hash: package.version.clone()
-	};
-	let file = client.request(req).await
+	let file = client.get_file(package.version.clone()).await
 		.map_err(io_other)?;
 
 	if file.is_empty() {
@@ -186,15 +183,15 @@ async fn update_image(
 ) -> io::Result<()> {
 
 	// check for new version
-	let req = PackageInfoReq {
-		arch: update.arch,
-		channel: update.channel,
-		name: format!("image-{}", update.board)
-	};
-	let info = client.request(req).await
+	let package = client.package_info(
+		update.channel,
+		update.arch,
+		update.device_id.clone(),
+		format!("image-{}", update.board)
+	).await
 		.map_err(io_other)?;
 
-	let package = match info.package {
+	let package = match package {
 		Some(p) => p,
 		// package not found
 		None => return Ok(())

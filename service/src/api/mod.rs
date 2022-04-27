@@ -75,13 +75,6 @@ request_handler!(
 	}
 );
 
-/*
-pub struct SystemInfo {
-    pub version: String,
-    pub packages: Vec<Package>,
-    pub installed: bool,
-}
-*/
 
 request_handler!(
 	async fn system_info<Action>(
@@ -112,6 +105,7 @@ request_handler!(
 			product: version_info.product,
 			installed: version_info.installed,
 			channel: cfg.channel,
+			device_id: version_info.device_id.clone(),
 			packages: packages_list
 		})
 	}

@@ -194,9 +194,9 @@ dependencies = [
 
 [[package]]
 name = "fire-crypto"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "688f73b5119ef1b54ba051b46883e6eb6d373ff1eb516dda2ee8b135faeb2ff3"
+checksum = "cd0bc136fb61f8cab5a5682e74a7e54f9300903c24bf5891e195b7b8fae39504"
 dependencies = [
  "base64",
  "blake2",
@@ -223,6 +223,18 @@ version = "0.2.4"
 dependencies = [
  "fire-crypto",
  "fire-log-to-stdout",
+ "serde",
+ "serde_json",
+ "simple-bytes",
+ "tokio",
+]
+
+[[package]]
+name = "fire-stream-api"
+version = "0.1.1"
+dependencies = [
+ "fire-crypto",
+ "fire-stream",
  "serde",
  "serde_json",
  "simple-bytes",
@@ -388,6 +400,7 @@ dependencies = [
  "base64",
  "fire-crypto",
  "fire-stream",
+ "fire-stream-api",
  "rand 0.8.4",
  "serde",
  "simple-bytes",
@@ -401,6 +414,7 @@ dependencies = [
  "clap",
  "file-db",
  "fire-crypto",
+ "fire-stream-api",
  "packages-api",
  "serde",
  "tokio",

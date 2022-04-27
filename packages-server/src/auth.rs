@@ -8,10 +8,9 @@ use tokio::sync::RwLock;
 
 use file_db::FileDb;
 
-use packages::auth::AuthKey;
+use packages::requests::AuthKey;
 
 use serde::{Serialize, Deserialize};
-
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,14 +38,16 @@ pub struct AuthDb {
 	inner: RwLock<FileDb<AuthDbFile>>
 }
 
+const AUTH_PATH: &'static str = "./auths.fdb";
+
 impl AuthDb {
 
 	pub async fn create() -> Result<Self> {
-		if fs::metadata("./auths.fdb").await.is_ok() {
+		if fs::metadata(AUTH_PATH).await.is_ok() {
 			return Self::read().await;
 		}
 
-		let db = FileDb::new("./auths.fdb", AuthDbFile::new());
+		let db = FileDb::new(AUTH_PATH, AuthDbFile::new());
 		db.write().await
 			.map_err(|e| Error::new("could not write auths.fdb", e))?;
 
@@ -56,7 +57,7 @@ impl AuthDb {
 	}
 
 	pub async fn read() -> Result<Self> {
-		let db = FileDb::open("./auths.fdb").await
+		let db = FileDb::open(AUTH_PATH).await
 			.map_err(|e| Error::new("auths.fdb could not be opened", e))?;
 
 		Ok(Self {

@@ -284,6 +284,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fire-stream-api"
+version = "0.1.1"
+dependencies = [
+ "fire-crypto",
+ "fire-stream",
+ "serde",
+ "serde_json",
+ "simple-bytes",
+ "tokio",
+]
+
+[[package]]
 name = "form_urlencoded"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -585,6 +597,7 @@ dependencies = [
  "base64",
  "fire-crypto",
  "fire-stream",
+ "fire-stream-api",
  "rand 0.8.4",
  "serde",
  "simple-bytes",

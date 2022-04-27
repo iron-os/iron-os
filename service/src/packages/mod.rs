@@ -35,7 +35,7 @@ use tokio::sync::{mpsc, watch, RwLock};
 
 use rand::{thread_rng, Rng};
 
-use bootloader_api::requests::{VersionInfo, Architecture};
+use bootloader_api::requests::{VersionInfo, DeviceId, Architecture};
 use packages::packages::{
 	PackagesCfg, PackageCfg, Package as PackPackage, BoardArch,
 	Channel, Hash, Source
@@ -345,6 +345,7 @@ struct Update {
 	pub board: String,
 	pub arch: BoardArch,
 	pub channel: Channel,
+	pub device_id: Option<DeviceId>,
 	pub packages: HashMap<String, PackageUpdateState>,
 	pub image: ImageUpdateState
 }
@@ -526,6 +527,7 @@ impl RawPackages {
 			board: version.board.clone(),
 			arch: boot_to_board_arch(version.arch),
 			channel: self.cfg.channel,
+			device_id: version.device_id.clone(),
 			packages: packs,
 			image
 		}

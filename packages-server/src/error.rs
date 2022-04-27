@@ -2,6 +2,7 @@
 use std::io;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Error {
 	description: String,
 	error: io::Error
