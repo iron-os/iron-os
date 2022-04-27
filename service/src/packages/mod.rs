@@ -220,10 +220,11 @@ pub async fn start(
 
 			// we do this step on every iteration to
 			// always get a new random value
-			let time = match packages.is_debug().await {
+			let time = match packages.channel().await {
 				// check version 30 seconds
-				true => Duration::from_secs(30),
-				false => Duration::from_secs(
+				Channel::Debug => Duration::from_secs(30),
+				Channel::Alpha => Duration::from_secs(60),
+				_ => Duration::from_secs(
 					thread_rng()
 						.gen_range((60 * min)..(60 * max))
 				)
@@ -437,9 +438,9 @@ impl SyncPackages {
 	}
 
 	// is this expensive?
-	pub async fn is_debug(&self) -> bool {
+	pub async fn channel(&self) -> Channel {
 		self.inner.read().await
-			.cfg.channel.is_debug()
+			.cfg.channel
 	}
 
 	pub async fn prepare_update(&self, version: &VersionInfo) -> Update {
