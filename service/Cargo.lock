@@ -219,7 +219,9 @@ dependencies = [
 
 [[package]]
 name = "fire-http"
-version = "0.2.8"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e0b0e103f66e816fe03d75e9c094c5849ecd99206cab4a7668668ef75c1c4b2"
 dependencies = [
  "base64",
  "bytes",
