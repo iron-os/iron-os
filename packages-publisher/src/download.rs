@@ -117,7 +117,7 @@ pub async fn download(opts: Download) -> Result<()> {
 	}
 
 	if unfinished {
-		return Ok(())
+		return Err(err!("unfinished", "not all packages could be downloaded"))
 	}
 
 	let sources: Vec<_> = cfg.sources.into_iter()
