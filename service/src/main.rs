@@ -38,7 +38,7 @@ async fn main() {
 			eprintln!("Access the page via 127.0.0.1:8888");
 		}
 
-		ui_api_tx.open_page("https://livgood.ch".into());
+		ui_api_tx.open_page("http://127.0.0.1:8080".into());
 
 		// start the ui
 		let ui_bg_task = ui::start(bootloader, ui_api_rx).await

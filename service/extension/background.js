@@ -5,6 +5,7 @@ import config from './config.js';
 function main() {
 	allowIframes();
 	blockRequests();
+	reloadOnError();
 	// handleConnection();
 }
 
@@ -70,6 +71,22 @@ function blockRequests() {
 	}, {
 		urls: [ '<all_urls>' ]
 	}, [ 'blocking' ]);
+}
+
+function reloadOnError() {
+	chrome.webNavigation.onErrorOccurred.addListener(details => {
+		// for the moment only reload the main frame and subframe
+		// but maybe we need to change this
+		if (details.parentFrameId > 0)
+			return;
+
+		const tabId = details.tabId;
+
+		setTimeout(() => {
+			chrome.tabs.reload(tabId, { bypassCache: true });
+		}, 1000);
+
+	});
 }
 
 /* Zoom
