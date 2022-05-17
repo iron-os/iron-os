@@ -169,6 +169,15 @@ fn publish() {
 
 /// Generates the image creates the output dir and then uploads
 fn publish(board, channel, pub_channel) {
+	_publish(board, channel, pub_channel, []);
+}
+
+// device id for whitelist
+fn publish(board, channel, pub_channel, device_id) {
+	_publish(board, channel, pub_channel, [device_id]);
+}
+
+fn _publish(board, channel, pub_channel, whitelist) {// whitelist should be an array
 	let buildroot = "./buildroot";
 	let full_buildroot = fs::full_path(buildroot);
 
@@ -210,6 +219,37 @@ fn publish(board, channel, pub_channel) {
 	let publisher = cmd([
 		"publisher", "upload", pub_channel
 	]);
+	if whitelist.len() > 0 {
+		publisher.arg("--whitelist");
+		publisher.args(whitelist);
+	}
+	publisher.dir(out_dir);
+	publisher.execute();
+}
+
+fn republish() {
+	print("republish <board> <channel> <pub-channel>");
+}
+
+fn republish(board, channel, pub_channel) {
+	_republish(board, channel, pub_channel, []);
+}
+
+fn republish(board, channel, pub_channel, device_id) {
+	_republish(board, channel, pub_channel, [device_id]);
+}
+
+fn _republish(board, channel, pub_channel, whitelist) {
+	let out_dir = "./output/" + board + "/" + channel;
+
+	// upload
+	let publisher = cmd([
+		"publisher", "upload", pub_channel
+	]);
+	if whitelist.len() > 0 {
+		publisher.arg("--whitelist");
+		publisher.args(whitelist);
+	}
 	publisher.dir(out_dir);
 	publisher.execute();
 }
