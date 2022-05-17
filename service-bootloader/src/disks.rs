@@ -45,18 +45,21 @@ const IMAGE_NAME: &str = "Image.gz";
 const IMAGE_NAME_B: &str = "ImageB.gz";
 
 pub fn api_disks() -> io::Result<Vec<ApiDisk>> {
-	let mut list = vec![];
 	let disks = Disks::read()?;
 
-	for (name, disk) in disks.inner {
-		let api_disk = ApiDisk {
-			name,
-			active: disk.is_root,
-			initialized: disk.gpt_disk.is_some(),
-			size: disk.size()?
-		};
-		list.push(api_disk);
-	}
+	let list = disks.inner.into_iter()
+		.map(|(name, disk)| {
+			ApiDisk {
+				name,
+				active: disk.is_root,
+				initialized: disk.gpt_disk.is_some(),
+				// there exist devices which are block devices but don't have a
+				// file in /dev/.. (or maybe a driver is missing)
+				// we don't skip those devices but set the size to 0
+				size: disk.size().unwrap_or(0)
+			}
+		})
+		.collect();
 
 	Ok(list)
 }
@@ -131,7 +134,7 @@ impl Disks {
 
 			let name = name.to_string();
 
-			let disk = Disk::new(&name)?;
+			let disk = Disk::new(&name);
 
 			list.insert(name, disk);
 
@@ -171,7 +174,7 @@ struct Disk {
 
 impl Disk {
 
-	pub fn new(name: &str) -> io::Result<Self> {
+	pub fn new(name: &str) -> Self {
 		let path = Path::new("/dev").join(name);
 
 		let mut me = Self {
@@ -185,7 +188,7 @@ impl Disk {
 		}
 
 		// if necessary should load block_size (so we can show binary size)
-		Ok(me)
+		me
 	}
 
 	fn open_gpt(&mut self) -> io::Result<()> {
