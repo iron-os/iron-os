@@ -8,6 +8,7 @@ action! {
 		// AllPackages = 10,
 		PackageInfo = 11,
 		SetPackageInfo = 13,
+		ChangeWhitelist = 15,
 		GetFile = 20,
 		SetFile = 22,
 

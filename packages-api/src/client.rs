@@ -1,14 +1,15 @@
 
 use crate::action::Action;
 use crate::error::{Result, Error};
-use crate::packages::{Channel, Package, BoardArch};
+use crate::packages::{Channel, Package, BoardArch, TargetArch};
 use crate::requests::{
 	PackageInfoReq, DeviceId,
 	SetPackageInfoReq,
 	GetFileReq, GetFile,
 	SetFileReq,
 	AuthKey, AuthenticationReq,
-	NewAuthKeyReq, NewAuthKeyKind
+	NewAuthKeyReq, NewAuthKeyKind,
+	ChangeWhitelistReq
 };
 
 use std::time::Duration;
@@ -107,6 +108,19 @@ impl Client {
 				"expected Key".into()
 			))
 		}
+	}
+
+	pub async fn change_whitelist(
+		&self,
+		channel: Channel,
+		arch: TargetArch,
+		name: String,
+		version: Hash,
+		whitelist: HashSet<DeviceId>
+	) -> Result<()> {
+		self.inner.request(ChangeWhitelistReq {
+			channel, arch, name, version, whitelist
+		}).await
 	}
 
 	pub async fn close(self) {

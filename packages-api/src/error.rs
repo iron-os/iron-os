@@ -14,6 +14,7 @@ pub enum Error {
 	AuthKeyUnknown,
 	NotAuthenticated,
 	SignatureIncorrect,
+	VersionNotFound,
 	Internal(String),
 	Request(String),
 	Response(String),

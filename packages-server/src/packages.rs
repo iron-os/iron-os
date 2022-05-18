@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Error as SerdeError, IntoDeserializer};
 
-use packages::packages::{Package, Channel, TargetArch, BoardArch};
+use packages::packages::{Package, Channel, Hash, TargetArch, BoardArch};
 use packages::requests::DeviceId;
 
 use file_db::FileDb;
@@ -90,6 +90,27 @@ impl PackagesDbFile {
 		}).or_insert_with(|| PackagesIndex::new());
 		index.push(entry);
 	}
+
+	fn change_whitelist(
+		&mut self,
+		channel: &Channel,
+		arch: &TargetArch,
+		name: &str,
+		version: &Hash,
+		whitelist: HashSet<DeviceId>
+	) -> bool {
+		let entry = self.indexes.get_mut(&IndexKey {
+			channel: *channel,
+			arch: *arch
+		}).and_then(|i| i.mut_with_version(name, version));
+
+		if let Some(entry) = entry {
+			entry.whitelist = whitelist;
+			true
+		} else {
+			false
+		}
+	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,6 +154,18 @@ impl PackagesIndex {
 			.iter().rev()
 			.find(|e| {
 				e.in_whitelist(device_id)
+			})
+	}
+
+	fn mut_with_version(
+		&mut self,
+		name: &str,
+		version: &Hash
+	) -> Option<&mut PackageEntry> {
+		self.list.get_mut(name)?
+			.iter_mut().rev()
+			.find(|e| {
+				&e.package.version == version
 			})
 	}
 
@@ -208,6 +241,23 @@ impl PackagesDb {
 		db.push(channel, entry);
 		lock.write().await
 			.expect("writing failed unexpectetly")
+	}
+
+	// returns true if the whitelist could be changed
+	pub async fn change_whitelist(
+		&self,
+		channel: &Channel,
+		arch: &TargetArch,
+		name: &str,
+		version: &Hash,
+		whitelist: HashSet<DeviceId>
+	) -> bool {
+		let mut lock = self.inner.write().await;
+		let db = lock.data_mut();
+		let r = db.change_whitelist(channel, arch, name, version, whitelist);
+		lock.write().await
+			.expect("writing failed unexpectetly");
+		r
 	}
 
 }

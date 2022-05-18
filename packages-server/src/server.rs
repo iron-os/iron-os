@@ -10,7 +10,8 @@ use packages::requests::{
 	PackageInfoReq, PackageInfo, GetFileReq, GetFile,
 	SetFileReq, SetPackageInfoReq,
 	NewAuthKeyReq, NewAuthKey, NewAuthKeyKind,
-	AuthenticationReq, AuthKey
+	AuthenticationReq, AuthKey,
+	ChangeWhitelistReq
 };
 use packages::action::Action;
 use packages::error::{Result as ApiResult, Error as ApiError};
@@ -74,6 +75,7 @@ pub async fn serve() -> Result<()> {
 	server.register_request(set_package_info);
 	server.register_request(new_auth_key);
 	server.register_request(auth_req);
+	server.register_request(change_whitelist);
 
 	server.run().await
 		.map_err(|e| Error::other("server failed", e))
@@ -257,3 +259,27 @@ request_handler!(
 	}
 );
 
+request_handler!(
+	async fn change_whitelist<Action>(
+		req: ChangeWhitelistReq,
+		session: Session,
+		auth_db: AuthDb,
+		packages: PackagesDb
+	) -> ApiResult<()> {
+		valid_auth(session, auth_db).await?;
+
+		let changed = packages.change_whitelist(
+			&req.channel,
+			&req.arch,
+			&req.name,
+			&req.version,
+			req.whitelist
+		).await;
+
+		if changed {
+			Ok(())
+		} else {
+			Err(ApiError::VersionNotFound)
+		}
+	}
+);

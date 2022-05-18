@@ -17,12 +17,14 @@ mod download;
 mod pack_image;
 mod config;
 mod auth;
+mod change_whitelist;
 
 use upload::Upload;
 use download::Download;
 use pack_image::PackImage;
 use config::ConfigOpts;
 use auth::AuthOpts;
+use change_whitelist::ChangeWhitelistOpts;
 
 use std::process;
 
@@ -44,7 +46,8 @@ enum SubCommand {
 	Download(Download),
 	PackImage(PackImage),
 	Config(ConfigOpts),
-	Auth(AuthOpts)
+	Auth(AuthOpts),
+	ChangeWhitelist(ChangeWhitelistOpts)
 }
 
 #[tokio::main]
@@ -67,6 +70,9 @@ async fn main() {
 		},
 		SubCommand::Auth(opts) => {
 			auth::authenticate(opts).await
+		},
+		SubCommand::ChangeWhitelist(opts) => {
+			change_whitelist::change_whitelist(opts).await
 		}
 	};
 

@@ -20,7 +20,7 @@ get file
 
 use crate::error::{Error, Result};
 use crate::action::Action;
-use crate::packages::{Channel, Package, BoardArch};
+use crate::packages::{Channel, Package, BoardArch, TargetArch};
 
 use std::collections::HashSet;
 
@@ -294,4 +294,21 @@ impl<B> Request<Action, B> for NewAuthKeyReq {
 	type Response = NewAuthKey;
 	type Error = Error;
 	const ACTION: Action = Action::NewAuthKey;
+}
+
+// Changewhitelist
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChangeWhitelistReq {
+	pub channel: Channel,
+	pub arch: TargetArch,
+	pub name: String,
+	pub version: Hash,
+	pub whitelist: HashSet<DeviceId>
+}
+
+impl<B> Request<Action, B> for ChangeWhitelistReq {
+	type Response = ();
+	type Error = Error;
+	const ACTION: Action = Action::ChangeWhitelist;
 }
