@@ -24,18 +24,57 @@ pub struct ProductToml {
 	product: String
 }
 
-/// Downloads and fills a full packages folder
-/// with the packages listed in `packages.toml`
-/// the address and the channel should be in `packages.toml`
+/// creates a tar.gz of the kernel and the rootfs
+/// this can then be uploaded to the packages server.
+/// 
+/// There is also an option to only create the version.fdb file
+/// to add to the boot partition.
 #[derive(clap::Parser)]
-pub struct PackImage {}
+pub struct PackImage {
+	/// If the command should use the existing image.tar.gz to create the
+	/// version.fdb file
+	#[clap(long)]
+	use_existing_image: bool,
+	#[clap(long)]
+	create_version_file: bool
+}
 
-pub async fn pack_image(_: PackImage) -> Result<()> {
+pub async fn pack_image(opts: PackImage) -> Result<()> {
 
 	let cfg: ImageToml = read_toml("./image.toml").await?;
 
+	if !opts.use_existing_image {
+		create_tar_gz(&cfg).await?;
+	}
+
+	if !opts.create_version_file {
+		// nothing more to done
+		return Ok(())
+	}
+
+	let hash = hash_file("./image.tar.gz").await?;
+
 	let product: ProductToml = read_toml("./product.toml").await?;
 
+	let version = VersionInfo {
+		board: cfg.board,
+		arch: cfg.arch,
+		product: product.product,
+		version_str: cfg.version,
+		version: hash,
+		signature: None,
+		device_id: None,
+		installed: false
+	};
+
+	let db = FileDb::new("./version.fdb", version);
+	db.write().await
+		.map_err(|e| err!(e, "could not store version.fdb"))?;
+
+	Ok(())
+}
+
+async fn create_tar_gz(cfg: &ImageToml) -> Result<()> {
 	let tmp_path = format!("./image_tmp/{}", cfg.name);
 	create_dir(&tmp_path).await?;
 
@@ -80,23 +119,6 @@ pub async fn pack_image(_: PackImage) -> Result<()> {
 	// todo: maybe use the version as a name?
 	compress("image.tar.gz", "./image_tmp", &cfg.name)?;
 	remove_dir("./image_tmp").await?;
-
-	let hash = hash_file("./image.tar.gz").await?;
-
-	let version = VersionInfo {
-		board: cfg.board,
-		arch: cfg.arch,
-		product: product.product,
-		version_str: cfg.version,
-		version: hash,
-		signature: None,
-		device_id: None,
-		installed: false
-	};
-
-	let db = FileDb::new("./version.fdb", version);
-	db.write().await
-		.map_err(|e| err!(e, "could not store version.fdb"))?;
 
 	Ok(())
 }
