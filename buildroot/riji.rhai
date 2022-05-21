@@ -5,8 +5,8 @@ fn help() {
 		"	- download",
 		"	- patch <board> <channel>",
 		"	- build <board> <channel>",
-		"	- download_packages <product> <board> <channel>",
-		"	- publish <board> <channel> <pub-channel>",
+		"	- upload <board> <channel> <pub-channel>",
+		"	- create_image <product> <board> <channel>",
 		"	- config <board> <channel>",
 		"	- linux_config <board> <channel>",
 		"	- rebuild <board> <channel> <package>",
@@ -136,24 +136,69 @@ fn build_internal(board, channel, buildroot) {
 	make.dir(br_out_dir);
 	print("build buildroot");
 	make.execute();
-
-	print("run riji publish to get the image");
 }
 
-fn download_packages() {
-	print("download_packages <product> <board> <channel>");
+fn upload() {
+	print("upload <board> <channel> <pub-channel> (one-device-whitelist)");
 }
 
-// channel is only used for the board
-//
-// download packages downloads the packages and prepares the publish step
-fn download_packages(product, board, channel) {
-	let product_file = fs::full_path("./products/" + product + ".toml");
+fn upload(board, channel, pub_channel) {
+	_upload(board, channel, pub_channel, []);
+}
+
+fn upload(board, channel, pub_channel, device_id) {
+	_upload(board, channel, pub_channel, [device_id]);
+}
+
+fn _upload(board, channel, pub_channel, whitelist) {
+	let buildroot = "./buildroot";
+	let full_buildroot = fs::full_path(buildroot);
 
 	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
 	let images = br_out_dir + "/images";
-	if !fs::is_dir(images) {
-		panic("cannot download packages, you first need to build an image");
+	let image = images + "/image.tar.gz";
+
+	if !fs::is_file(image) {
+		panic("you need to build " + board + " " + channel + " first");
+	}
+
+	// create output
+	let out_dir = "./output/" + board + "/" + channel;
+	fs::create_dir(out_dir);
+
+	// now copy the image
+	fs::copy(image, out_dir);
+	fs::copy(images + "/image.toml", out_dir + "/package.toml");
+	fs::copy("./package.rhai", out_dir);
+
+	let publisher = cmd([
+		"publisher", "upload", pub_channel
+	]);
+	if whitelist.len() > 0 {
+		publisher.arg("--whitelist");
+		publisher.args(whitelist);
+	}
+	publisher.dir(out_dir);
+	publisher.execute();
+}
+
+fn create_image() {
+	print("create_image <product> <board> <channel>");	
+}
+
+fn create_image(product, board, channel) {
+	let buildroot = "./buildroot";
+	let full_buildroot = fs::full_path(buildroot);
+
+	// first download the packages
+	let product_file = fs::full_path("./products/" + product + ".toml");
+	let product_toml = toml::read(product_file);
+	let product_name = product_toml.product;
+
+	let br_out_dir = new_br_out_dir(buildroot, board, channel);
+	let images = br_out_dir + "/images";
+	if !fs::is_file(images + "/image.tar.gz") {
+		panic("you first need to build " + board + " " + channel);
 	}
 
 	let publisher = cmd([
@@ -161,31 +206,8 @@ fn download_packages(product, board, channel) {
 	]);
 	publisher.dir(images);
 	publisher.execute();
-}
 
-fn publish() {
-	print("publish <board> <channel> <pub-channel>");
-}
-
-/// Generates the image creates the output dir and then uploads
-fn publish(board, channel, pub_channel) {
-	_publish(board, channel, pub_channel, []);
-}
-
-// device id for whitelist
-fn publish(board, channel, pub_channel, device_id) {
-	_publish(board, channel, pub_channel, [device_id]);
-}
-
-fn _publish(board, channel, pub_channel, whitelist) {// whitelist should be an array
-	let buildroot = "./buildroot";
-	let full_buildroot = fs::full_path(buildroot);
-
-	let br_out_dir = new_br_out_dir("./buildroot", board, channel);
-	let images = br_out_dir + "/images";
-	if !fs::is_dir(images) {
-		panic("cannot publish, you first need to build an image");
-	}
+	// create the image
 	let full_images = fs::full_path(images);
 
 	let board_riji = cmd([
@@ -198,60 +220,24 @@ fn _publish(board, channel, pub_channel, whitelist) {// whitelist should be an a
 	let out_dir = "./output/" + board + "/" + channel;
 	fs::create_dir(out_dir);
 
-	// now copy the image
-	fs::copy(images + "/disk.img", out_dir);
-	fs::copy(images + "/image.tar.gz", out_dir);
-	fs::copy(images + "/image.toml", out_dir + "/package.toml");
-	fs::copy("./package.rhai", out_dir);
+	let img_file = product_name + ".img";
+	let img_path = out_dir + "/" + img_file;
+
+	fs::copy(images + "/disk.img", img_path);
 
 	// create vdi file if vbox is installed
 	if fs::is_prog("VBoxManage") {
-		fs::delete(out_dir + "/disk.vdi");
+		let vdi_path = out_dir + "/" + product_name + ".vdi";
+		fs::delete(vdi_path);
 		let vbox = cmd([
 			"VBoxManage", "convertfromraw", "--format", "VDI",
-			out_dir + "/disk.img", out_dir + "/disk.vdi"
+			img_path, vdi_path
 		]);
 		vbox.execute();
 		// the reverse is VBoxManage clonemedium --format RAW debian.vdi debian.img
 	}
 
-	// upload
-	let publisher = cmd([
-		"publisher", "upload", pub_channel
-	]);
-	if whitelist.len() > 0 {
-		publisher.arg("--whitelist");
-		publisher.args(whitelist);
-	}
-	publisher.dir(out_dir);
-	publisher.execute();
-}
-
-fn republish() {
-	print("republish <board> <channel> <pub-channel>");
-}
-
-fn republish(board, channel, pub_channel) {
-	_republish(board, channel, pub_channel, []);
-}
-
-fn republish(board, channel, pub_channel, device_id) {
-	_republish(board, channel, pub_channel, [device_id]);
-}
-
-fn _republish(board, channel, pub_channel, whitelist) {
-	let out_dir = "./output/" + board + "/" + channel;
-
-	// upload
-	let publisher = cmd([
-		"publisher", "upload", pub_channel
-	]);
-	if whitelist.len() > 0 {
-		publisher.arg("--whitelist");
-		publisher.args(whitelist);
-	}
-	publisher.dir(out_dir);
-	publisher.execute();
+	print("created: " + img_path);
 }
 
 fn config() {

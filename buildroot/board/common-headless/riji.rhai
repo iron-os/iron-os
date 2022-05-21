@@ -30,9 +30,13 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/weston", target_dir + "/etc/");
 
 	// copy network
-	fs::copy("./rootfs/network/gsm-connection.mconnection", target_dir + "/etc/NetworkManager/system-connections/");
+	fs::copy(
+		"./rootfs/network/gsm-connection.mconnection",
+		target_dir + "/etc/NetworkManager/system-connections/"
+	);
 
-	// create empty data folder (needed for fresh build since else device_table.mk failes)
+	// create empty data folder (needed for fresh build since else
+	// device_table.mk failes)
 	fs::create_dir(target_dir + "/data");
 
 	// create boot dir
@@ -81,7 +85,10 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	// target dir is in ext2/target but we can't see that folder
 
 	// create service-bootloader symlink
-	let ln = cmd(["ln", "-sf", "../service-bootloader.service", "service-bootloader.service"]);
+	let ln = cmd([
+		"ln", "-sf",
+		"../service-bootloader.service", "service-bootloader.service"
+	]);
 	ln.dir(target_dir + "/etc/systemd/system/multi-user.target.wants/");
 	ln.execute();
 
@@ -101,7 +108,7 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	chmod("700", target_dir + "/etc/NetworkManager/system-connections");
 
 	// check that lvm2-monitor.service does not exist
-	if fs::is_file(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service") == true {
+	if fs::is_file(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service") {
 		panic("lvm2 exists");
 	}
 
@@ -130,8 +137,8 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 
 fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	let rootfs_uuid = fs_uuid(host_dir, binaries_dir + "/rootfs.ext2");
-	let boot_uuid = trim(fs::read(binaries_dir + "/boot_uuid"));
-	let data_uuid = trim(fs::read(binaries_dir + "/data_uuid"));
+	let boot_uuid = fs::read(binaries_dir + "/boot_uuid").trim();
+	let data_uuid = fs::read(binaries_dir + "/data_uuid").trim();
 
 
 	if fs::is_file(binaries_dir + "/Image") {
@@ -169,6 +176,13 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 	} else {
 		panic("unkown bootloader");
 	}
+
+	// now create the ./image.tar.gz file
+	let publisher = cmd([
+		binaries_dir + "/publisher", "pack-image"
+	]);
+	publisher.dir(binaries_dir);
+	publisher.execute();
 }
 
 fn post_image_using_grub(
@@ -204,7 +218,7 @@ fn post_image_using_grub(
 	let data_uuid_reg = regex("DATA_UUID");
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", data_uuid);
 
-	// let's create the startup.nsh file
+	// let's create the startup.nsh file (some bios were using needs it)
 	let efi_file;
 	if fs::is_file(efi_dir + "/bootx64.efi") {
 		efi_file = "bootx64.efi";
@@ -305,13 +319,15 @@ fn create_image(binaries_dir, buildroot_dir) {
 	fakeroot.dir(current_dir);
 	fakeroot.execute();
 
+	// now we need to create the image package +
+	// version.fdb file
 	let publisher = cmd([
-		binaries_dir + "/publisher", "pack-image"
+		binaries_dir + "/publisher", "pack-image",
+		"--use-existing-image", "--create-version-file"
 	]);
 	publisher.dir(binaries_dir);
 	publisher.execute();
-	// now we need to create the image package +
-	// version.fdb file
+	
 
 	let genimage_cfg;
 	if fs::is_file(binaries_dir + "/genimage-efi.cfg") {
@@ -385,8 +401,8 @@ fn apply_patch(channel, buildroot) {
 		let pack_regex = regex("source \"package/setserial/Config.in\"");
 		pack_regex.replace_file(
 			package_config,
-			"source \"package/setserial/Config.in\"" +
-			"\nsource \"package/service-bootloader/Config.in\""
+			"source \"package/setserial/Config.in\"\n" +
+			"source \"package/service-bootloader/Config.in\""
 		);
 	}
 

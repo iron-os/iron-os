@@ -7,13 +7,25 @@ riji download
 This will download buildroot and set the git head to the
 correct version.
 
-Then run:
+## Building
+
+To build call:
 ```
-riji patch
+riji build <board> <channel>
 ```
 
-To build correctly u need a `packages.toml` file containing at least the packages
-`chromium` and `service`.
+This will build the board with a specific channel (Debug/Release).
+
+The Build will compile the kernel and all other binaries that are needed for
+the root filesystem. It will also create the image.tar.gz which can be uploaded
+with `riji upload <board> <channel> <pub-channel>`.
+
+## Creating an image (to write to an installer usb drive)
+```
+riji create_image <product> <board> <channel>
+```
+
+This will create a new disk.img file in `output/<board>/<channel>`.
 
 ## Changes
 
