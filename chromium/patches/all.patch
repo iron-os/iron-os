@@ -2,7 +2,7 @@ diff --git a/build/config/BUILDCONFIG.gn b/build/config/BUILDCONFIG.gn
 index fcc7e12834733..7798f73b73c05 100644
 --- a/build/config/BUILDCONFIG.gn
 +++ b/build/config/BUILDCONFIG.gn
-@@ -236,6 +236,8 @@ if (target_os == "android") {
+@@ -238,6 +238,8 @@ if (target_os == "android") {
    } else {
      _default_toolchain = "//build/toolchain/linux:$target_cpu"
    }
@@ -11,7 +11,7 @@ index fcc7e12834733..7798f73b73c05 100644
  } else if (target_os == "fuchsia") {
    _default_toolchain = "//build/toolchain/fuchsia:$target_cpu"
  } else if (target_os == "ios") {
-@@ -296,7 +298,8 @@ is_android = current_os == "android"
+@@ -298,7 +300,8 @@ is_android = current_os == "android"
  is_chromeos = current_os == "chromeos"
  is_fuchsia = current_os == "fuchsia"
  is_ios = current_os == "ios"
@@ -60,7 +60,7 @@ diff --git a/components/policy/BUILD.gn b/components/policy/BUILD.gn
 index 998af332de4a3..c2eccb0bc813a 100644
 --- a/components/policy/BUILD.gn
 +++ b/components/policy/BUILD.gn
-@@ -121,12 +121,17 @@ action("policy_code_generate") {
+@@ -122,12 +122,17 @@ action("policy_code_generate") {
      outputs -= [ app_restrictions_path ]
    }
  
@@ -79,7 +79,7 @@ index 998af332de4a3..c2eccb0bc813a 100644
  
      # Output files to be generated
      "--policy-constants-header=" +
-@@ -158,13 +163,18 @@ action("full_runtime_code_generate") {
+@@ -159,13 +164,18 @@ action("full_runtime_code_generate") {
      policy_common_definitions_full_runtime_proto_path,
    ]
  
@@ -119,7 +119,7 @@ diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser
 index f28855f738e3b..cf8865393b0b4 100644
 --- a/content/browser/web_contents/web_contents_impl.cc
 +++ b/content/browser/web_contents/web_contents_impl.cc
-@@ -5805,10 +5805,7 @@ void WebContentsImpl::DidNavigateAnyFramePostCommit(
+@@ -5858,10 +5858,7 @@ void WebContentsImpl::DidNavigateAnyFramePostCommit(
  
  bool WebContentsImpl::CanOverscrollContent() const {
    OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::CanOverscrollContent");
@@ -135,9 +135,9 @@ diff --git a/third_party/widevine/cdm/widevine.gni b/third_party/widevine/cdm/wi
 index 8c2d16bd54c9d..15c9f3d273c01 100644
 --- a/third_party/widevine/cdm/widevine.gni
 +++ b/third_party/widevine/cdm/widevine.gni
-@@ -26,6 +26,7 @@ if (is_chromeos && !is_chromeos_device) {
- library_widevine_cdm_available =
-     (is_chromeos && (target_cpu == "x64" || target_cpu == "arm")) ||
+@@ -27,6 +27,7 @@ if (is_chromeos && !is_chromeos_device) {
+     (is_chromeos &&
+      (target_cpu == "x64" || target_cpu == "arm" || target_cpu == "arm64")) ||
      (target_os == "linux" && target_cpu == "x64") ||
 +    (is_ironos && (target_cpu == "x64" || target_cpu == "arm64")) ||
      (target_os == "mac" && (target_cpu == "x64" || target_cpu == "arm64")) ||

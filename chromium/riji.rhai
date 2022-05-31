@@ -4,7 +4,7 @@ const PATCH_FILE = "./patches.patch";
 const DEPOT = "./depot_tools";
 const CHROM_DEPOT = "../../depot_tools";
 const CHROM = "./chromium/src";
-const STABLE = "100.0.4896.60";
+const STABLE = "102.0.5005.61";
 
 
 fn help() {
@@ -238,7 +238,7 @@ fn bundle(chrome, build_path, out_path) {
 	fs::copy(build_path + "/chrome_100_percent.pak", out_path);
 	fs::copy(build_path + "/chrome_200_percent.pak", out_path);
 	fs::copy(build_path + "/resources.pak", out_path);
-	fs::copy(build_path + "/swiftshader", out_path);
+	// fs::copy(build_path + "/swiftshader", out_path);
 	fs::copy(build_path + "/vk_swiftshader_icd.json", out_path);
 	fs::create_dir(out_path + "/locales");
 	fs::copy(build_path + "/locales/en-US.pak", out_path + "/locales");
