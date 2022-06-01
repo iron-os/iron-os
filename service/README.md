@@ -43,3 +43,9 @@ whitelist = [
 	"localhost"
 ]
 ```
+
+## Remote debugg chromium
+add  `--remote-debugging-port=9222` to the start_chrome.templ
+execute `ssh -L 0.0.0.0:9223:localhost:9222 localhost -N` on remote machine
+now you can go in chrome and open `chrome://inspect/#devices` and select the
+appropriate device

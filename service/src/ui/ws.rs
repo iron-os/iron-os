@@ -2,18 +2,33 @@
 use super::Data;
 
 use fire::ws_route;
-use fire::ws::Error;
+use fire::ws::{Message, Error};
 
 ws_route!{
-	MainWs, "/onopenpage", |ws, api| -> Result<(), Error> {
+	MainWs, "/service-stream", |ws, api, web_watchdog| -> Result<(), Error> {
 		loop {
-			let url = api.on_open_page().await;
-			ws.send(url).await?;
+			tokio::select! {
+				msg = ws.receive() => {
+					let msg = msg?;
+					match msg {
+						Some(Message::Text(t)) if t == "StillAlive" => {
+							web_watchdog.set_still_alive();
+						},
+						Some(m) => {
+							eprintln!("unknown ws service-stream msg {:?}", m);
+						},
+						None => return Ok(())
+					}
+				},
+				url = api.on_open_page() => {
+					ws.send(url).await?;
+				}
+			}
 		}
 	},
 	|result| {
 		if let Err(e) = result {
-			eprintln!("websocket error {:?}", e);
+			eprintln!("websocket service-stream error {:?}", e);
 		}
 	}
 }

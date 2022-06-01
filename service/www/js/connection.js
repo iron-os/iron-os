@@ -4,6 +4,7 @@ import { timeout } from './util.js';
 export default class Connection {
 	constructor() {
 		this.openPageFn = () => {};
+		this.interval = null;
 	}
 
 	onOpenPage(fn) {
@@ -12,7 +13,12 @@ export default class Connection {
 
 	// does not throw
 	connect() {
-		const ws = new WebSocket('ws://127.0.0.1:8888/onopenpage');
+		if (this.interval) {
+			clearInterval(this.interval);
+			this.interval = null;
+		}
+
+		const ws = new WebSocket('ws://127.0.0.1:8888/service-stream');
 
 		ws.addEventListener('close', async e => {
 			console.log('connection failed');
@@ -28,5 +34,13 @@ export default class Connection {
 			else
 				console.log('received unknown data', data);
 		});
+
+		this.interval = setInterval(() => {
+			try {
+				ws.send('StillAlive');
+			} catch (e) {
+				console.log('could not send watchdog');
+			}
+		}, 5000);
 	}
 }
