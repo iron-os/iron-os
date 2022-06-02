@@ -9,7 +9,7 @@ index b78a7c7550..8b5c53c261 100644
 -sha256  5c23964112b90238bed39e5dd1e41cd71a79398813cdc3bbb15a9fdc94e547ae  weston-10.0.0.tar.xz
 -sha512  77e05530751e4f743eebf015ab5b78a1fcc66b774713b5e296cfffc488be84e459f811c85ac4280b7b63eebf4ff5c958dd7306376ab343e6b80feae16c8c35a4  weston-10.0.0.tar.xz
 -sha256  fdb65868f65d0fbdb05c2d3b779e10ce9969fa0c4b9262ba4f260e87086ab860  COPYING
-+sha256  8638fbf823201259ca7b6aac522a19c81db2db898cfc45d267206e79453cbba7  kiosk-sleep-v10.0.1.tar.gz
++sha256  f59b5a917708f219b8aa4f1f6f296a384e39b627cd05c8a4a909b90f22b4dd68  kiosk-sleep-v10.0.2.tar.gz
 diff --git a/package/weston/weston.mk b/package/weston/weston.mk
 index 90cf160688..699251ebd6 100644
 --- a/package/weston/weston.mk
@@ -21,7 +21,7 @@ index 90cf160688..699251ebd6 100644
 -WESTON_VERSION = 10.0.0
 -WESTON_SITE = https://wayland.freedesktop.org/releases
 -WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
-+WESTON_VERSION = 10.0.1
++WESTON_VERSION = 10.0.2
 +WESTON_SITE = https://repos.lvgd.ch/iron-os/weston/archive
 +WESTON_SOURCE = kiosk-sleep-v$(WESTON_VERSION).tar.gz
  WESTON_LICENSE = MIT
