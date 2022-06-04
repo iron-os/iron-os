@@ -1,5 +1,5 @@
 
-use crate::Bootloader;
+use crate::{Bootloader, context};
 
 use std::{io, env, fmt};
 use std::os::unix::fs::PermissionsExt;
@@ -45,6 +45,12 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 		.replace("BINARY", &bin_path)
 		.replace("URL", url)
 		.replace("EXTENSION", &extension_path);
+
+	let cmd = if context::is_image_debug() {
+		cmd.replace("DEBUG", "--remote-debugging-port=9222")
+	} else {
+		cmd.replace("DEBUG", "")
+	};
 
 	// create start script
 	{
