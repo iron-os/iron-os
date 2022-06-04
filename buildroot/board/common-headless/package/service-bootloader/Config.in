@@ -8,4 +8,7 @@ if BR2_PACKAGE_SERVICE_BOOTLOADER
 config BR2_PACKAGE_SERVICE_BOOTLOADER_HEADLESS
 	bool "headless (no ui)"
 
+config BR2_PACKAGE_SERVICE_BOOTLOADER_DEBUG
+	bool "image debug"
+
 endif

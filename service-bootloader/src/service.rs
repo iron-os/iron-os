@@ -175,6 +175,9 @@ pub fn start() -> io::Result<()> {
 	#[cfg(feature = "headless")]
 	child.env("HEADLESS", "yes");
 
+	#[cfg(feature = "image-debug")]
+	child.env("IMAGE_DEBUG", "yes");
+
 	let mut child = child
 		.stdin_piped()
 		.stdout_piped()

@@ -114,6 +114,7 @@ fn build_internal(board, channel, buildroot) {
 	let out_dir = "./output/" + board + "/" + channel;
 
 	fs::create_dir(images);
+	fs::write(images + "/channel.txt", channel);
 
 	// patch
 	patch_internal(buildroot, board, channel);

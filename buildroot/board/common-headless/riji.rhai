@@ -2,6 +2,8 @@
 // target dir points to output/target
 // binaries points to the images folder
 fn post_build(host_dir, target_dir, binaries_dir) {
+	let channel = fs::read(binaries_dir + "/channel.txt").trim();
+	print("post_build channel: " + channel);
 
 	// copy pam.d
 	fs::copy("./rootfs/pam.d", target_dir + "/etc/");
@@ -21,7 +23,11 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 
 	// copy service-bootloader
 	let systemd_folder = target_dir + "/etc/systemd/system/";
-	fs::copy("./rootfs/weston.service", systemd_folder);
+	if channel == "Debug" {
+		fs::copy("./rootfs/weston-debug.service", systemd_folder + "weston.service");
+	} else {
+		fs::copy("./rootfs/weston.service", systemd_folder);
+	}
 	fs::copy("./rootfs/service-bootloader.service", systemd_folder);
 	fs::copy("./rootfs/subprocess.service", systemd_folder);
 	// symlink get's created in fakeroot

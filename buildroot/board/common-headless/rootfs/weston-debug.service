@@ -1,0 +1,29 @@
+# This will start the main weston process
+# Since we don't autostart it we can get away with some stuff
+# example from here: https://github.com/Hjdskes/cage/wiki/Starting-Cage-on-boot-with-systemd
+
+[Unit]
+Description=Run weston
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/weston -c /etc/weston/weston.ini -S wayland-0 --debug
+Restart=always
+RestartSec=2
+User=user
+# Log this user with utmp, letting it show up with commands 'w' and
+# 'who'. This is needed since we replace (a)getty.
+UtmpIdentifier=tty1
+UtmpMode=user
+# A virtual terminal is needed.
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+# Fail to start if not controlling the virtual terminal.
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+
+# Set a custom pam session
+PAMName=weston
