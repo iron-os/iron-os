@@ -19,6 +19,16 @@ fn io_other(s: impl fmt::Display) -> io::Error {
 	io::Error::new(io::ErrorKind::Other, s.to_string())
 }
 
+macro_rules! write_arg {
+	($s:expr, $($tt:tt)*) => (
+		{
+			use std::fmt::Write;
+			write!($s, $($tt)*).unwrap();
+			write!($s, " ").unwrap();
+		}
+	)
+}
+
 // the url needs https or http
 pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 
@@ -36,21 +46,38 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 		.map_err(|_| io_other("invalid package path"))?;
 	let extension_path = format!("{}/{}", my_curr_path, "extension");
 
+	let mut args = String::new();
+	write_arg!(args, "--disable-infobars");
+	write_arg!(args, "--disable-restore-session-state");
+	write_arg!(args, "--disable-session-storage");
+	write_arg!(args, "--disable-rollback-option");
+	write_arg!(args, "--disable-speech-api");
+	write_arg!(args, "--disable-sync");
+	write_arg!(args, "--disable-pinch");
+	write_arg!(args, "--kiosk \"{}\"", url);
+	write_arg!(args, "--load-extension=\"{}\"", extension_path);
 
-	// todo: there should be a way to not display the: out of storage
-	// message
+	// todo: there should be a way to not display the: out of storage message
 
-	// this is not really efficient
+	if context::is_image_debug() {
+		write_arg!(args, "--remote-debugging-port=9222");
+	};
+
+	let product = client.version_info().await
+		.map_err(|e| io_other(format!("failed to get version info {:?}", e)))?
+		.product;
+
+	if product == "sputnik" {
+		// this fixes an issue we had where the display could freeze up
+		// will be removed after
+		// https://bugs.chromium.org/p/chromium/issues/detail?id=1336078 gets
+		// resolved
+		write_arg!(args, "--disable-gpu");
+	}
+
 	let cmd = CMD.replace("CURRENT_DIR", &curr_path)
 		.replace("BINARY", &bin_path)
-		.replace("URL", url)
-		.replace("EXTENSION", &extension_path);
-
-	let cmd = if context::is_image_debug() {
-		cmd.replace("DEBUG", "--remote-debugging-port=9222")
-	} else {
-		cmd.replace("DEBUG", "")
-	};
+		.replace("ARGS", &args);
 
 	// create start script
 	{

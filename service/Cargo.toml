@@ -21,7 +21,7 @@ api = { package = "service-api", version = "0.2", path = "./../service-api" }
 # display
 wayland-client = "0.29"
 wayland-commons = "0.29"
-linux-info = "0.1"
+linux-info = "0.1.9"
 
 [build-dependencies]
 wayland-scanner = "0.29"

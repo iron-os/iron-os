@@ -5,7 +5,6 @@
 # --enable-native-gpu-memory-buffers --enable-gpu-memory-buffer-video-frames --enable-zero-copy --gpu-no-context-lost
 # --enable-oop-rasterization
 # EGL_PLATFORM=surfaceless
+# --disable-gpu
 cd CURRENT_DIR
-XDG_RUNTIME_DIR=/run/user/14 WAYLAND_DISPLAY=wayland-0 BINARY \
-	--disable-infobars --disable-restore-session-state --disable-session-storage --disable-rollback-option \
-	--disable-speech-api --disable-sync --disable-pinch --kiosk "URL" --load-extension="EXTENSION" DEBUG
+XDG_RUNTIME_DIR=/run/user/14 WAYLAND_DISPLAY=wayland-0 BINARY ARGS
