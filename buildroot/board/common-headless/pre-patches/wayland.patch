@@ -1,0 +1,156 @@
+diff --git a/package/wayland/0001-build-add-option-to-disable-tests.patch b/package/wayland/0001-build-add-option-to-disable-tests.patch
+deleted file mode 100644
+index 5ecf100d64..0000000000
+--- a/package/wayland/0001-build-add-option-to-disable-tests.patch
++++ /dev/null
+@@ -1,58 +0,0 @@
+-From 88f1605a826ca0c2ff02be6f4cf9ecabf68e8341 Mon Sep 17 00:00:00 2001
+-From: James Hilliard <james.hilliard1@gmail.com>
+-Date: Tue, 3 Mar 2020 15:27:51 -0700
+-Subject: [PATCH] build: add option to disable tests
+-
+-When building for a product, tests are not needed.
+-
+-Besides, one test requires a C++ compiler, which is not always
+-available.
+-
+-So, add an option to configure to disable building tests altogether.
+-
+-Signed-off-by: "Yann E. MORIN" <yann.morin.1998@free.fr>
+-Signed-off-by: Alexey Brodkin <abrodkin@synopsys.com>
+-Signed-off-by: James Hilliard <james.hilliard1@gmail.com>
+-[Upstream status:
+-https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/66]
+-Signed-off-by: Adrian Perez de Castro <aperez@igalia.com>
+-[yann.morin.1998@free.fr: backport from upstream]
+-Signed-off-by: Yann E. MORIN <yann.morin.1998@free.fr>
+----
+- meson.build       | 4 +++-
+- meson_options.txt | 4 ++++
+- 2 files changed, 7 insertions(+), 1 deletion(-)
+-
+-diff --git a/meson.build b/meson.build
+-index cdb66bc..714a86d 100644
+---- a/meson.build
+-+++ b/meson.build
+-@@ -84,7 +84,9 @@ subdir('src')
+- if get_option('libraries')
+- 	subdir('cursor')
+- 	subdir('egl')
+--	subdir('tests')
+-+	if get_option('tests')
+-+		subdir('tests')
+-+	endif
+- 	if get_option('documentation')
+- 		subdir('doc')
+- 	endif
+-diff --git a/meson_options.txt b/meson_options.txt
+-index de588d1..4433fa0 100644
+---- a/meson_options.txt
+-+++ b/meson_options.txt
+-@@ -6,6 +6,10 @@ option('scanner',
+-   description: 'Compile wayland-scanner binary',
+-   type: 'boolean',
+-   value: 'true')
+-+option('tests',
+-+  description: 'Compile Wayland tests',
+-+  type: 'boolean',
+-+  value: 'true')
+- option('documentation',
+-   description: 'Build the documentation (requires Doxygen, dot, xmlto, xsltproc)',
+-   type: 'boolean',
+--- 
+-2.25.1
+-
+diff --git a/package/wayland/0002-meson-only-require-cpp-for-tests.patch b/package/wayland/0002-meson-only-require-cpp-for-tests.patch
+deleted file mode 100644
+index 84d0e4cf6f..0000000000
+--- a/package/wayland/0002-meson-only-require-cpp-for-tests.patch
++++ /dev/null
+@@ -1,59 +0,0 @@
+-From 4c2105312379b62dc84f6eaaf26e2ab293d51b92 Mon Sep 17 00:00:00 2001
+-From: James Hilliard <james.hilliard1@gmail.com>
+-Date: Fri, 16 Apr 2021 02:32:38 -0600
+-Subject: [PATCH] meson: only require cpp for tests
+-
+-Signed-off-by: James Hilliard <james.hilliard1@gmail.com>
+-[Upstream status:
+-https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/130]
+-Signed-off-by: Adrian Perez de Castro <aperez@igalia.com>
+-[yann.morin.1998@free.fr: backport from upstream]
+-Signed-off-by: Yann E. MORIN <yann.morin.1998@free.fr>
+----
+- meson.build       |  2 +-
+- tests/meson.build | 16 +++++++++-------
+- 2 files changed, 10 insertions(+), 8 deletions(-)
+-
+-diff --git a/meson.build b/meson.build
+-index 12b4641..cdb66bc 100644
+---- a/meson.build
+-+++ b/meson.build
+-@@ -1,5 +1,5 @@
+- project(
+--	'wayland', 'c', 'cpp',
+-+	'wayland', 'c',
+- 	version: '1.19.0',
+- 	license: 'MIT',
+- 	meson_version: '>= 0.52.1',
+-diff --git a/tests/meson.build b/tests/meson.build
+-index a32ac50..2e11af4 100644
+---- a/tests/meson.build
+-+++ b/tests/meson.build
+-@@ -64,15 +64,17 @@ executable(
+- 	dependencies: test_runner_dep
+- )
+- 
+--test(
+--	'cpp-compile-test',
+--	executable(
+-+if add_languages('cpp')
+-+	test(
+- 		'cpp-compile-test',
+--		'cpp-compile-test.cpp',
+--		wayland_server_protocol_h,
+--		include_directories: src_inc
+-+		executable(
+-+			'cpp-compile-test',
+-+			'cpp-compile-test.cpp',
+-+			wayland_server_protocol_h,
+-+			include_directories: src_inc
+-+		)
+- 	)
+--)
+-+endif
+- 
+- sed_path = find_program('sed').path()
+- 
+--- 
+-2.31.1
+-
+diff --git a/package/wayland/wayland.hash b/package/wayland/wayland.hash
+index e9dcb63a90..cd4cb1a474 100644
+--- a/package/wayland/wayland.hash
++++ b/package/wayland/wayland.hash
+@@ -1,6 +1,6 @@
+-# From https://lists.freedesktop.org/archives/wayland-devel/2021-January/041692.html
+-sha256  baccd902300d354581cd5ad3cc49daa4921d55fb416a5883e218750fef166d15  wayland-1.19.0.tar.xz
+-sha512  d8a86f5e23e4a88e7c84b82fdb51eb350419086afe462ecb2f4d5c3ba9290ede310cbbcffd60215219ddccf5bad4adec21a5ebfbef6577200f66ac7a1b64a5ef  wayland-1.19.0.tar.xz
++# From https://lists.freedesktop.org/archives/wayland-devel/2021-December/042064.html
++sha256  b8a034154c7059772e0fdbd27dbfcda6c732df29cae56a82274f6ec5d7cd8725  wayland-1.20.0.tar.xz
++sha512  e8a1f410994b947f850799bdd0d95a2429d8467f853e62a0ab3915a4e9fe130f8aa977e03715114ab740c6ec546edea63d275ce7f927d4f3029ea126e6a7d215  wayland-1.20.0.tar.xz
+ 
+ # Locally calculated
+ sha256  6eefcb023622a463168a5c20add95fd24a38c7482622a9254a23b99b7c153061  COPYING
+diff --git a/package/wayland/wayland.mk b/package/wayland/wayland.mk
+index ecfe95d68a..4c19875bba 100644
+--- a/package/wayland/wayland.mk
++++ b/package/wayland/wayland.mk
+@@ -4,7 +4,7 @@
+ #
+ ################################################################################
+ 
+-WAYLAND_VERSION = 1.19.0
++WAYLAND_VERSION = 1.20.0
+ WAYLAND_SITE = https://wayland.freedesktop.org/releases
+ WAYLAND_SOURCE = wayland-$(WAYLAND_VERSION).tar.xz
+ WAYLAND_LICENSE = MIT

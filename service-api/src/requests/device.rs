@@ -152,3 +152,6 @@ impl<B> Request<Action, B> for SetDisplayBrightnessReq {
 
 	const ACTION: Action = Action::SetDisplayBrightness;
 }
+
+// Todo maybe a DisplayStateChange stream should be added
+// for when the display get's waken up by touch

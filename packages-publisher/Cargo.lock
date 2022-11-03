@@ -273,7 +273,7 @@ checksum = "524831e35ab839fea8a9f7f01ca06d38082eae7dd1d5d7311338a77511cffaf6"
 
 [[package]]
 name = "fire-stream"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "fire-crypto",
  "fire-log-to-stdout",
@@ -906,9 +906,9 @@ checksum = "02658e48d89f2bec991f9a78e69cfa4c316f8d6a6c4ec12fae1aeb263d486788"
 
 [[package]]
 name = "simple-bytes"
-version = "0.2.7"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6e1e9ae8286717cd63707924ea5e2b434510954055cfdc92c4c7c242edac512"
+checksum = "aa2918786cb2caa43531999c275e69d0ab5acf68235702aec75ad1936d9bac89"
 
 [[package]]
 name = "smallvec"
