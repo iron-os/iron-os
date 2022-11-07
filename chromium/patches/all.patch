@@ -25,7 +25,7 @@ diff --git a/build/config/sanitizers/sanitizers.gni b/build/config/sanitizers/sa
 index ded87a56715b0..b9f8861920e21 100644
 --- a/build/config/sanitizers/sanitizers.gni
 +++ b/build/config/sanitizers/sanitizers.gni
-@@ -51,14 +51,14 @@ declare_args() {
+@@ -48,14 +48,14 @@ declare_args() {
    #
    # TODO(pcc): Remove this flag if/when CFI is enabled in all official builds.
    is_cfi = is_official_build && is_clang &&
@@ -47,20 +47,19 @@ diff --git a/build/config/ui.gni b/build/config/ui.gni
 index 83ec3d7e226db..fec7ed5bbbfa7 100644
 --- a/build/config/ui.gni
 +++ b/build/config/ui.gni
-@@ -41,7 +41,7 @@ declare_args() {
+@@ -41,6 +41,6 @@ declare_args() {
  
- assert(!use_glib || (is_linux && !is_chromecast))
+ assert(!use_glib || (is_linux && !is_castos))
  
--use_atk = is_linux && !is_chromecast && use_glib &&
-+use_atk = is_linux && !is_ironos && !is_chromecast && use_glib &&
-           current_toolchain == default_toolchain
+-use_atk = use_glib && current_toolchain == default_toolchain
++use_atk = use_glib && !is_ironos && current_toolchain == default_toolchain
  
  # Whether using Xvfb to provide a display server for a test might be
 diff --git a/components/policy/BUILD.gn b/components/policy/BUILD.gn
 index 998af332de4a3..c2eccb0bc813a 100644
 --- a/components/policy/BUILD.gn
 +++ b/components/policy/BUILD.gn
-@@ -122,12 +122,17 @@ action("policy_code_generate") {
+@@ -127,12 +127,17 @@ action("policy_code_generate") {
      outputs -= [ app_restrictions_path ]
    }
  
@@ -73,13 +72,13 @@ index 998af332de4a3..c2eccb0bc813a 100644
      # Input information
      "--chrome-version-file=" + chrome_version_path,
      "--policy-templates-file=" +
-         rebase_path("resources/policy_templates.json", root_build_dir),
+         rebase_path(policy_templates_generated_json_path, root_build_dir),
 -    "--target-platform=" + target_os,
 +    "--target-platform=" + target_platform,
  
      # Output files to be generated
      "--policy-constants-header=" +
-@@ -159,13 +164,18 @@ action("full_runtime_code_generate") {
+@@ -165,13 +170,18 @@ action("full_runtime_code_generate") {
      policy_common_definitions_full_runtime_proto_path,
    ]
  
@@ -94,7 +93,7 @@ index 998af332de4a3..c2eccb0bc813a 100644
 -    "--target-platform=" + target_os,
 +    "--target-platform=" + target_platform,
      "--policy-templates-file=" +
-         rebase_path("resources/policy_templates.json", root_build_dir),
+         rebase_path(policy_templates_generated_json_path, root_build_dir),
 -    "--target-platform=" + target_os,
 +    "--target-platform=" + target_platform,
  
@@ -104,7 +103,7 @@ diff --git a/components/resources/BUILD.gn b/components/resources/BUILD.gn
 index db317cd4e3260..f14ca81db306c 100644
 --- a/components/resources/BUILD.gn
 +++ b/components/resources/BUILD.gn
-@@ -94,6 +94,10 @@ action("about_credits") {
+@@ -103,6 +103,10 @@ action("about_credits") {
  
    outputs = [ about_credits_file ]
  
@@ -119,7 +118,7 @@ diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser
 index f28855f738e3b..cf8865393b0b4 100644
 --- a/content/browser/web_contents/web_contents_impl.cc
 +++ b/content/browser/web_contents/web_contents_impl.cc
-@@ -5858,10 +5858,7 @@ void WebContentsImpl::DidNavigateAnyFramePostCommit(
+@@ -5935,10 +5935,7 @@ void WebContentsImpl::DidNavigateAnyFramePostCommit(
  
  bool WebContentsImpl::CanOverscrollContent() const {
    OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::CanOverscrollContent");
@@ -141,8 +140,8 @@ index 8c2d16bd54c9d..15c9f3d273c01 100644
      (target_os == "linux" && target_cpu == "x64") ||
 +    (is_ironos && (target_cpu == "x64" || target_cpu == "arm64")) ||
      (target_os == "mac" && (target_cpu == "x64" || target_cpu == "arm64")) ||
-     (target_os == "win" && (target_cpu == "x86" || target_cpu == "x64"))
- 
+     (target_os == "win" &&
+      (target_cpu == "x86" || target_cpu == "x64" || target_cpu == "arm64"))
 diff --git a/tools/variations/fieldtrial_to_struct.py b/tools/variations/fieldtrial_to_struct.py
 index 9ecf38974795f..3afde792b94d5 100755
 --- a/tools/variations/fieldtrial_to_struct.py
@@ -203,3 +202,34 @@ index 0000000000000..99d91182f4f31
 +  }
 +}
 \ No newline at end of file
+diff --git a/third_party/wayland/src/src/wayland-client-core.h b/third_party/wayland/src/src/wayland-client-core.h
+--- a/third_party/wayland/src/src/wayland-client-core.h
++++ b/third_party/wayland/src/src/wayland-client-core.h
+@@ -119,9 +119,27 @@ struct wl_display;
+  */
+ struct wl_event_queue;
+ 
++/** Destroy proxy after marshalling
++ * @ingroup wl_proxy
++ */
++#define WL_MARSHAL_FLAG_DESTROY (1 << 0)
++
+ void
+ wl_event_queue_destroy(struct wl_event_queue *queue);
+ 
++struct wl_proxy *
++wl_proxy_marshal_flags(struct wl_proxy *proxy, uint32_t opcode,
++              const struct wl_interface *interface,
++              uint32_t version,
++              uint32_t flags, ...);
++
++struct wl_proxy *
++wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
++                const struct wl_interface *interface,
++                uint32_t version,
++                uint32_t flags,
++                union wl_argument *args);
++
+ void
+ wl_proxy_marshal(struct wl_proxy *p, uint32_t opcode, ...);
+ 

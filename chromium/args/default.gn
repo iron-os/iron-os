@@ -13,6 +13,8 @@ disable_fieldtrial_testing_config = true
 enable_vr = false
 enable_reading_list = false
 
+use_system_libffi = true
+
 # use_system_libjpeg = true
 # use_system_libpng = true
 
@@ -34,7 +36,10 @@ use_ozone = true
 ozone_auto_platforms = false
 ozone_platform = "wayland"
 ozone_platform_wayland = true
+use_system_libwayland_client = true
+use_system_wayland_scanner = true
 use_gtk = false
+use_qt = false
 
 ## graphics
 # use_egl = true

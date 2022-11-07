@@ -4,7 +4,7 @@ const PATCH_FILE = "./patches.patch";
 const DEPOT = "./depot_tools";
 const CHROM_DEPOT = "../../depot_tools";
 const CHROM = "./chromium/src";
-const STABLE = "102.0.5005.61";
+const STABLE = "107.0.5304.87";
 
 
 fn help() {

@@ -2,7 +2,7 @@ diff --git a/ffmpeg_options.gni b/ffmpeg_options.gni
 index c9ebbca3b6..09176f7740 100644
 --- a/ffmpeg_options.gni
 +++ b/ffmpeg_options.gni
-@@ -67,7 +67,7 @@ if (current_cpu == "x86") {
+@@ -65,7 +65,7 @@ if (current_cpu == "x86") {
  os_config = current_os
  if ((is_linux || is_chromeos) && is_msan) {
    os_config = "linux-noasm"
