@@ -436,14 +436,14 @@ fn rust_build(arch, channel, path, binary) {
 }
 
 fn full_host_path(board) {
-	let host_raw_release = "./buildroot/output/" + board + "/Release/host";
-	let host_raw_debug = "./buildroot/output/" + board + "/Debug/host";
-	let host_raw = host_raw_release;
+	return full_host_path(board, "Release");
+}
+
+/// buildChannel: Debug | Release
+fn full_host_path(board, buildChannel) {
+	let host_raw = "./buildroot/output/" + board + "/" + buildChannel + "/host";
 	if !fs::is_dir(host_raw) {
-		host_raw = host_raw_debug;
-	}
-	if !fs::is_dir(host_raw) {
-		panic("host folder not found: " + host_raw_release + " & " + host_raw_debug);
+		panic("host folder not found: " + host_raw);
 	}
 
 	return fs::full_path(host_raw);
@@ -460,6 +460,10 @@ fn sysroot(arch) {
 }
 
 fn sysroot(arch, board) {
+	sysroot(arch, board, "Release");
+}
+
+fn sysroot(arch, board, buildChannel) {
 	let buildroot_target;
 	if arch == "Amd64" {
 		buildroot_target = "x86_64-buildroot-linux-gnu";
@@ -469,7 +473,7 @@ fn sysroot(arch, board) {
 		panic("only Amd64 && Arm64 supported");
 	}
 
-	let host = full_host_path(board);
+	let host = full_host_path(board, buildChannel);
 	let sysroot = host + "/" + buildroot_target + "/sysroot";
 
 	print(sysroot);
