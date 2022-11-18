@@ -122,7 +122,7 @@ fn configure(arch, channel) {
 	_configure(CHROM_DEPOT, CHROM, arch, channel);
 }
 
-fn _configure(depot, chrome, arch, channel) {
+fn _configure(depot, chrome, arch, channel, sysrootChannel) {
 	//_patch(chrome);
 
 	let real_arch = arch;
@@ -155,7 +155,9 @@ fn _configure(depot, chrome, arch, channel) {
 		panic("only Amd64 && Arm64 are supported");
 	}
 
-	let buildroot_riji = cmd(["riji", "sysroot", real_arch, board]);
+	let buildroot_riji = cmd([
+		"riji", "sysroot", real_arch, board, sysrootChannel
+	]);
 	buildroot_riji.dir("./../buildroot");
 	let sysroot = trim(buildroot_riji.output());
 	print("using sysroot: " + sysroot);
@@ -177,7 +179,11 @@ fn build() {
 }
 
 fn build(arch, channel) {
-	_configure(CHROM_DEPOT, CHROM, arch, channel);
+	build(arch, channel, "Release");
+}
+
+fn build(arch, channel, sysrootChannel) {
+	_configure(CHROM_DEPOT, CHROM, arch, channel, sysrootChannel);
 
 	print("build arch: " + arch + " channel: " + channel);
 	arch = lowercase(arch);
