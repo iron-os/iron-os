@@ -128,7 +128,7 @@ impl Disks {
 		for disk_path in disks {
 			let name = try_cont!(disk_path.file_name());
 			let name = try_cont!(name.to_str());
-			/// raspberry has disks that are named like ram1 ...
+			// raspberry has disks that are named like ram1 ...
 			if name.starts_with("loop") || name.starts_with("ram") {
 				continue
 			}
