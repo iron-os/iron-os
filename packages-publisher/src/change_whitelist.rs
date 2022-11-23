@@ -27,7 +27,7 @@ pub struct ChangeWhitelistOpts {
 	version: Hash,
 	#[clap(long)]
 	arch: Option<BoardArch>,
-	#[clap(long)]
+	#[clap(long, num_args(0..))]
 	whitelist: Vec<DeviceId>
 }
 
