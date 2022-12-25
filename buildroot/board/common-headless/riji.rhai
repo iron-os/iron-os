@@ -34,6 +34,7 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/chromium.service", systemd_folder);
 	fs::copy("./rootfs/rules.d", target_dir + "/etc/udev/");
 	fs::copy("./rootfs/weston", target_dir + "/etc/");
+	fs::copy("./rootfs/NetworkManager.conf", target_dir + "/etc/NetworkManager/");
 
 	// copy network
 	fs::copy(
