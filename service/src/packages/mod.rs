@@ -31,7 +31,7 @@ use tokio::fs;
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, sleep};
 use tokio::process::Command;
-use tokio::sync::{mpsc, watch, RwLock};
+use tokio::sync::{mpsc, oneshot, RwLock};
 
 use rand::{thread_rng, Rng};
 
@@ -52,25 +52,12 @@ fn path(s: &str) -> PathBuf {
 	Path::new(PACKAGES_DIR).join(s)
 }
 
-#[derive(Debug)]
-enum PackRequest {
-	RequestUpdate,
-	AddPackage(String)
-}
-
 fn new_api() -> (PackagesApi, PackagesReceiver) {
-	let (m_tx, m_rx) = mpsc::channel(2);
-	let (w_tx, w_rx) = watch::channel(Updated::new());
+	let (tx, rx) = mpsc::channel(2);
 
 	(
-		PackagesApi {
-			tx: m_tx,
-			rx: w_rx
-		},
-		PackagesReceiver {
-			tx: w_tx,
-			rx: m_rx
-		}
+		PackagesApi { tx },
+		PackagesReceiver { rx }
 	)
 }
 
@@ -81,108 +68,93 @@ pub struct Packages {
 }
 
 impl Packages {
-	pub async fn add_package(&mut self, name: String) -> Package {
-		let _ = self.api.add_package(name.clone()).await;
-		loop {
-			if let Some(pack) = self.inner.get(&name).await {
-				return pack
-			}
-
-			self.api.recv_updated().await;
-		}
+	/// Downloads a package and adds it to the list returns None if the package
+	/// was not found
+	pub async fn add_package(
+		&self,
+		name: String
+	) -> Option<Package> {
+		self.api.add_package(name).await
 	}
 
+	pub async fn update(&self) {
+		self.api.update().await
+	}
+
+	/// Returns a list of all current packages
 	pub async fn packages(&self) -> Vec<Package> {
 		self.inner.packages().await
 	}
 
+	/// Returns the stored packages configuration
 	pub async fn config(&self) -> PackagesCfg {
 		self.inner.config().await
 	}
 
+	/// Returns the binary if it exists which should be run after the ui
+	/// was started
+	///
+	/// The first string is the path of the package
+	/// and the second string is the path to the binary
 	pub async fn on_run_binary(&self) -> Option<(String, String)> {
 		self.inner.on_run_binary().await
 	}
 }
 
-#[derive(Debug, Clone)]
-pub struct Updated {
-	pub packages: Vec<String>,
-	// image version
-	pub image: bool
-}
-
-impl Updated {
-	fn new() -> Self {
-		Self {
-			packages: vec![],
-			image: false
-		}
-	}
+#[derive(Debug)]
+enum PackRequest {
+	RequestUpdate(oneshot::Sender<()>),
+	// bool: true == package was added
+	AddPackage(String, oneshot::Sender<Option<Package>>)
 }
 
 // impl Packages 
 
-/// Internal api to communcate with the packages background task.
+/// Internal api to communicate with the packages background task.
 #[derive(Clone)]
 struct PackagesApi {
-	tx: mpsc::Sender<PackRequest>,
-	// names, image
-	rx: watch::Receiver<Updated>
+	tx: mpsc::Sender<PackRequest>
 }
 
 impl PackagesApi {
-	pub async fn add_package(&mut self, name: String) -> Updated {
+	/// this might take a while
+	pub async fn add_package(
+		&self,
+		name: String
+	) -> Option<Package> {
+		let (tx, rx) = oneshot::channel();
+
 		// should we check if the package already exists?
-		self.tx.send(PackRequest::AddPackage(name)).await
+		self.tx.send(PackRequest::AddPackage(name, tx)).await
 			.expect("packages api failed");
 
-		self.wait_on_new().await
+		rx.await.expect("packages api failed")
 	}
 
-	/// this may take a long time
-	#[allow(dead_code)]
-	pub async fn force_update(&mut self) -> Updated {
-		self.tx.send(PackRequest::RequestUpdate).await
+	/// this might take a while
+	async fn update(&self) {
+		let (tx, rx) = oneshot::channel();
+
+		self.tx.send(PackRequest::RequestUpdate(tx)).await
 			.expect("packages api failed");
-		// clear the receiver so we don't receive old values
-		self.wait_on_new().await
-	}
 
-	pub async fn wait_on_new(&mut self) -> Updated {
-		let _ = self.rx.borrow_and_update();
-		self.recv_updated().await
-	}
-
-	pub async fn recv_updated(&mut self) -> Updated {
-		self.rx.changed().await.expect("packages api failed");
-		self.rx.borrow().clone()
+		rx.await.expect("packages api failed");
 	}
 }
 
 struct PackagesReceiver {
-	rx: mpsc::Receiver<PackRequest>,
-	tx: watch::Sender<Updated>
+	rx: mpsc::Receiver<PackRequest>
 }
 
 impl PackagesReceiver {
-
 	pub async fn recv(&mut self) -> PackRequest {
 		self.rx.recv().await.expect("service api failed")
 	}
-
-	pub fn send(&self, updated: Updated) {
-		self.tx.send(updated).expect("packages api failed")
-	}
-
 }
-
-// we need to have two watc
 
 pub async fn start(
 	client: Bootloader
 ) -> io::Result<(Packages, JoinHandle<()>)> {
-
 	let (tx, mut rx) = new_api();
 
 	let packages = SyncPackages::load().await?;
@@ -201,52 +173,44 @@ pub async fn start(
 			// not installed
 
 			// for an installation to be finished
-			// a restart is required so we don't need to check it in the loop
+			// a restart is required so we don't need to check in a loop
 			eprintln!("not installed, only updating when installed");
 			return
 		}
 
+		let times = UpdateIntervalTimes::from_channel(packages.channel().await);
+
 		let mut failed = false;
+		let mut update_state: Option<Update> = None;
+		let mut req: Option<PackRequest> = None;
 
 		loop {
-
-			let (min, max) = if failed {
-				// retry between 2-8 minutes
-				(2, 8)
+			let time = if failed {
+				times.failed_duration()
 			} else {
-				// check version every 5-15 minutes
-				(5, 15)
+				times.normal_duration()
 			};
 
-			// we do this step on every iteration to
-			// always get a new random value
-			let time = match packages.channel().await {
-				// check version 30 seconds
-				Channel::Debug => Duration::from_secs(30),
-				Channel::Alpha => Duration::from_secs(60),
-				_ => Duration::from_secs(
-					thread_rng()
-						.gen_range((60 * min)..(60 * max))
-				)
-			};
-
-			let req = tokio::select! {
-				req = rx.recv() => {
-					Some(req)
+			tokio::select! {
+				n_req = rx.recv(), if req.is_none() => {
+					req = Some(n_req);
 				},
-				_ = sleep(time) => {
-					None
-				}
+				_ = sleep(time) => {}
 			};
 
-			let mut update_data = packages.prepare_update(&version_info).await;
+			if update_state.is_none() {
+				update_state = Some(
+					packages.prepare_update(&version_info).await
+				);
+			}
+			let mut update_data = update_state.as_mut().unwrap();
 
 			// todo add package if we have a request
-			match req {
-				Some(PackRequest::AddPackage(name)) => {
-					if !update_data.packages.contains_key(&name) {
+			match &req {
+				Some(PackRequest::AddPackage(name, _)) => {
+					if !update_data.packages.contains_key(name) {
 						update_data.packages.insert(
-							name,
+							name.clone(),
 							PackageUpdateState::ToUpdate {
 								version: None,
 								new_folder: DEFAULT_FOLDER.to_string()
@@ -257,7 +221,7 @@ pub async fn start(
 				_ => {}
 			}
 
-			// update every
+			// update all packages and the image
 			let update_res = update(
 				&packages.sources().await,
 				&mut update_data,
@@ -275,16 +239,30 @@ pub async fn start(
 			packages.apply_update(&update_data).await
 				.expect("apply_update failed");
 
-			eprintln!("updated: {:?}", update_data);
+			let image_was_updated = update_data.image.was_updated();
+			let any_package_was_updated = update_data.any_package_was_updated();
 
-			rx.send(update_data.updated());
+			eprintln!("updated: {:?}", update_data);
+			update_state = None;
+
+			// send success
+			match req.take() {
+				Some(PackRequest::AddPackage(name, tx)) => {
+					// let's check if the package was added
+					let _ = tx.send(packages.get(&name).await);
+				},
+				Some(PackRequest::RequestUpdate(tx)) => {
+					let _ = tx.send(());
+				},
+				None => {}
+			}
 
 			// if image was updated
-			if update_data.image.was_updated() {
+			if image_was_updated {
 				client.restart().await
 					.expect("could not restart the system");
 			// if packages updated
-			} else if update_data.package_was_updated() {
+			} else if any_package_was_updated {
 				client.systemd_restart("service-bootloader").await
 					.expect("could not restart service-bootloader");
 			}
@@ -295,40 +273,68 @@ pub async fn start(
 	Ok((ret_pack, task))
 }
 
-// // needs to stay internal
-// struct Packages {
-// 	pub cfg: PackagesCfg,
-// 	pub list: Vec<PackageCfg>
-// }
+struct UpdateIntervalTimes {
+	failed: UpdateInterval,
+	normal: UpdateInterval
+}
 
-// impl Packages {
+impl UpdateIntervalTimes {
+	const DEBUG: Self = Self {
+		failed: UpdateInterval::Fixed(30),
+		normal: UpdateInterval::Fixed(30)
+	};
+	const ALPHA: Self = Self {
+		failed: UpdateInterval::Fixed(30),
+		normal: UpdateInterval::Fixed(60)
+	};
+	const BETA: Self = Self {
+		failed: UpdateInterval::Range(30, 4 * 60),
+		normal: UpdateInterval::Range(2 * 60, 10 * 60)
+	};
+	const RELEASE: Self = Self {
+		// 2-8 minutes
+		failed: UpdateInterval::Range(2 * 60, 8 * 60),
+		// 5-15 minutes
+		normal: UpdateInterval::Range(5 * 60, 15 * 60)
+	};
 
-// 	pub async fn load() -> io::Result<Self> {
+	const fn from_channel(channel: Channel) -> Self {
+		match channel {
+			Channel::Debug => Self::DEBUG,
+			Channel::Alpha => Self::ALPHA,
+			Channel::Beta => Self::BETA,
+			Channel::Release => Self::RELEASE
+		}
+	}
 
-// 		let cfg = FileDb::open(path("packages.fdb")).await?
-// 			.into_data();
+	fn failed_duration(&self) -> Duration {
+		self.failed.to_duration()
+	}
 
-// 		let mut list = vec![];
-// 		// read all directories
+	fn normal_duration(&self) -> Duration {
+		self.normal.to_duration()
+	}
+}
 
-// 		let mut dirs = fs::read_dir(PACKAGES_DIR).await?;
-// 		while let Some(entry) = dirs.next_entry().await? {
-// 			if !entry.file_type().await?.is_dir() {
-// 				continue
-// 			}
+#[derive(Debug, Clone, Copy)]
+enum UpdateInterval {
+	// in seconds
+	Fixed(u64),
+	// in seconds
+	Range(u64, u64)
+}
 
-// 			let mut path = entry.path();
-// 			path.push("package.fdb");
-// 			let cfg = FileDb::open(path).await?
-// 				.into_data();
+impl UpdateInterval {
+	pub fn to_duration(&self) -> Duration {
+		match *self {
+			Self::Fixed(s) => Duration::from_secs(s),
+			Self::Range(min, max) => Duration::from_secs(
+				thread_rng().gen_range(min..max)
+			)
+		}
+	}
+}
 
-// 			list.push(cfg);
-// 		}
-
-// 		Ok(Self { cfg, list })
-// 	}
-
-// }
 
 async fn extract(path: &str, to: &str) -> io::Result<()> {
 	let stat = Command::new("tar")
@@ -341,6 +347,7 @@ async fn extract(path: &str, to: &str) -> io::Result<()> {
 	}
 }
 
+/// A struct which manages the state of an update process
 #[derive(Debug, Clone)]
 struct Update {
 	pub board: String,
@@ -354,11 +361,11 @@ struct Update {
 impl Update {
 	pub fn is_finished(&self) -> bool {
 		// find a package that is not already updated
-		!self.packages.values().any(|v| !v.is_finished())
-		&&
+		!self.packages.values().any(|v| !v.is_finished()) &&
 		self.image.is_finished()
 	}
 
+	/// Returns a list of package states which need to be updated
 	pub fn to_update(
 		&mut self
 	) -> impl Iterator<Item=(&str, &mut PackageUpdateState)> {
@@ -367,31 +374,24 @@ impl Update {
 			.map(|(name, pack)| (name.as_str(), pack))
 	}
 
-	pub fn package_was_updated(&self) -> bool {
+	/// Check if any package was updated
+	pub fn any_package_was_updated(&self) -> bool {
 		self.packages.values().any(|p| p.was_updated())
-	}
-
-	pub fn updated(&self) -> Updated {
-		Updated {
-			packages: self.packages.iter()
-				.filter(|(_, state)| state.was_updated())
-				.map(|(n, _)| n.to_string())
-				.collect(),
-			image: self.image.was_updated()
-		}
 	}
 }
 
 #[derive(Debug, Clone)]
 enum PackageUpdateState {
 	ToUpdate {
-		// is stored in the table
-		// name: 
+		// name is stored in the table
 		version: Option<Hash>,
 		new_folder: String
 	},
 	NoUpdate,
-	Updated(PackPackage)
+	Updated(PackPackage),
+	/// This means the package was not found in any source
+	/// or that package was returned with the wrong signature
+	NotFound
 }
 
 impl PackageUpdateState {
@@ -410,7 +410,8 @@ enum ImageUpdateState {
 		version: Hash
 	},
 	NoUpdate,
-	Updated(VersionInfo)
+	Updated(VersionInfo),
+	NotFound
 }
 
 impl ImageUpdateState {
@@ -424,7 +425,8 @@ impl ImageUpdateState {
 }
 
 
-// writing is only permitted by this 
+// writing to the packages location is only permitted by this struct / this
+// module and one task
 #[derive(Debug, Clone)]
 struct SyncPackages {
 	inner: Arc<RwLock<RawPackages>>
@@ -443,6 +445,7 @@ impl SyncPackages {
 			.cfg.channel
 	}
 
+	/// Creates an update struct from the current packages information
 	pub async fn prepare_update(&self, version: &VersionInfo) -> Update {
 		self.inner.read().await.prepare_update(version)
 	}
@@ -459,7 +462,7 @@ impl SyncPackages {
 
 	pub async fn get(&self, name: &str) -> Option<Package> {
 		self.inner.read().await.list.get(name)
-			.map(|db| convert_pack_cfg(db))
+			.map(|db| package_cfg_to_package(db))
 	}
 
 	pub async fn packages(&self) -> Vec<Package> {
@@ -484,9 +487,8 @@ struct RawPackages {
 }
 
 impl RawPackages {
-
+	/// Load the packages information from the filesystem
 	pub async fn load() -> io::Result<Self> {
-
 		let cfg = FileDb::open(path("packages.fdb")).await?;
 
 		let mut list = HashMap::new();
@@ -508,6 +510,7 @@ impl RawPackages {
 		Ok(Self { cfg, list })
 	}
 
+	/// Creates the update struct from the current packages
 	pub fn prepare_update(&self, version: &VersionInfo) -> Update {
 		let mut packs = HashMap::new();
 
@@ -526,7 +529,7 @@ impl RawPackages {
 
 		Update {
 			board: version.board.clone(),
-			arch: boot_to_board_arch(version.arch),
+			arch: boot_arch_to_board_arch(version.arch),
 			channel: self.cfg.channel,
 			device_id: version.device_id.clone(),
 			packages: packs,
@@ -563,10 +566,8 @@ impl RawPackages {
 						}
 					};
 				},
-				// this should never happen
-				PackageUpdateState::ToUpdate {..} => {
-					return Err(io_other!("package {:?} was not found", name))
-				}
+				PackageUpdateState::ToUpdate {..} => unreachable!(),
+				PackageUpdateState::NotFound => {}
 			}
 		}
 
@@ -596,19 +597,19 @@ impl RawPackages {
 
 	pub fn packages(&self) -> Vec<Package> {
 		self.list.values()
-			.map(|v| convert_pack_cfg(v))
+			.map(|v| package_cfg_to_package(v))
 			.collect()
 	}
 }
 
-fn boot_to_board_arch(boot_arch: Architecture) -> BoardArch {
+fn boot_arch_to_board_arch(boot_arch: Architecture) -> BoardArch {
 	match boot_arch {
 		Architecture::Amd64 => BoardArch::Amd64,
 		Architecture::Arm64 => BoardArch::Arm64
 	}
 }
 
-fn convert_pack_cfg(cfg: &PackageCfg) -> Package {
+fn package_cfg_to_package(cfg: &PackageCfg) -> Package {
 	let pack = cfg.package();
 
 	Package {

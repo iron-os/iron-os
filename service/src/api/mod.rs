@@ -21,7 +21,7 @@ use api::requests::{
 		DisksReq, Disk as ApiDisk, Disks as ApiDisks
 	},
 	packages::{
-		ListPackagesReq, ListPackages, AddPackage, AddPackageReq
+		ListPackagesReq, ListPackages, AddPackage, AddPackageReq, UpdateReq
 	},
 	device::{DeviceInfoReq, DeviceInfo, SetPowerStateReq, PowerState}
 };
@@ -56,6 +56,7 @@ pub async fn start(
 	server.register_request(set_power_state);
 	server.register_request(list_packages);
 	server.register_request(add_package);
+	server.register_request(update_req);
 	server.register_request(device_info_req);
 
 	Ok(tokio::spawn(async move {
@@ -223,10 +224,18 @@ request_handler!(
 		req: AddPackageReq,
 		packages: Packages
 	) -> ApiResult<AddPackage> {
-		let mut packages = packages.clone();
-		let pack = packages.add_package(req.name).await;
+		let package = packages.add_package(req.name).await;
 
-		Ok(AddPackage { package: pack })
+		Ok(AddPackage { package })
+	}
+);
+
+request_handler!(
+	async fn update_req<Action>(
+		_req: UpdateReq,
+		packages: Packages
+	) -> ApiResult<()> {
+		Ok(packages.update().await)
 	}
 );
 

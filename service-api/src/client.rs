@@ -6,7 +6,8 @@ use crate::requests::ui::OpenPageReq;
 use crate::requests::packages::{
 	ListPackagesReq, ListPackages,
 	AddPackageReq, Package,
-	RemovePackageReq
+	RemovePackageReq,
+	UpdateReq
 };
 use crate::requests::device::{
 	DeviceInfoReq, DeviceInfo,
@@ -61,13 +62,17 @@ impl Client {
 		self.inner.request(ListPackagesReq).await
 	}
 
-	pub async fn add_package(&self, name: String) -> Result<Package> {
+	pub async fn add_package(&self, name: String) -> Result<Option<Package>> {
 		self.inner.request(AddPackageReq { name }).await
 			.map(|a| a.package)
 	}
 
 	pub async fn remove_package(&self, name: String) -> Result<()> {
 		self.inner.request(RemovePackageReq { name }).await
+	}
+
+	pub async fn request_update(&self) -> Result<()> {
+		self.inner.request(UpdateReq).await
 	}
 
 	pub async fn device_info(&self) -> Result<DeviceInfo> {

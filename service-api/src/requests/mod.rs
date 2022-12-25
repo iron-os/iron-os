@@ -161,7 +161,8 @@ pub mod packages {
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	#[serde(rename_all = "camelCase")]
 	pub struct AddPackage {
-		pub package: Package
+		/// Returns None if the package was not found
+		pub package: Option<Package>
 	}
 
 	impl<B> Request<Action, B> for AddPackageReq {
@@ -186,4 +187,15 @@ pub mod packages {
 		const ACTION: Action = Action::RemovePackage;
 	}
 
+	/// Not implemented
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
+	pub struct UpdateReq;
+
+	impl<B> Request<Action, B> for UpdateReq {
+		type Response = ();
+		type Error = Error;
+
+		const ACTION: Action = Action::Update;
+	}
 }

@@ -15,14 +15,14 @@ use packages::client::Client;
 
 use bootloader_api::requests::UpdateReq;
 
+/// if this functions returns Ok(()) the PackageUpdateState::ToUpdate will never
+/// be set
 pub(super) async fn update(
 	sources: &[Source],
 	update: &mut Update,
 	bootloader: &Bootloader
 ) -> io::Result<()> {
-
 	for source in sources.iter().rev() {
-
 		if update.is_finished() {
 			return Ok(())
 		}
@@ -32,7 +32,16 @@ pub(super) async fn update(
 			update,
 			bootloader
 		).await?;
+	}
 
+	// states for packages that where not found are still ToUpdate
+	// we need to set the to NotFound
+	for (_, state) in update.to_update() {
+		*state = PackageUpdateState::NotFound;
+	}
+
+	if !update.image.is_finished() {
+		update.image = ImageUpdateState::NotFound;
 	}
 
 	Ok(())
@@ -53,7 +62,6 @@ async fn update_from_source(
 	let device_id = update.device_id.clone();
 
 	for (name, state) in update.to_update() {
-
 		// check package info
 		let package = client.package_info(
 			channel,
@@ -63,7 +71,7 @@ async fn update_from_source(
 		).await
 			.map_err(io_other)?;
 
-		// skip if the package as not changed
+		// skip if the package was not found
 		let package = match package {
 			Some(p) => p,
 			None => continue
@@ -89,14 +97,19 @@ async fn update_from_source(
 			&package.version,
 			&package.signature
 		) {
-			return Err(io_other(format!("signature mismatch {:?}", package)))
+			eprintln!("signature mismatch for {:?}", package);
+			// this was a hard error but we don't wan't to brick the whole
+			// update process if a package was uploaded with the wrong
+			// signature
+
+			// this is not optimal since it might be flagged as NotFound
+			continue
 		}
 
 		// todo we got an update
 		update_package(new_folder, &package, &client).await?;
 
 		*state = PackageUpdateState::Updated(package);
-
 	}
 
 	if !update.image.is_finished() {
@@ -159,12 +172,12 @@ async fn download_file(
 		.map_err(io_other)?;
 
 	if file.is_empty() {
-		return Err(io_other(format!("file empty {:?}", package)));
+		return Err(io_other!("file empty {:?}", package));
 	}
 
 	// validate hash
 	if file.hash() != package.version {
-		return Err(io_other(format!("hash mismatch {:?}", package)))
+		return Err(io_other!("hash mismatch {:?}", package))
 	}
 
 	// remove file if it exists
@@ -175,6 +188,7 @@ async fn download_file(
 	Ok(())
 }
 
+/// you need to make sure the image is still in the ToUpdate State
 async fn update_image(
 	source: &Source,
 	update: &mut Update,
@@ -213,7 +227,9 @@ async fn update_image(
 		&package.version,
 		&package.signature
 	) {
-		return Err(io_other(format!("signature mismatch {:?}", package)))
+		eprintln!("signature mismatch {:?}", package);
+		// might be flagged as not found
+		return Ok(())
 	}
 
 	// /data/tmp/image

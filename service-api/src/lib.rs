@@ -27,6 +27,7 @@ action! {
 		ListPackages = 30,
 		AddPackage = 32,
 		RemovePackage = 34,
+		Update = 36,
 		// storage
 		GetStorage = 40,
 		SetStorage = 42,
