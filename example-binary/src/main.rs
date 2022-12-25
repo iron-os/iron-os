@@ -1,9 +1,8 @@
-
-mod service_api;
-
 use tokio::time::{sleep, Duration};
 
 use clap::Parser;
+
+use service_api::client::Client;
 
 
 #[derive(Debug, Parser)]
@@ -19,7 +18,11 @@ enum SubCommand {
 	/// Install on a specific disk
 	Install(Install),
 	/// View Device Info
-	DeviceInfo(DeviceInfo)
+	DeviceInfo(DeviceInfo),
+	/// List all packages
+	ListPackages(ListPackages),
+	/// UpdateNow
+	UpdateNow(UpdateNow)
 }
 
 #[derive(Debug, Parser)]
@@ -33,16 +36,22 @@ struct Install {
 #[derive(Debug, Parser)]
 struct DeviceInfo {}
 
+#[derive(Debug, Parser)]
+struct ListPackages {}
+
+#[derive(Debug, Parser)]
+struct UpdateNow {}
+
 #[tokio::main]
 async fn main() {
 	let args = Args::parse();
 
-	let client = service_api::Client::connect().await
+	let client = Client::connect("/data/service-api").await
 		.expect("could not connect to the service api");
 
 	match args.subcmd {
 		Some(SubCommand::ListDisks(_)) => {
-			let disks = client.list_disks().await
+			let disks = client.disks().await
 				.expect("failed to list disks");
 
 			println!("{:>8} | {:>4} | {:>8}", "Name", "Init", "Size");
@@ -68,17 +77,31 @@ async fn main() {
 			println!("Display device info");
 			let device_info = client.device_info().await
 				.expect("failed to get device info");
-			eprintln!("{:#?}", device_info);
+			println!("{:#?}", device_info);
 			return;
 		},
-		_ => {}
+		Some(SubCommand::ListPackages(_)) => {
+			println!("Display packages");
+			let packages = client.list_packages().await
+				.expect("failed to list packages");
+			println!("{:#?}", packages);
+			return
+		},
+		Some(SubCommand::UpdateNow(_)) => {
+			eprintln!("update now");
+			client.request_update().await
+				.expect("failed to request update");
+			println!("update done");
+			return;
+		}
+		None => {}
 	}
 
 	// wait until a network connection could be established
 	sleep(Duration::from_secs(30)).await;
 
 	// let's open youtube
-	client.open_page("https://youtube.com").await
+	client.open_page("https://youtube.com".into()).await
 		.expect("could not open youtube");
 
 	loop {
