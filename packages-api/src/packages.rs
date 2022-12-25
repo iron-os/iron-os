@@ -1,4 +1,3 @@
-
 use std::str::FromStr;
 use std::{fmt, mem};
 
@@ -32,11 +31,9 @@ impl fmt::Display for Channel {
 }
 
 impl Channel {
-
 	pub fn is_debug(&self) -> bool {
 		matches!(self, Self::Debug)
 	}
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +60,8 @@ pub struct PackagesCfg {
 	/// until some source is found that contains that package
 	pub sources: Vec<Source>,
 	/// if this is true that last source will return realtime updates
+	///
+	/// Todo
 	pub fetch_realtime: bool,
 	/// the package that should be run normally
 	pub on_run: String,
@@ -149,6 +148,7 @@ impl PackageCfg {
 		}
 	}
 
+	/// Returns the current side of the package
 	pub fn current(&self) -> &'static str {
 		match self {
 			Self::Left(_) => "left",
@@ -156,6 +156,7 @@ impl PackageCfg {
 		}
 	}
 
+	/// returns the other side of the package
 	pub fn other(&self) -> &'static str {
 		match self {
 			Self::Left(_) => "right",
@@ -163,6 +164,7 @@ impl PackageCfg {
 		}
 	}
 
+	/// Switches the side of the current package and stores it there
 	pub fn switch(&mut self, new: Package) {
 		let new = match self {
 			Self::Left(_) => PackageCfg::Right(new),

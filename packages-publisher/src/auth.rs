@@ -22,6 +22,8 @@ pub async fn authenticate(opts: AuthOpts) -> Result<()> {
 
 	let priv_key = get_priv_key(&source).await?;
 
+	println!("connecting to {:?}", source.addr);
+
 	// build a connection
 	let client = Client::connect(&source.addr, source.public_key.clone()).await
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;

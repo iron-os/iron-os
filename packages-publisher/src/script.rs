@@ -22,9 +22,15 @@ impl Script {
 	pub fn build(
 		&mut self,
 		arch: &TargetArch,
-		channel: &Channel
+		channel: &Channel,
+		host_channel: Option<&Channel>
 	) -> Result<()> {
-		self.inner.execute("build", vec![arch.to_string(), channel.to_string()])
+		let mut args = vec![arch.to_string(), channel.to_string()];
+		if let Some(host_channel) = host_channel {
+			args.push(host_channel.to_string());
+		}
+
+		self.inner.execute("build", args)
 			.map_err(|e| err!(format!("{:?}", e), "failed to build"))
 	}
 

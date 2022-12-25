@@ -389,6 +389,10 @@ fn board_by_arch(arch) {
 }
 
 fn rust_build(arch, channel, path, binary) {
+	rust_build(arch, channel, path, binary, "Release");
+}
+
+fn rust_build(arch, channel, path, binary, hostChannel) {
 	let board;
 	let buildroot_target;
 	let target;
@@ -407,7 +411,7 @@ fn rust_build(arch, channel, path, binary) {
 	let minus_sign = regex("-");
 	let upper_target = minus_sign.replace(uppercase(target), "_");
 
-	let host = full_host_path(board);
+	let host = full_host_path(board, hostChannel);
 	let sysroot = host + "/" + buildroot_target + "/sysroot";
 	let cargo_bin = host + "/bin/cargo";
 	let cargo_home = host + "/share/cargo";

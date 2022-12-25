@@ -58,6 +58,8 @@ pub struct Upload {
 	#[clap(long)]
 	arch: Option<BoardArch>,
 	#[clap(long)]
+	host_channel: Option<Channel>,
+	#[clap(long, num_args(0..))]
 	whitelist: Vec<DeviceId>
 }
 
@@ -85,6 +87,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 				packages.push(build(
 					arch,
 					&cfg.channel,
+					cfg.host_channel.as_ref(),
 					&package,
 					&priv_key
 				).await?);
@@ -94,6 +97,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			packages.push(build(
 				&arch,
 				&cfg.channel,
+				cfg.host_channel.as_ref(),
 				&package,
 				&priv_key
 			).await?);
@@ -102,6 +106,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			packages.push(build(
 				&arch.into(),
 				&cfg.channel,
+				cfg.host_channel.as_ref(),
 				&package,
 				&priv_key
 			).await?);
@@ -175,6 +180,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 async fn build(
 	arch: &TargetArch,
 	channel: &Channel,
+	host_channel: Option<&Channel>,
 	package: &PackageToml,
 	priv_key: &Keypair
 	// tar file
@@ -183,7 +189,7 @@ async fn build(
 	let mut script = Script::new(package.script())?;
 
 	paint_act!("calling build {} {}", arch, channel);
-	script.build(&arch, &channel)?;
+	script.build(&arch, &channel, host_channel)?;
 
 	let tar_name = match &package.tar_file {
 		Some(n) => n.clone(),

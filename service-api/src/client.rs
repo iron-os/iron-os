@@ -33,7 +33,6 @@ pub struct Client {
 }
 
 impl Client {
-
 	pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
 		let stream = UnixStream::connect(path).await
 			.map_err(|e| Error::Internal(e.to_string()))?;
