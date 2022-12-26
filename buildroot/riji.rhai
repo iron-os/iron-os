@@ -421,6 +421,7 @@ fn rust_build(arch, channel, path, binary, hostChannel) {
 	cargo.env_clear();
 	cargo.env("BUILD_CHANNEL", channel);
 	cargo.env("BUILD_SYSROOT", sysroot);
+	cargo.env("PKG_CONFIG_SYSROOT_DIR", sysroot);
 	cargo.env("PATH", host + "/bin" + ":" + "/usr/bin");
 	cargo.env("CARGO_HOME", cargo_home);
 	cargo.env("__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS", "nightly");
