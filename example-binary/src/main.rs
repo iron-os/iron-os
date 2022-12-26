@@ -22,7 +22,11 @@ enum SubCommand {
 	/// List all packages
 	ListPackages(ListPackages),
 	/// UpdateNow
-	UpdateNow(UpdateNow)
+	UpdateNow(UpdateNow),
+	/// List Access Points
+	ListAccessPoints(ListAccessPoints),
+	/// List Connections
+	ListConnections(ListConnections)
 }
 
 #[derive(Debug, Parser)]
@@ -41,6 +45,12 @@ struct ListPackages {}
 
 #[derive(Debug, Parser)]
 struct UpdateNow {}
+
+#[derive(Debug, Parser)]
+struct ListAccessPoints {}
+
+#[derive(Debug, Parser)]
+struct ListConnections {}
 
 #[tokio::main]
 async fn main() {
@@ -71,14 +81,14 @@ async fn main() {
 			client.install_on(i.disk).await
 				.expect("failed to install");
 			println!("Installation completed");
-			return;
+			return
 		},
 		Some(SubCommand::DeviceInfo(_)) => {
 			println!("Display device info");
 			let device_info = client.device_info().await
 				.expect("failed to get device info");
 			println!("{:#?}", device_info);
-			return;
+			return
 		},
 		Some(SubCommand::ListPackages(_)) => {
 			println!("Display packages");
@@ -88,11 +98,23 @@ async fn main() {
 			return
 		},
 		Some(SubCommand::UpdateNow(_)) => {
-			eprintln!("update now");
+			println!("update now");
 			client.request_update().await
 				.expect("failed to request update");
 			println!("update done");
-			return;
+			return
+		},
+		Some(SubCommand::ListAccessPoints(_)) => {
+			println!("access points");
+			let list = client.network_access_points().await.unwrap();
+			println!("{:#?}", list);
+			return
+		},
+		Some(SubCommand::ListConnections(_)) => {
+			println!("connections");
+			let list = client.network_connections().await.unwrap();
+			println!("{:#?}", list);
+			return
 		}
 		None => {}
 	}
