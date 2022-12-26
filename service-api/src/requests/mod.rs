@@ -6,6 +6,7 @@
 // - DisplayState (turn on off)
 
 pub mod device;
+pub mod network;
 
 use crate::Action;
 use crate::error::Error;

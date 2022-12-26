@@ -15,6 +15,10 @@ use crate::requests::device::{
 	DisksReq, Disk,
 	SetDisplayStateReq, SetDisplayBrightnessReq
 };
+use crate::requests::network::{
+	AccessPointsReq, AccessPoints,
+	ConnectionsReq, Connection
+};
 
 use std::time::Duration;
 use std::path::Path;
@@ -95,4 +99,12 @@ impl Client {
 		self.inner.request(SetDisplayBrightnessReq { brightness }).await
 	}
 
+	pub async fn network_access_points(&self) -> Result<AccessPoints> {
+		self.inner.request(AccessPointsReq).await
+	}
+
+	pub async fn network_connections(&self) -> Result<Vec<Connection>> {
+		self.inner.request(ConnectionsReq).await
+			.map(|c| c.list)
+	}
 }

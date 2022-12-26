@@ -22,7 +22,6 @@ pub struct Server {
 }
 
 impl Server {
-
 	pub async fn new(path: impl AsRef<Path>) -> Result<Self> {
 		let listener = UnixListener::bind(path)
 			.map_err(|e| Error::Internal(e.to_string()))?;
@@ -50,5 +49,4 @@ impl Server {
 		self.inner.run().await
 			.map_err(|e| Error::Internal(e.to_string()))
 	}
-
 }

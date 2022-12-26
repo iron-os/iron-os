@@ -31,6 +31,10 @@ action! {
 		// storage
 		GetStorage = 40,
 		SetStorage = 42,
-		RemoveStorage = 44
+		RemoveStorage = 44,
+		// network
+		NetworkConnections = 50,
+		NetworkAddConnection = 52,
+		NetworkAccessPoints = 54
 	}
 }

@@ -1,5 +1,7 @@
-
 mod device_info;
+mod network_manager;
+
+use network_manager::{NetworkManager, DeviceKind, ApSecurityFlag};
 
 use crate::Bootloader;
 use crate::ui::{ApiSender};
@@ -23,13 +25,21 @@ use api::requests::{
 	packages::{
 		ListPackagesReq, ListPackages, AddPackage, AddPackageReq, UpdateReq
 	},
-	device::{DeviceInfoReq, DeviceInfo, SetPowerStateReq, PowerState}
+	device::{DeviceInfoReq, DeviceInfo, SetPowerStateReq, PowerState},
+	network::{
+		AccessPointsReq, AccessPoints, AccessPoint,
+		ConnectionsReq, Connections, Connection, ConnectionKind, ConnectionWifi
+	}
 };
 use api::{request_handler, Action};
 use api::error::{Result as ApiResult, Error as ApiError};
 
 use tokio::fs;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, spawn_blocking};
+
+fn api_error_dbus(e: dbus::Error) -> ApiError {
+	ApiError::Internal(e.to_string())
+}
 
 pub async fn start(
 	client: Bootloader,
@@ -58,6 +68,8 @@ pub async fn start(
 	server.register_request(add_package);
 	server.register_request(update_req);
 	server.register_request(device_info_req);
+	server.register_request(access_points_req);
+	server.register_request(connections);
 
 	Ok(tokio::spawn(async move {
 		server.run().await
@@ -244,3 +256,137 @@ Get JournalLogs
 
 journalctl -n 400 --output-fields=_SYSTEMD_UNIT,MESSAGE,CODE_FILE,CODE_LINE,CODE_FUNC,_EXE -r -o json > test.txt
 */
+
+fn access_points_sync() -> ApiResult<AccessPoints> {
+	let nm = NetworkManager::connect().map_err(api_error_dbus)?;
+
+	// lets get the first device that is a wifi device
+	let device = nm.devices().map_err(api_error_dbus)?
+		.into_iter()
+		.find_map(|device| {
+			// check the kind
+			match device.kind() {
+				Ok(DeviceKind::Wifi) => {},
+				Ok(_) => return None,
+				Err(e) => {
+					eprintln!("could not get device kind {:?}", e);
+					return None
+				}
+			}
+
+			let inf = match device.interface() {
+				Ok(s) => s,
+				Err(_) => return None
+			};
+
+			Some((inf, device))
+		});
+	let (device_name, device) = match device {
+		Some(d) => d,
+		None => return Ok(AccessPoints { device: String::new(), list: vec![] })
+	};
+
+	let access_points = device.access_points().map_err(api_error_dbus)?;
+
+	let list = access_points.into_iter()
+		.filter_map(|ap| {
+			let has_mgmt_psk =
+				ap.wpa_flags()
+					.map(|f| f.matches(ApSecurityFlag::KeyMgmtPsk))
+					.unwrap_or(false) ||
+				ap.rsn_flags()
+					.map(|f| f.matches(ApSecurityFlag::KeyMgmtPsk))
+					.unwrap_or(false);
+
+			if !has_mgmt_psk {
+				return None
+			}
+
+			let (ssid, strength) = match (ap.ssid(), ap.strength()) {
+				(Ok(s), Ok(st)) => (s, st),
+				_ => return None
+			};
+
+			Some(AccessPoint { ssid, strength })
+		})
+		.collect();
+
+	Ok(AccessPoints {
+		device: device_name,
+		list
+	})
+}
+
+request_handler!(
+	async fn access_points_req<Action>(
+		_req: AccessPointsReq,
+	) -> ApiResult<AccessPoints> {
+		spawn_blocking(access_points_sync).await
+			.unwrap()
+	}
+);
+
+
+fn connections_sync() -> ApiResult<Connections> {
+	let nm = NetworkManager::connect().map_err(api_error_dbus)?;
+
+	let cons = nm.connections().map_err(api_error_dbus)?;
+
+	let list = cons.into_iter()
+		.filter_map(|con| {
+			let setts = con.get_settings().ok()?;
+
+			let con_setts = setts.get("connection")?;
+
+			let ty = con_setts.get_str("type")?;
+			let id = con_setts.get_str("id")?.to_string();
+			let uuid = con_setts.get_str("uuid")?.to_string();
+
+			let kind = match ty {
+				"802-11-wireless" => {
+					let interface_name = con_setts.get_str("interface-name")?
+						.to_string();
+					let wifi_setts = setts.get("802-11-wireless")?;
+					let ssid = wifi_setts.get_string_from_bytes("ssid")?;
+					let mode = wifi_setts.get_str("mode")?;
+					if mode != "infrastructure" {
+						eprintln!("unknown wifi mode {:?}", mode);
+						return None
+					}
+
+					let wifi_sec_setts = setts.get("802-11-wireless-security")?;
+					let key_mgmt = wifi_sec_setts.get_str("key-mgmt")?;
+					if key_mgmt != "wpa-psk" {
+						eprintln!("unknown key-mgmt {:?}", key_mgmt);
+						return None
+					}
+
+					let wifi = ConnectionWifi { interface_name, ssid };
+					ConnectionKind::Wifi(wifi)
+				},
+				"802-3-ethernet" => return None,
+				"gsm" => {
+					eprintln!("gsm settings {:#?}", setts);
+					return None
+				},
+				ty => {
+					eprintln!("connection type unknown {:?}", ty);
+					return None
+				}
+			};
+
+			Some(Connection { id, uuid, kind })
+		})
+		.collect();
+
+	Ok(Connections { list })
+}
+
+request_handler!(
+	async fn connections<Action>(
+		_req: ConnectionsReq,
+	) -> ApiResult<Connections> {
+		spawn_blocking(connections_sync).await
+			.unwrap()
+	}
+);
