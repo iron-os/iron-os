@@ -1,7 +1,7 @@
 mod device_info;
 mod network_manager;
 
-use network_manager::{NetworkManager, DeviceKind, ApSecurityFlag};
+use network_manager::{NetworkManager, DeviceKind, ApSecurityFlag, PropMap};
 
 use crate::Bootloader;
 use crate::ui::{ApiSender};
@@ -10,6 +10,7 @@ use crate::packages::Packages;
 use crate::display::{Display, State};
 
 use std::io;
+use std::collections::HashMap;
 
 use api::server::Server;
 use api::requests::{
@@ -28,7 +29,10 @@ use api::requests::{
 	device::{DeviceInfoReq, DeviceInfo, SetPowerStateReq, PowerState},
 	network::{
 		AccessPointsReq, AccessPoints, AccessPoint,
-		ConnectionsReq, Connections, Connection, ConnectionKind, ConnectionWifi
+		ConnectionsReq, Connections, Connection, ConnectionKind, ConnectionWifi,
+		ConnectionGsm,
+		AddConnectionReq, AddConnectionKind,
+		RemoveConnectionReq
 	}
 };
 use api::{request_handler, Action};
@@ -70,6 +74,8 @@ pub async fn start(
 	server.register_request(device_info_req);
 	server.register_request(access_points_req);
 	server.register_request(connections);
+	server.register_request(add_connection);
+	server.register_request(remove_connection);
 
 	Ok(tokio::spawn(async move {
 		server.run().await
@@ -333,53 +339,59 @@ fn connections_sync() -> ApiResult<Connections> {
 	let cons = nm.connections().map_err(api_error_dbus)?;
 
 	let list = cons.into_iter()
-		.filter_map(|con| {
-			let setts = con.get_settings().ok()?;
-
-			let con_setts = setts.get("connection")?;
-
-			let ty = con_setts.get_str("type")?;
-			let id = con_setts.get_str("id")?.to_string();
-			let uuid = con_setts.get_str("uuid")?.to_string();
-
-			let kind = match ty {
-				"802-11-wireless" => {
-					let interface_name = con_setts.get_str("interface-name")?
-						.to_string();
-					let wifi_setts = setts.get("802-11-wireless")?;
-					let ssid = wifi_setts.get_string_from_bytes("ssid")?;
-					let mode = wifi_setts.get_str("mode")?;
-					if mode != "infrastructure" {
-						eprintln!("unknown wifi mode {:?}", mode);
-						return None
-					}
-
-					let wifi_sec_setts = setts.get("802-11-wireless-security")?;
-					let key_mgmt = wifi_sec_setts.get_str("key-mgmt")?;
-					if key_mgmt != "wpa-psk" {
-						eprintln!("unknown key-mgmt {:?}", key_mgmt);
-						return None
-					}
-
-					let wifi = ConnectionWifi { interface_name, ssid };
-					ConnectionKind::Wifi(wifi)
-				},
-				"802-3-ethernet" => return None,
-				"gsm" => {
-					eprintln!("gsm settings {:#?}", setts);
-					return None
-				},
-				ty => {
-					eprintln!("connection type unknown {:?}", ty);
-					return None
-				}
-			};
-
-			Some(Connection { id, uuid, kind })
-		})
+		.filter_map(convert_connection)
 		.collect();
 
 	Ok(Connections { list })
+}
+
+fn convert_connection(con: network_manager::Connection) -> Option<Connection> {
+	let setts = con.get_settings().ok()?;
+
+	let con_setts = setts.get("connection")?;
+
+	let ty = con_setts.get_str("type")?;
+	let id = con_setts.get_str("id")?.to_string();
+	let uuid = con_setts.get_str("uuid")?.to_string();
+
+	let kind = match ty {
+		"802-11-wireless" => {
+			let interface_name = con_setts.get_str("interface-name")?
+				.to_string();
+			let wifi_setts = setts.get("802-11-wireless")?;
+			let ssid = wifi_setts.get_string_from_bytes("ssid")?;
+			let mode = wifi_setts.get_str("mode")?;
+			if mode != "infrastructure" {
+				eprintln!("unknown wifi mode {:?}", mode);
+				return None
+			}
+
+			let wifi_sec_setts = setts.get("802-11-wireless-security")?;
+			let key_mgmt = wifi_sec_setts.get_str("key-mgmt")?;
+			if key_mgmt != "wpa-psk" {
+				eprintln!("unknown key-mgmt {:?}", key_mgmt);
+				return None
+			}
+
+			let wifi = ConnectionWifi { interface_name, ssid };
+			ConnectionKind::Wifi(wifi)
+		},
+		"gsm" => {
+			let gsm_setts = setts.get("gsm")?;
+
+			let apn = gsm_setts.get_str("apn")?.to_string();
+
+			let gsm = ConnectionGsm { apn };
+			ConnectionKind::Gsm(gsm)
+		},
+		"802-3-ethernet" => return None,
+		ty => {
+			eprintln!("connection type unknown {:?}", ty);
+			return None
+		}
+	};
+
+	Some(Connection { id, uuid, kind })
 }
 
 request_handler!(
@@ -387,6 +399,83 @@ request_handler!(
 		_req: ConnectionsReq,
 	) -> ApiResult<Connections> {
 		spawn_blocking(connections_sync).await
+			.unwrap()
+	}
+);
+
+fn add_connection_sync(req: AddConnectionReq) -> ApiResult<Connection> {
+	let nm = NetworkManager::connect().map_err(api_error_dbus)?;
+
+	let mut setts = HashMap::new();
+	let mut con_setts = PropMap::new();
+	con_setts.insert_string("id", req.id);
+	con_setts.insert_string("uuid", uuid::Uuid::new_v4().to_string());
+
+	match req.kind {
+		AddConnectionKind::Wifi(wifi) => {
+			con_setts.insert_string("type", "802-11-wireless");
+			con_setts.insert_string("interface-name", wifi.interface_name);
+
+			let mut wifi_setts = PropMap::new();
+			wifi_setts.insert_string_as_bytes("ssid", wifi.ssid);
+			wifi_setts.insert_string("mode", "infrastructure");
+
+			let mut wifi_sec_setts = PropMap::new();
+			wifi_sec_setts.insert_string("key-mgmt", "wpa-psk");
+			wifi_sec_setts.insert_string("auth-alg", "open");
+			wifi_sec_setts.insert_string("psk", wifi.password);
+
+			setts.insert("802-11-wireless", wifi_setts);
+			setts.insert("802-11-wireless-security", wifi_sec_setts);
+		},
+		AddConnectionKind::Gsm(gsm) => {
+			con_setts.insert_string("type", "gsm");
+
+			let mut gsm_setts = PropMap::new();
+			gsm_setts.insert_string("apn", gsm.apn);
+
+			setts.insert("gsm", gsm_setts);
+		}
+	}
+
+	let mut ipv4 = PropMap::new();
+	ipv4.insert_string("method", "auto");
+
+	let mut ipv6 = PropMap::new();
+	ipv6.insert_string("method", "auto");
+
+	setts.insert("connection", con_setts);
+	setts.insert("ipv4", ipv4);
+	setts.insert("ipv6", ipv6);
+
+	let con = nm.add_connection(setts).map_err(api_error_dbus)?;
+
+	convert_connection(con).ok_or_else(|| {
+		ApiError::Internal("connection cannot be converted".into())
+	})
+}
+
+request_handler!(
+	async fn add_connection<Action>(
+		req: AddConnectionReq,
+	) -> ApiResult<Connection> {
+		spawn_blocking(move || add_connection_sync(req)).await
+			.unwrap()
+	}
+);
+
+
+fn remove_connection_sync(uuid: String) -> ApiResult<()> {
+	let nm = NetworkManager::connect().map_err(api_error_dbus)?;
+
+	nm.remove_connection(&uuid).map_err(api_error_dbus)
+}
+
+request_handler!(
+	async fn remove_connection<Action>(
+		req: RemoveConnectionReq,
+	) -> ApiResult<()> {
+		spawn_blocking(move || remove_connection_sync(req.uuid)).await
 			.unwrap()
 	}
 );
