@@ -36,12 +36,6 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/weston", target_dir + "/etc/");
 	fs::copy("./rootfs/NetworkManager.conf", target_dir + "/etc/NetworkManager/");
 
-	// copy network
-	fs::copy(
-		"./rootfs/network/gsm-connection.mconnection",
-		target_dir + "/etc/NetworkManager/system-connections/"
-	);
-
 	// create empty data folder (needed for fresh build since else
 	// device_table.mk failes)
 	fs::create_dir(target_dir + "/data");
@@ -50,7 +44,6 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::create_dir(target_dir + "/boot");
 
 	if fs::is_dir(target_dir + "/etc/ssh") == true {
-
 		// make open ssh work without rw
 		let sshd_keygen = regex("ExecStartPre=.*");
 		sshd_keygen.replace_file(
@@ -66,7 +59,6 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 				"HostKey /data/etc/ssh/ssh_host_ed25519_key"
 			]);
 		}
-
 	}
 
 	let logind = target_dir + "/etc/systemd/logind.conf";
