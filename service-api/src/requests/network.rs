@@ -55,7 +55,7 @@ pub struct Connection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConnectionKind {
 	Wifi(ConnectionWifi),
-	// Gsm(ConnectionGsm)
+	Gsm(ConnectionGsm)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,10 +66,11 @@ pub struct ConnectionWifi {
 	pub ssid: String
 }
 
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct ConnectionGsm {
-// }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionGsm {
+	pub apn: String
+}
 
 impl<B> Request<Action, B> for ConnectionsReq {
 	type Response = Connections;
@@ -89,7 +90,7 @@ pub struct AddConnectionReq {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AddConnectionKind {
 	Wifi(AddConnectionWifi),
-	// Gsm(ConnectionGsm)
+	Gsm(AddConnectionGsm)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,9 +102,29 @@ pub struct AddConnectionWifi {
 	pub password: String
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddConnectionGsm {
+	pub apn: String
+}
+
 impl<B> Request<Action, B> for AddConnectionReq {
 	type Response = Connection;
 	type Error = Error;
 
 	const ACTION: Action = Action::NetworkAddConnection;
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveConnectionReq {
+	pub uuid: String
+}
+
+impl<B> Request<Action, B> for RemoveConnectionReq {
+	type Response = ();
+	type Error = Error;
+
+	const ACTION: Action = Action::NetworkRemoveConnection;
 }

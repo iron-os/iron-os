@@ -107,6 +107,18 @@ impl NetworkManager {
 				}
 			})
 	}
+
+	pub fn remove_connection(&self, uuid: &str) -> Result<(), Error> {
+		let path = self.dbus.proxy(DBUS_PATH_SETTINGS)
+			.get_connection_by_uuid(uuid)?;
+
+		let con = Connection {
+			dbus: self.dbus.clone(),
+			path
+		};
+
+		con.delete()
+	}
 }
 
 pub struct Device {
@@ -256,6 +268,7 @@ impl AccessPoint {
 			})
 	}
 
+	#[allow(dead_code)]
 	pub fn mode(&self) -> Result<ApMode, Error> {
 		AccessPointTrait::mode(&self.dbus.proxy(&self.path))
 			.map(Into::into)
@@ -326,7 +339,9 @@ impl Connection {
 			})
 	}
 
-	// secrets??
+	pub fn delete(&self) -> Result<(), Error> {
+		SettingsConnectionTrait::delete(&self.dbus.proxy(&self.path))
+	}
 }
 
 #[derive(Debug)]
@@ -335,6 +350,12 @@ pub struct PropMap {
 }
 
 impl PropMap {
+	pub fn new() -> Self {
+		Self {
+			inner: HashMap::new()
+		}
+	}
+
 	pub fn get_str(&self, s: &str) -> Option<&str> {
 		self.inner.get(s)?
 			.as_str()
@@ -348,5 +369,18 @@ impl PropMap {
 			.collect::<Option<_>>()?;
 
 		String::from_utf8(bytes).ok()
+	}
+
+	pub fn insert_string(&mut self, k: impl Into<String>, v: impl Into<String>) {
+		self.inner.insert(k.into(), Variant(Box::new(v.into())));
+	}
+
+	pub fn insert_string_as_bytes(
+		&mut self,
+		k: impl Into<String>,
+		v: impl Into<String>
+	) {
+		let v = v.into().into_bytes();
+		self.inner.insert(k.into(), Variant(Box::new(v)));
 	}
 }
