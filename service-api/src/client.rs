@@ -17,7 +17,9 @@ use crate::requests::device::{
 };
 use crate::requests::network::{
 	AccessPointsReq, AccessPoints,
-	ConnectionsReq, Connection
+	ConnectionsReq, Connection,
+	AddConnectionReq, AddConnectionKind,
+	RemoveConnectionReq
 };
 
 use std::time::Duration;
@@ -106,5 +108,20 @@ impl Client {
 	pub async fn network_connections(&self) -> Result<Vec<Connection>> {
 		self.inner.request(ConnectionsReq).await
 			.map(|c| c.list)
+	}
+
+	pub async fn network_add_connection(
+		&self,
+		id: String,
+		kind: AddConnectionKind
+	) -> Result<Connection> {
+		self.inner.request(AddConnectionReq { id, kind }).await
+	}
+
+	pub async fn network_remove_connection(
+		&self,
+		uuid: String
+	) -> Result<()> {
+		self.inner.request(RemoveConnectionReq { uuid }).await
 	}
 }
