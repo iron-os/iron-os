@@ -1,4 +1,3 @@
-
 use crate::io_other;
 use crate::command::Command;
 use crate::version_info::update_version_info;
@@ -70,7 +69,6 @@ enum NewDisk {
 }
 
 pub fn install_on(name: String) -> io::Result<()> {
-
 	let mut active = None;
 	let mut new = None;
 
@@ -118,7 +116,6 @@ struct Disks {
 }
 
 impl Disks {
-
 	pub fn read() -> io::Result<Self> {
 		let mut list = HashMap::new();
 
@@ -163,7 +160,6 @@ impl Disks {
 			)
 			.ok_or_else(|| io_other("root disk not found"))
 	}
-
 }
 
 #[derive(Debug)]
@@ -174,7 +170,6 @@ struct Disk {
 }
 
 impl Disk {
-
 	pub fn new(name: &str) -> Self {
 		let path = Path::new("/dev").join(name);
 
@@ -280,14 +275,15 @@ impl Disk {
 		let len = file.seek(SeekFrom::End(0))?;
 		Ok(len)
 	}
-
 }
 
 /// writes a new partition
-fn install_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<()> {
+fn install_to_new_disk(
+	install_disk: &mut Disk,
+	new_disk: &mut Disk
+) -> io::Result<()> {
 	// do we need to write the entire drive
 	// or is it enough to 
-
 	write_gpt_to_new_disk(install_disk, new_disk)?;
 
 	// wait until linux reads the new gpt table
@@ -306,7 +302,10 @@ fn install_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Resu
 	Ok(())
 }
 
-fn write_gpt_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<()> {
+fn write_gpt_to_new_disk(
+	install_disk: &mut Disk,
+	new_disk: &mut Disk
+) -> io::Result<()> {
 	// delete previous gpt if it exists
 	new_disk.gpt_disk = None;
 
@@ -394,8 +393,10 @@ fn write_gpt_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Re
 ///
 /// This function expects
 /// all new partitions to be bigger or the same size as the previous ones
-fn copy_to_new_disk(install_disk: &mut Disk, new_disk: &mut Disk) -> io::Result<()> {
-
+fn copy_to_new_disk(
+	install_disk: &mut Disk,
+	new_disk: &mut Disk
+) -> io::Result<()> {
 	let old_sector_size = install_disk.sector_size()
 		.ok_or_else(|| io_other("could not get sector_size"))?;
 	let new_sector_size = new_disk.sector_size()
@@ -494,7 +495,11 @@ fn copy_len_to_new(
 
 		// this is just an info
 		if rem != read_b {
-			println!("could not fill entire buffer expected {} filled {}", rem, read_b);
+			println!(
+				"could not fill entire buffer expected {} filled {}",
+				rem,
+				read_b
+			);
 		}
 
 		read += read_b as u64;
@@ -506,9 +511,7 @@ fn copy_len_to_new(
 }
 
 fn configure_disk(disk: &mut Disk) -> io::Result<()> {
-
 	// update fstab to with the new uuid
-
 	let root_path = disk.part_path("root a")
 		.ok_or_else(|| io_other("could not get root path"))?;
 
