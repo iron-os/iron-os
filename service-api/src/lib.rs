@@ -35,6 +35,7 @@ action! {
 		// network
 		NetworkConnections = 50,
 		NetworkAddConnection = 52,
+		NetworkRemoveConnection = 53,
 		NetworkAccessPoints = 54
 	}
 }
