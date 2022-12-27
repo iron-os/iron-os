@@ -1,4 +1,3 @@
-
 use crate::command::Command;
 use crate::io_other;
 use crate::disks::{api_disks, install_on};
@@ -157,7 +156,6 @@ request_handler!{
 }
 
 pub fn start() -> io::Result<()> {
-
 	let service_package = Path::new("/data/packages/service");
 	let package_file = service_package.join("package.fdb");
 	let package: PackageCfg = FileDb::<PackageCfg>::open_sync(package_file)?

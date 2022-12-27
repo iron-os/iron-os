@@ -1,4 +1,3 @@
-
 use crate::io_other;
 
 use std::process::{Child as StdChild, Command as StdCommand, Stdio};
@@ -12,7 +11,6 @@ use std::ops::{Deref, DerefMut};
 pub struct Command(StdCommand);
 
 impl Command {
-
 	pub fn new<S: AsRef<OsStr>>(program: S) -> Self {
 		Self(StdCommand::new(program))
 	}
@@ -84,7 +82,6 @@ impl Command {
 				inner, should_kill: false
 			})
 	}
-
 }
 
 pub struct Child {

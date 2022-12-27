@@ -1,4 +1,3 @@
-
 mod command;
 mod service;
 mod disks;
@@ -52,6 +51,3 @@ fn io_other<E>(e: E) -> io::Error
 where E: Into<Box<dyn StdError + Send + Sync>> {
 	io::Error::new(io::ErrorKind::Other, e)
 }
-
-// io_comm io error with comments
-// fn io_comm<E
