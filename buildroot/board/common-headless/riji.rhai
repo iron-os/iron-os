@@ -422,4 +422,7 @@ fn apply_patch(channel, buildroot) {
 	print("patch weston");
 	let weston_diff = diff_from_file("./pre-patches/weston-kiosk-sleep.patch");
 	buildroot_repo.apply_diff(weston_diff);
+	print("patch rtl8188eu");
+	let rtl8188eu_diff = diff_from_file("./pre-patches/rtl8188eu.patch");
+	buildroot_repo.apply_diff(rtl8188eu_diff);
 }
