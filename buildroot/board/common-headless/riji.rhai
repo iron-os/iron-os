@@ -36,6 +36,10 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/weston", target_dir + "/etc/");
 	fs::copy("./rootfs/NetworkManager.conf", target_dir + "/etc/NetworkManager/");
 
+	// disable dnssec by default (having some problem on our local wifi)
+	let dnssec = regex("#DNSSEC=\\S*");
+	dnssec.replace_file(target_dir + "/etc/systemd/resolved.conf", "DNSSEC=no");
+
 	// create empty data folder (needed for fresh build since else
 	// device_table.mk failes)
 	fs::create_dir(target_dir + "/data");
@@ -103,8 +107,6 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	fs::delete(target_dir + "/home");
 
 	// the rights for the home folder are given in create_image_fakeroot
-
-	chmod("700", target_dir + "/etc/NetworkManager/system-connections");
 
 	// check that lvm2-monitor.service does not exist
 	if fs::is_file(target_dir + "/usr/lib/systemd/system/lvm2-monitor.service") {
