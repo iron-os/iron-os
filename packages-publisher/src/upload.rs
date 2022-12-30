@@ -1,4 +1,3 @@
-
 use crate::error::Result;
 use crate::util::{
 	read_toml, create_dir, compress, remove_dir, hash_file, get_priv_key
@@ -127,7 +126,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	let mut confirm = String::new();
 	let stdin = io::stdin();
 	stdin.read_line(&mut confirm)
-		.map_err(|e| err!(e, "could not read private key"))?;
+		.map_err(|e| err!(e, "could not read confirmation"))?;
 
 	if confirm.trim() != "YES" {
 		return Err(err!(confirm, "confirmation not received"))
