@@ -1,4 +1,3 @@
-
 use crate::config::Config;
 use crate::packages::{PackagesDb, PackageEntry};
 use crate::auth::AuthDb;
@@ -20,7 +19,6 @@ use packages::server::{
 	};
 
 pub async fn serve() -> Result<()> {
-
 	let cfg = match Config::read().await {
 		Ok(cfg) => cfg,
 		Err(e) => {

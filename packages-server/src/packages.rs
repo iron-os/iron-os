@@ -1,4 +1,3 @@
-
 use crate::error::{Error, Result};
 
 use std::result::Result as StdResult;
