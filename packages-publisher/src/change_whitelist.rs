@@ -1,8 +1,8 @@
-
 use crate::error::Result;
 use crate::util::read_toml;
 use crate::config::Config;
 
+use std::io;
 use std::collections::HashSet;
 
 use packages::client::Client;
@@ -13,6 +13,7 @@ use packages::error::Error as ApiError;
 use riji::{paint_ok, paint_err};
 
 use serde::Deserialize;
+
 
 #[derive(Debug, Clone, Deserialize)]
 struct PackageToml {
@@ -32,7 +33,6 @@ pub struct ChangeWhitelistOpts {
 }
 
 pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
-
 	// check config
 	let config = Config::open().await?;
 	let source = config.get(&opts.channel)?;
@@ -62,6 +62,24 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
 	let whitelist: HashSet<_> = opts.whitelist.into_iter().collect();
+
+	println!();
+	println!("do you really wan't to change the whitelist for package:");
+	println!("channel: {}", opts.channel);
+	println!("version: {:?}", opts.version);
+	println!("archs: {:?}", target_archs);
+	println!("whitelist: {:?}", whitelist);
+	println!();
+	println!("Enter YES to confirm");
+
+	let mut confirm = String::new();
+	let stdin = io::stdin();
+	stdin.read_line(&mut confirm)
+		.map_err(|e| err!(e, "could not read confirmation"))?;
+
+	if confirm.trim() != "YES" {
+		return Err(err!(confirm, "confirmation not received"))
+	}
 
 	for arch in target_archs {
 		let r = client.change_whitelist(
