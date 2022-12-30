@@ -1,14 +1,12 @@
 [package]
 name = "packages-api"
 version = "0.1.0"
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2021"
 
 [dependencies]
 tokio = { version = "1.0", features = ["net", "io-util", "time", "fs"] }
-stream = { package = "fire-stream", version = "0.2", features = ["json", "fs", "encrypted"], path = "./../../fire-stream" }
-stream-api = { package = "fire-stream-api", version = "0.1.1", features = ["encrypted"], path = "./../../fire-stream-api" }
+stream = { package = "fire-stream", version = "0.2.6", features = ["json", "fs", "encrypted"] }
+stream-api = { package = "fire-stream-api", version = "0.1.2", features = ["encrypted"] }
 bytes = { package = "simple-bytes", version = "0.2.6" }
 serde = { version = "1.0", features = ["derive"] }
 crypto = { package = "fire-crypto", version = "0.3.4", features = ["signature", "serde", "b64", "hash"] }

@@ -1,4 +1,3 @@
-
 use crate::error::{Error, Result};
 use crate::config::Config;
 
