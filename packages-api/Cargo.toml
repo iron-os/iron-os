@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.0", features = ["net", "io-util", "time", "fs"] }
-stream = { package = "fire-stream", version = "0.2.6", features = ["json", "fs", "encrypted"] }
+stream = { package = "fire-stream", version = "0.2.7", features = ["json", "fs", "encrypted"] }
 stream-api = { package = "fire-stream-api", version = "0.1.2", features = ["encrypted"] }
 bytes = { package = "simple-bytes", version = "0.2.6" }
 serde = { version = "1.0", features = ["derive"] }

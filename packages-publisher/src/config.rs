@@ -1,4 +1,3 @@
-
 use crate::error::{Result};
 use crate::util::{read_toml, write_toml};
 
@@ -27,7 +26,6 @@ pub struct Config {
 }
 
 impl Config {
-
 	/// tries to open an existing configuration if that failes
 	/// creates a new one
 	async fn new() -> Self {
@@ -81,7 +79,6 @@ impl Config {
 	pub async fn write(&self) -> Result<()> {
 		write_toml(&path()?, &self.inner).await
 	}
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +96,7 @@ pub struct Source {
 	pub public_key: PublicKey,
 	#[serde(rename = "private-key")]
 	pub priv_key: Option<Keypair>,
+	/// reader auth key
 	#[serde(rename = "auth-key")]
 	pub auth_key: Option<AuthKey>
 }

@@ -1,3 +1,4 @@
+use crate::packages::Channel;
 
 use std::{fmt, error};
 
@@ -7,11 +8,13 @@ use stream_api::error::{ApiError, Error as ErrorTrait};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Error {
 	ConnectionClosed,
 	RequestDropped,
 	AuthKeyUnknown,
+	NoSignKeyForChannel(Channel),
 	NotAuthenticated,
 	SignatureIncorrect,
 	VersionNotFound,
@@ -22,7 +25,6 @@ pub enum Error {
 }
 
 impl ApiError for Error {
-
 	fn connection_closed() -> Self {
 		Self::ConnectionClosed
 	}
@@ -46,7 +48,6 @@ impl ApiError for Error {
 	fn other<E: ErrorTrait>(e: E) -> Self {
 		Self::Other(e.to_string())
 	}
-
 }
 
 impl fmt::Display for Error {

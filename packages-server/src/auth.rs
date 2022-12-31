@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use tokio::fs;
 use tokio::sync::RwLock;
@@ -8,28 +8,34 @@ use tokio::sync::RwLock;
 use file_db::FileDb;
 
 use packages::requests::AuthKey;
+use packages::packages::Channel;
 
 use serde::{Serialize, Deserialize};
 
 
+fn default_keys() -> HashMap<AuthKey, Channel> {
+	HashMap::new()
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct AuthDbFile {
-	keys: HashSet<AuthKey>
+	#[serde(rename = "keys_v2", default = "default_keys")]
+	keys: HashMap<AuthKey, Channel>
 }
 
 impl AuthDbFile {
 	fn new() -> Self {
 		Self {
-			keys: HashSet::new()
+			keys: HashMap::new()
 		}
 	}
 
-	fn insert(&mut self, key: AuthKey) {
-		self.keys.insert(key);
+	fn insert(&mut self, key: AuthKey, channel: Channel) {
+		self.keys.insert(key, channel);
 	}
 
-	fn contains(&self, key: &AuthKey) -> bool {
-		self.keys.contains(key)
+	fn get(&self, key: &AuthKey) -> Option<Channel> {
+		self.keys.get(key).map(|c| *c)
 	}
 }
 
@@ -40,7 +46,6 @@ pub struct AuthDb {
 const AUTH_PATH: &'static str = "./auths.fdb";
 
 impl AuthDb {
-
 	pub async fn create() -> Result<Self> {
 		if fs::metadata(AUTH_PATH).await.is_ok() {
 			return Self::read().await;
@@ -64,17 +69,16 @@ impl AuthDb {
 		})
 	}
 
-	pub async fn insert(&self, key: AuthKey) {
+	pub async fn insert(&self, key: AuthKey, channel: Channel) {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
-		db.insert(key);
+		db.insert(key, channel);
 		lock.write().await
 			.expect("writing failed");
 	}
 
-	pub async fn contains(&self, key: &AuthKey) -> bool {
+	pub async fn get(&self, key: &AuthKey) -> Option<Channel> {
 		let lock = self.inner.read().await;
-		lock.data().contains(key)
+		lock.data().get(key)
 	}
-
 }

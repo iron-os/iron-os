@@ -1,4 +1,3 @@
-
 use crate::action::Action;
 use crate::error::{Result, Error};
 use crate::packages::{Channel, Package, BoardArch, TargetArch};
@@ -7,8 +6,9 @@ use crate::requests::{
 	SetPackageInfoReq,
 	GetFileReq, GetFile,
 	SetFileReq,
-	AuthKey, AuthenticationReq,
-	NewAuthKeyReq, NewAuthKeyKind,
+	AuthKey, AuthenticateReaderReq,
+	AuthenticateWriter1Req, AuthenticateWriter2Req,
+	NewAuthKeyReaderReq,
 	ChangeWhitelistReq
 };
 
@@ -17,19 +17,19 @@ use std::collections::HashSet;
 
 use stream_api::client::{Config, Client as StreamClient, EncryptedBytes};
 
-use crypto::signature::{PublicKey, Signature};
+use crypto::signature::{PublicKey, Keypair};
 use crypto::hash::Hash;
 
 use tokio::net::{TcpStream, ToSocketAddrs};
 
 const TIMEOUT: Duration = Duration::from_secs(10);
 
+
 pub struct Client {
 	inner: StreamClient<Action, EncryptedBytes>
 }
 
 impl Client {
-
 	pub async fn connect<A>(addr: A, pub_key: PublicKey) -> Result<Self>
 	where A: ToSocketAddrs {
 		let stream = TcpStream::connect(addr).await
@@ -47,12 +47,7 @@ impl Client {
 		})
 	}
 
-	// pub async fn request<R>(&self, req: R) -> Result<R::Response>
-	// where R: Request<Action, EncryptedBytes> {
-	// 	self.inner.request(req).await
-	// 		.map_err(Error::Stream)
-	// }
-
+	/// can be called by anyone
 	pub async fn package_info(
 		&self,
 		channel: Channel,
@@ -65,66 +60,65 @@ impl Client {
 			.map(|r| r.package)
 	}
 
+	/// can only be called if you authenticated as a writer
 	pub async fn set_package_info(
 		&self,
-		channel: Channel,
 		package: Package,
 		whitelist: HashSet<DeviceId>
 	) -> Result<()> {
-		let req = SetPackageInfoReq { channel, package, whitelist };
+		let req = SetPackageInfoReq { package, whitelist };
 		self.inner.request(req).await
 	}
 
+	/// can be called by anyone
 	pub async fn get_file(&self, hash: Hash) -> Result<GetFile> {
 		let req = GetFileReq { hash };
 		self.inner.raw_request(req).await
 	}
 
+	/// you need to be authentiacated as a writer
 	pub async fn set_file(&self, req: SetFileReq) -> Result<()> {
 		self.inner.raw_request(req).await
 	}
 
-	pub async fn authenticate(&self, key: AuthKey) -> Result<()> {
-		self.inner.request(AuthenticationReq { key }).await
+	/// authenticate as reader
+	pub async fn authenticate_reader(&self, key: AuthKey) -> Result<()> {
+		self.inner.request(AuthenticateReaderReq { key }).await
 	}
 
-	pub async fn auth_challenge(&self) -> Result<AuthKey> {
-		let resp = self.inner.request(NewAuthKeyReq { sign: None }).await?;
-		match resp.kind {
-			NewAuthKeyKind::Challenge => Ok(resp.key),
-			NewAuthKeyKind::NewKey => Err(Error::Response(
-				"expected Challenge".into()
-			))
-		}
+	/// authenticate as writer
+	pub async fn authenticate_writer(
+		&self,
+		channel: &Channel,
+		key: &Keypair
+	) -> Result<()> {
+		let resp = self.inner.request(AuthenticateWriter1Req {
+			channel: *channel
+		}).await?;
+		self.inner.request(AuthenticateWriter2Req {
+			signature: key.sign(&resp.challenge)
+		}).await
 	}
 
-	/// you need to sign the challenge
-	pub async fn auth_key(&self, sign: Signature) -> Result<AuthKey> {
-		let req = NewAuthKeyReq { sign: Some(sign) };
-		let resp = self.inner.request(req).await?;
-		match resp.kind {
-			NewAuthKeyKind::NewKey => Ok(resp.key),
-			NewAuthKeyKind::Challenge => Err(Error::Response(
-				"expected Key".into()
-			))
-		}
+	/// need to be authenticate as a writer
+	pub async fn new_auth_key_reader(&self) -> Result<AuthKey> {
+		self.inner.request(NewAuthKeyReaderReq).await
 	}
 
+	/// need to be authenticate as a writer
 	pub async fn change_whitelist(
 		&self,
-		channel: Channel,
 		arch: TargetArch,
 		name: String,
 		version: Hash,
 		whitelist: HashSet<DeviceId>
 	) -> Result<()> {
 		self.inner.request(ChangeWhitelistReq {
-			channel, arch, name, version, whitelist
+			arch, name, version, whitelist
 		}).await
 	}
 
 	pub async fn close(self) {
 		self.inner.close().await
 	}
-
 }

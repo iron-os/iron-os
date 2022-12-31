@@ -51,9 +51,10 @@ async fn main() -> Result<()> {
 			let cfg = Config::read().await?;
 			println!("Connection public key: {}", cfg.con_key.public());
 
-			if let Some(sign_key) = cfg.sign_key {
-				println!("Current signature public key: {}", sign_key);
-			}
+			println!("cfg debug: {:?}", cfg.debug);
+			println!("cfg alpha: {:?}", cfg.alpha);
+			println!("cfg beta: {:?}", cfg.beta);
+			println!("cfg release: {:?}", cfg.release);
 
 			let sign = Keypair::new();
 			println!("New signature private key: {}", sign);
