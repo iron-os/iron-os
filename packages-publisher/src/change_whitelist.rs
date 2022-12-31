@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::util::read_toml;
+use crate::util::{read_toml, get_priv_key};
 use crate::config::Config;
 
 use std::io;
@@ -37,11 +37,6 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 	let config = Config::open().await?;
 	let source = config.get(&opts.channel)?;
 
-	if source.auth_key.is_none() {
-		println!("please first call auth <channel> to get an auth key");
-		return Ok(())
-	}
-
 	// read package toml
 	let package: PackageToml = read_toml("./package.toml").await?;
 
@@ -57,8 +52,10 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 	let client = Client::connect(&source.addr, source.public_key.clone()).await
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
+	let key = get_priv_key(&source).await?;
+
 	// authenticate
-	client.authenticate(source.auth_key.clone().unwrap()).await
+	client.authenticate_writer(&opts.channel, &key).await
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
 	let whitelist: HashSet<_> = opts.whitelist.into_iter().collect();
@@ -83,7 +80,6 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 
 	for arch in target_archs {
 		let r = client.change_whitelist(
-			opts.channel,
 			arch,
 			package.name.clone(),
 			opts.version.clone(),

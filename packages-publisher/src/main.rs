@@ -1,13 +1,3 @@
-
-// what can we do?
-/*
-
-upload package info from package.toml
-
-download packages folder for image from packages.toml
-
-*/
-
 #[macro_use]
 mod error;
 mod util;
@@ -52,7 +42,6 @@ enum SubCommand {
 
 #[tokio::main]
 async fn main() {
-
 	let opts = Opts::parse();
 
 	let r = match opts.subcmd {
@@ -84,5 +73,4 @@ async fn main() {
 			process::exit(1);
 		}
 	}
-
 }

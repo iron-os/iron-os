@@ -310,9 +310,9 @@ checksum = "524831e35ab839fea8a9f7f01ca06d38082eae7dd1d5d7311338a77511cffaf6"
 
 [[package]]
 name = "fire-stream"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcf0f46490bac2a2fbb6182f082e971ddab98113f702ea390efc7fe7b5510593"
+checksum = "1884b841ab25f270b92bc54e2a42fecc3500b8bfcf31f5e709c75d108b588951"
 dependencies = [
  "fire-crypto",
  "fire-log-to-stdout",

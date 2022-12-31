@@ -1,4 +1,3 @@
-
 use crate::error::Result;
 
 use packages::packages::{Channel, TargetArch};
@@ -8,7 +7,6 @@ pub struct Script {
 }
 
 impl Script {
-
 	pub fn new(p: &str) -> Result<Self> {
 		let inner = riji::Script::new(p)
 			.map_err(|e| err!(format!("{:?}", e), "could not open script {:?}", p))?;
@@ -46,5 +44,4 @@ impl Script {
 			channel.to_string()
 		]).map_err(|e| err!(format!("{:?}", e), "failed to pack"))
 	}
-
 }

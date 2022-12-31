@@ -1,4 +1,3 @@
-
 use crate::error::{Result};
 use crate::util::{create_dir, hash_file, read_toml, remove_dir, compress, copy};
 
@@ -9,6 +8,7 @@ use file_db::FileDb;
 use bootloader_api::requests::{VersionInfo, Architecture};
 
 use serde::{Deserialize};
+
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ImageToml {

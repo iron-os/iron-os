@@ -63,20 +63,14 @@ pub struct Upload {
 }
 
 pub async fn upload(cfg: Upload) -> Result<()> {
-
 	// check config
 	let config = Config::open().await?;
 	let source = config.get(&cfg.channel)?;
 
-	if source.auth_key.is_none() {
-		println!("please first call auth <channel> to get an auth key");
-		return Ok(())
-	}
+	let priv_key = get_priv_key(&source).await?;
 
 	// read package toml
 	let package: PackageToml = read_toml("./package.toml").await?;
-
-	let priv_key = get_priv_key(&source).await?;
 
 	let mut packages = vec![];
 
@@ -139,11 +133,10 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
 	// authenticate
-	client.authenticate(source.auth_key.clone().unwrap()).await
+	client.authenticate_writer(&cfg.channel, &priv_key).await
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
 	for (tar_path, package) in packages {
-
 		let tar = File::open(&tar_path).await
 			.expect("tar file deleted");
 		let file_req = SetFileReq::new(package.signature.clone(), tar).await
@@ -154,7 +147,6 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			.map_err(|e| err!(e, "failed to upload file"))?;
 
 		client.set_package_info(
-			cfg.channel,
 			package,
 			HashSet::from_iter(cfg.whitelist.clone())
 		).await
@@ -162,7 +154,6 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 		fs::remove_file(&tar_path).await
 			.expect("could not remove tar");
-
 	}
 
 	println!("package uploaded");

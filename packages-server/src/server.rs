@@ -6,12 +6,17 @@ use crate::error::{Result, Error};
 
 use stream_api::{request_handler, raw_request_handler};
 use packages::requests::{
-	PackageInfoReq, PackageInfo, GetFileReq, GetFile,
-	SetFileReq, SetPackageInfoReq,
-	NewAuthKeyReq, NewAuthKey, NewAuthKeyKind,
-	AuthenticationReq, AuthKey,
+	PackageInfoReq, PackageInfo,
+	SetPackageInfoReq,
+	GetFileReq, GetFile,
+	SetFileReq,
+	AuthenticateReaderReq, AuthKey,
+	AuthenticateWriter1Req, AuthenticateWriter1, Challenge,
+	AuthenticateWriter2Req,
+	NewAuthKeyReaderReq,
 	ChangeWhitelistReq
 };
+use packages::packages::Channel;
 use packages::action::Action;
 use packages::error::{Result as ApiResult, Error as ApiError};
 use packages::server::{
@@ -28,7 +33,7 @@ pub async fn serve() -> Result<()> {
 		}
 	};
 
-	if cfg.sign_key.is_none() {
+	if !cfg.has_sign_key() {
 		eprintln!("please define the signature public key `sign-key`");
 		return Ok(())
 	}
@@ -37,7 +42,9 @@ pub async fn serve() -> Result<()> {
 		Ok(p) => p,
 		Err(e) => {
 			eprintln!("reading packages db failed");
-			eprintln!("to create the packages db file use the command `create`");
+			eprintln!(
+				"to create the packages db file use the command `create`"
+			);
 			return Err(e)
 		}
 	};
@@ -68,15 +75,41 @@ pub async fn serve() -> Result<()> {
 	server.register_data(auth_db);
 	// server.register_request(all_packages);
 	server.register_request(package_info);
+	server.register_request(set_package_info);
 	server.register_request(get_file);
 	server.register_request(set_file);
-	server.register_request(set_package_info);
-	server.register_request(new_auth_key);
-	server.register_request(auth_req);
+	server.register_request(authenticate_reader);
+	server.register_request(authenticate_writer1);
+	server.register_request(authenticate_writer2);
+	server.register_request(new_auth_key_reader);
 	server.register_request(change_whitelist);
 
 	server.run().await
 		.map_err(|e| Error::other("server failed", e))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct AuthReader(Channel);
+
+#[allow(dead_code)]
+fn valid_reader_auth(sess: &Session) -> ApiResult<Channel> {
+	match sess.get::<AuthReader>() {
+		Some(c) => Ok(c.0),
+		None => Err(ApiError::NotAuthenticated)
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct AuthWriterChallenge(Channel, Challenge);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct AuthWriter(Channel);
+
+fn valid_writer_auth(sess: &Session) -> ApiResult<Channel> {
+	match sess.get::<AuthWriter>() {
+		Some(a) => Ok(a.0),
+		None => Err(ApiError::NotAuthenticated)
+	}
 }
 
 request_handler!(
@@ -95,6 +128,41 @@ request_handler!(
 	}
 );
 
+// todo some party could upload an old version
+request_handler!(
+	async fn set_package_info<Action>(
+		req: SetPackageInfoReq,
+		files: Files,
+		session: Session,
+		cfg: Config,
+		packages: PackagesDb
+	) -> ApiResult<()> {
+		let channel = valid_writer_auth(session)?;
+
+		// check that we have a file with that version
+		let hash = &req.package.version;
+		if !files.exists(hash).await {
+			return Err(ApiError::Request(format!("version does not exists")))
+		}
+
+		// validate that the signature is correct
+		let sign_pub_key = cfg.sign_pub_key_by_channel(channel)
+			.ok_or_else(|| ApiError::NoSignKeyForChannel(channel))?;
+
+		if !sign_pub_key.verify(hash, &req.package.signature) {
+			return Err(ApiError::SignatureIncorrect)
+		}
+
+		// now set it
+		packages.push_package(channel, PackageEntry {
+			package: req.package,
+			whitelist: req.whitelist
+		}).await;
+
+		Ok(())
+	}
+);
+
 raw_request_handler!(
 	async fn get_file<Action, EncryptedBytes>(
 		req: GetFileReq,
@@ -108,106 +176,22 @@ raw_request_handler!(
 	}
 );
 
-#[derive(Debug, Clone, Hash)]
-struct Challenge(AuthKey);
-
-// Administration stuff
-// to create a new user we need to get a random value signed by the signature
-// key
-request_handler!(
-	async fn new_auth_key<Action>(
-		req: NewAuthKeyReq,
-		session: Session,
-		cfg: Config,
-		auth_db: AuthDb
-	) -> ApiResult<NewAuthKey> {
-		if let Some(sign) = req.sign {
-			let chall = session.get::<Challenge>();
-			let valid = match chall {
-				Some(chal) => {
-					let sign_key = cfg.sign_key.as_ref().unwrap();
-					sign_key.verify(chal.0.as_ref(), &sign)
-				},
-				None => false
-			};
-
-			if !valid {
-				return Err(ApiError::Request("Signature incorrect".into()))
-			}
-
-			let key = AuthKey::new();
-			session.set(key.clone());
-			auth_db.insert(key.clone()).await;
-			return Ok(NewAuthKey {
-				kind: NewAuthKeyKind::NewKey,
-				key
-			})
-		}
-
-		// create a challenge
-		let key = AuthKey::new();
-		let chall = Challenge(key.clone());
-		session.set(chall);
-
-		Ok(NewAuthKey {
-			kind: NewAuthKeyKind::Challenge,
-			key
-		})
-	}
-);
-
-
-request_handler!(
-	async fn auth_req<Action>(
-		req: AuthenticationReq,
-		session: Session,
-		auth_db: AuthDb
-	) -> ApiResult<()> {
-		let valid = auth_db.contains(&req.key).await;
-		if !valid {
-			return Err(ApiError::AuthKeyUnknown)
-		}
-
-		session.set(req.key.clone());
-		// need to increase the body limit
-		let conf = session.get::<Configurator<ServerConfig>>().unwrap();
-		let mut cfg = conf.read();
-		// the limit should be 200mb
-		cfg.body_limit = 200_000_000;
-		conf.update(cfg);
-
-		Ok(())
-	}
-);
-
-async fn valid_auth(sess: &Session, auth_db: &AuthDb) -> ApiResult<()> {
-	match sess.get::<AuthKey>() {
-		Some(k) => if auth_db.contains(&k).await {
-			Ok(())
-		} else {
-			Err(ApiError::NotAuthenticated)
-		},
-		None => Err(ApiError::NotAuthenticated)
-	}
-}
-
 // todo some party could upload an old version
 raw_request_handler!(
 	async fn set_file<Action, EncryptedBytes>(
 		req: SetFileReq,
 		files: Files,
 		session: Session,
-		auth_db: AuthDb,
 		cfg: Config
 	) -> ApiResult<()> {
-		valid_auth(session, auth_db).await?;
+		let channel = valid_writer_auth(session)?;
 
 		// generate hash of file
 		let hash = req.hash();
 		// validate signature
-		let sign_key = cfg.sign_key.as_ref().unwrap();
-		let signature = req.signature();
-		if !sign_key.verify(&hash, signature) {
+		let sign_pub_key = cfg.sign_pub_key_by_channel(channel)
+			.ok_or_else(|| ApiError::NoSignKeyForChannel(channel))?;
+		if !sign_pub_key.verify(&hash, req.signature()) {
 			return Err(ApiError::SignatureIncorrect)
 		}
 
@@ -223,37 +207,117 @@ raw_request_handler!(
 	}
 );
 
-// todo some party could upload an old version
+// Administration stuff
+// to authenticate as a reader your have to call NewAuthKeyReaderReq
 request_handler!(
-	async fn set_package_info<Action>(
-		req: SetPackageInfoReq,
-		files: Files,
+	async fn authenticate_reader<Action>(
+		req: AuthenticateReaderReq,
 		session: Session,
-		auth_db: AuthDb,
-		cfg: Config,
-		packages: PackagesDb
+		auth_db: AuthDb
 	) -> ApiResult<()> {
-		valid_auth(session, auth_db).await?;
+		let channel = match auth_db.get(&req.key).await {
+			Some(c) => c,
+			None => return Err(ApiError::AuthKeyUnknown)
+		};
 
-		// check that we have a file with that version
-		let hash = &req.package.version;
-		if !files.exists(hash).await {
-			return Err(ApiError::Request(format!("version does not exists")))
-		}
+		session.set(AuthReader(channel));
 
-		// validate that the signature is correct
-		let sign_key = cfg.sign_key.as_ref().unwrap();
-		if !sign_key.verify(hash, &req.package.signature) {
+		Ok(())
+
+		// if let Some(sign) = req.sign {
+		// 	let chall = session.get::<Challenge>();
+		// 	let valid = match chall {
+		// 		Some(chal) => {
+		// 			let sign_key = cfg.sign_key.as_ref().unwrap();
+		// 			sign_key.verify(chal.0.as_ref(), &sign)
+		// 		},
+		// 		None => false
+		// 	};
+
+		// 	if !valid {
+		// 		return Err(ApiError::Request("Signature incorrect".into()))
+		// 	}
+
+		// 	let key = AuthKey::new();
+		// 	session.set(key.clone());
+		// 	auth_db.insert(key.clone()).await;
+		// 	return Ok(NewAuthKey {
+		// 		kind: NewAuthKeyKind::NewKey,
+		// 		key
+		// 	})
+		// }
+
+		// // create a challenge
+		// let key = AuthKey::new();
+		// let chall = Challenge(key.clone());
+		// session.set(chall);
+
+		// Ok(NewAuthKey {
+		// 	kind: NewAuthKeyKind::Challenge,
+		// 	key
+		// })
+	}
+);
+
+request_handler!(
+	async fn authenticate_writer1<Action>(
+		req: AuthenticateWriter1Req,
+		session: Session
+	) -> ApiResult<AuthenticateWriter1> {
+		let challenge = Challenge::new();
+		session.set(AuthWriterChallenge(req.channel, challenge.clone()));
+
+		Ok(AuthenticateWriter1 { challenge })
+	}
+);
+
+request_handler!(
+	async fn authenticate_writer2<Action>(
+		req: AuthenticateWriter2Req,
+		session: Session,
+		cfg: Config
+	) -> ApiResult<()> {
+		let AuthWriterChallenge(channel, challenge) =
+			session.take::<AuthWriterChallenge>().ok_or_else(|| {
+				ApiError::NotAuthenticated
+			})?;
+
+		let sign_pub_key = cfg.sign_pub_key_by_channel(channel)
+			.ok_or_else(|| ApiError::NoSignKeyForChannel(channel))?;
+
+		if !sign_pub_key.verify(challenge, &req.signature) {
 			return Err(ApiError::SignatureIncorrect)
 		}
 
-		// now set it
-		packages.push_package(req.channel, PackageEntry {
-			package: req.package,
-			whitelist: req.whitelist
-		}).await;
+		session.set(AuthWriter(channel));
+
+		// need to increase the body limit (since we are a writer)
+		let conf = session.get::<Configurator<ServerConfig>>().unwrap();
+		let mut cfg = conf.read();
+		// the limit should be 200mb
+		cfg.body_limit = 200_000_000;
+		conf.update(cfg);
 
 		Ok(())
+	}
+);
+
+
+request_handler!(
+	async fn new_auth_key_reader<Action>(
+		_req: NewAuthKeyReaderReq,
+		session: Session,
+		auth_db: AuthDb
+	) -> ApiResult<AuthKey> {
+		let channel = valid_writer_auth(session)?;
+
+		// you are a valid writer
+		// so let's create a new AuthKey to read data
+		let key = AuthKey::new();
+		auth_db.insert(key.clone(), channel).await;
+		session.set(AuthReader(channel));
+
+		Ok(key)
 	}
 );
 
@@ -261,13 +325,12 @@ request_handler!(
 	async fn change_whitelist<Action>(
 		req: ChangeWhitelistReq,
 		session: Session,
-		auth_db: AuthDb,
 		packages: PackagesDb
 	) -> ApiResult<()> {
-		valid_auth(session, auth_db).await?;
+		let channel = valid_writer_auth(session)?;
 
 		let changed = packages.change_whitelist(
-			&req.channel,
+			&channel,
 			&req.arch,
 			&req.name,
 			&req.version,
