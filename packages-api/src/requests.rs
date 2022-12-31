@@ -1,23 +1,3 @@
-
-/*
-what api do we provide??
-
-authenticate
-- authenticate stream
-
-all packages
-- list all packages
-
-package info
-- get info about a package
-
-image info (contains bzImage and rootfs)
-- 
-
-get file
-- by hash (returns the file + a signature)
-*/
-
 use crate::error::{Error, Result};
 use crate::action::Action;
 use crate::packages::{Channel, Package, BoardArch, TargetArch};
@@ -43,24 +23,31 @@ type Message = stream_api::message::Message<Action, EncryptedBytes>;
 
 pub type DeviceId = Token<32>;
 
-// All packages
-
-// #[derive(Debug, Serialize, Deserialize)]
+// /// All packages
+// ///
+// /// Can be called by anyone
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
 // pub struct AllPackagesReq {
 // 	pub channel: Channel
 // }
 
-// serde_req!(Action::AllPackages, AllPackagesReq, AllPackages);
-
-// #[derive(Debug, Serialize, Deserialize)]
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
 // pub struct AllPackages {
 // 	pub list: Vec<Package>
 // }
 
-// serde_res!(AllPackages);
+// impl<B> Request<Action, B> for AllPackagesReq {
+// 	type Response = AllPackages;
+// 	type Error = Error;
+// 	const ACTION: Action = Action::AllPackages;
+// }
 
 
-// Package Info
+/// Package Info
+///
+/// Can be called by anyone
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageInfoReq {
@@ -85,10 +72,11 @@ impl<B> Request<Action, B> for PackageInfoReq {
 	const ACTION: Action = Action::PackageInfo;
 }
 
+
+/// Needs to be authenticated as a writer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetPackageInfoReq {
-	pub channel: Channel,
 	pub package: Package,
 	// if empty no whitelist is applied
 	pub whitelist: HashSet<DeviceId>
@@ -100,8 +88,10 @@ impl<B> Request<Action, B> for SetPackageInfoReq {
 	const ACTION: Action = Action::SetPackageInfo;
 }
 
-// Get File
 
+/// Get File
+///
+/// Can be accessed by anyone
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetFileReq {
@@ -178,7 +168,10 @@ impl RawRequest<Action, EncryptedBytes> for GetFileReq {
 	const ACTION: Action = Action::GetFile;
 }
 
-/// This is temporary will be replaced with streams
+
+/// Set a file
+///
+/// Needs to be authenticated as a writer
 #[derive(Debug)]
 pub struct SetFileReq {
 	signature: Signature,
@@ -188,7 +181,6 @@ pub struct SetFileReq {
 
 impl SetFileReq {
 	pub async fn new(sign: Signature, mut file: File) -> Result<Self> {
-
 		let mut msg = Message::new();
 
 		// check how big the file is then allocate
@@ -229,7 +221,6 @@ impl SetFileReq {
 		let body = self.message.body();
 		&body.inner()[Signature::LEN..]
 	}
-
 }
 
 impl SerdeMessage<Action, EncryptedBytes, Error> for SetFileReq {
@@ -259,48 +250,68 @@ impl RawRequest<Action, EncryptedBytes> for SetFileReq {
 	const ACTION: Action = Action::SetFile;
 }
 
+
 pub type AuthKey = Token<32>;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AuthenticationReq {
+pub struct AuthenticateReaderReq {
 	pub key: AuthKey
 }
 
-impl<B> Request<Action, B> for AuthenticationReq {
+impl<B> Request<Action, B> for AuthenticateReaderReq {
 	type Response = ();
 	type Error = Error;
-	const ACTION: Action = Action::Authentication;
+	const ACTION: Action = Action::AuthenticateReader;
 }
 
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NewAuthKeyReq {
-	pub sign: Option<Signature>
+pub struct AuthenticateWriter1Req {
+	pub channel: Channel
 }
+
+pub type Challenge = Token<32>;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NewAuthKey {
-	pub kind: NewAuthKeyKind,
-	pub key: AuthKey
+pub struct AuthenticateWriter1 {
+	pub challenge: Challenge
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum NewAuthKeyKind {
-	Challenge,
-	NewKey
-}
-
-impl<B> Request<Action, B> for NewAuthKeyReq {
-	type Response = NewAuthKey;
+impl<B> Request<Action, B> for AuthenticateWriter1Req {
+	type Response = AuthenticateWriter1;
 	type Error = Error;
-	const ACTION: Action = Action::NewAuthKey;
+	const ACTION: Action = Action::AuthenticateWriter1;
 }
 
-// Changewhitelist
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthenticateWriter2Req {
+	pub signature: Signature
+}
+
+impl<B> Request<Action, B> for AuthenticateWriter2Req {
+	type Response = ();
+	type Error = Error;
+	const ACTION: Action = Action::AuthenticateWriter2;
+}
+
+
+/// Needs to be authenticated as a writer
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewAuthKeyReaderReq;
+
+impl<B> Request<Action, B> for NewAuthKeyReaderReq {
+	type Response = AuthKey;
+	type Error = Error;
+	const ACTION: Action = Action::NewAuthKeyReader;
+}
+
+
+/// Changewhitelist
+///
+/// Needs to be authenticated as a writer
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChangeWhitelistReq {
-	pub channel: Channel,
 	pub arch: TargetArch,
 	pub name: String,
 	pub version: Hash,

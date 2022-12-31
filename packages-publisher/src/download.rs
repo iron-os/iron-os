@@ -1,4 +1,3 @@
-
 use crate::error::Result;
 use crate::util::{create_dir, remove_dir, read_toml, write_toml, extract};
 
@@ -66,7 +65,6 @@ pub struct Download {
 }
 
 pub async fn download(opts: Download) -> Result<()> {
-
 	// read packages.toml
 	let cfg: PackagesToml = read_toml(opts.config).await?;
 
@@ -133,7 +131,6 @@ pub async fn download(opts: Download) -> Result<()> {
 	// extract packages
 	// and create package.fdb
 	for pack in packs {
-
 		let path = format!("{}/{}", local_packages, pack.name);
 		let tar = format!("{}/{}.tar.gz", local_packages, pack.name);
 
@@ -155,7 +152,6 @@ pub async fn download(opts: Download) -> Result<()> {
 		let db = FileDb::new(fdb, PackageCfg::Left(pack));
 		db.write().await
 			.map_err(|e| err!(e, "could not store file db"))?;
-
 	}
 
 	let packs_cfg = PackagesCfg {
@@ -180,7 +176,6 @@ async fn download_from_source(
 	source: &SourceToml,
 	packages_dir: &str
 ) -> Result<()> {
-
 	// should we delete the packages folder
 	let client = Client::connect(&source.address, source.pub_key.clone()).await
 		.map_err(|e| err!(e, "connect to {} failed", source.address))?;

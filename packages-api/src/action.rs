@@ -12,7 +12,9 @@ action! {
 		GetFile = 20,
 		SetFile = 22,
 
-		NewAuthKey = 30,
-		Authentication = 32
+		NewAuthKeyReader = 31,
+		AuthenticateReader = 32,
+		AuthenticateWriter1 = 34,
+		AuthenticateWriter2 = 35
 	}
 }
