@@ -19,6 +19,8 @@ enum SubCommand {
 	Install(Install),
 	/// View Device Info
 	DeviceInfo(DeviceInfo),
+	/// View System Info
+	SystemInfo(SystemInfo),
 	/// List all packages
 	ListPackages(ListPackages),
 	/// UpdateNow
@@ -39,6 +41,9 @@ struct Install {
 
 #[derive(Debug, Parser)]
 struct DeviceInfo {}
+
+#[derive(Debug, Parser)]
+struct SystemInfo {}
 
 #[derive(Debug, Parser)]
 struct ListPackages {}
@@ -88,6 +93,13 @@ async fn main() {
 			let device_info = client.device_info().await
 				.expect("failed to get device info");
 			println!("{:#?}", device_info);
+			return
+		},
+		Some(SubCommand::SystemInfo(_)) => {
+			println!("Display system info");
+			let system_info = client.system_info().await
+				.expect("failed to get system info");
+			println!("{:#?}", system_info);
 			return
 		},
 		Some(SubCommand::ListPackages(_)) => {
