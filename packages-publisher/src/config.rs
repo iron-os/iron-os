@@ -112,7 +112,6 @@ pub struct ConfigOpts {
 }
 
 pub async fn configure(opts: ConfigOpts) -> Result<()> {
-
 	let mut cfg = Config::new().await;
 
 	let src = match opts.channel {
