@@ -5,7 +5,7 @@ use crate::packages::{Channel, Package, BoardArch, TargetArch};
 use std::collections::HashSet;
 
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
 
 use stream_api::derive_serde_message;
 use stream_api::message::{SerdeMessage, EncryptedBytes};
@@ -17,7 +17,7 @@ use crypto::signature::Signature;
 use crypto::hash::{Hasher, Hash};
 use crypto::token::Token;
 
-use bytes::{BytesRead, BytesWrite};
+use bytes::{BytesRead, BytesReadRef, BytesWrite};
 
 type Message = stream_api::message::Message<Action, EncryptedBytes>;
 
@@ -95,9 +95,7 @@ impl<B> Request<Action, B> for SetPackageInfoReq {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetFileReq {
-	pub hash: Hash,
-	// pub start: Option<u64>,
-	// pub end: Option<u64>
+	pub hash: Hash
 }
 
 derive_serde_message!(GetFileReq);
@@ -111,7 +109,6 @@ pub struct GetFile {
 impl GetFile {
 	/// Before sending this response you should check the hash
 	pub async fn from_file(mut file: File) -> Result<Self> {
-
 		let mut msg = Message::new();
 
 		// check how big the file is then allocate
@@ -166,6 +163,189 @@ impl RawRequest<Action, EncryptedBytes> for GetFileReq {
 	type Response = GetFile;
 	type Error = Error;
 	const ACTION: Action = Action::GetFile;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Range {
+	start: u64,
+	// can be longer that the file itself the returned file will tell you how
+	// long it is
+	len: u64
+}
+
+
+/// Get File Part
+///
+/// Can be accessed by anyone
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetFilePartReq {
+	pub hash: Hash,
+	pub start: u64,
+	// can be longer that the file itself the returned file will tell you how
+	// long it is
+	pub len: u64
+}
+
+derive_serde_message!(GetFilePartReq);
+
+#[derive(Debug)]
+pub struct GetFilePart {
+	// we keep the message so no new allocation is done
+	// +------------------------+
+	// |          Body          |
+	// +--------------+---------+
+	// |Total File Len|File Part|
+	// +--------------+---------+
+	// |     u64      |   ...   |
+	// +--------------+---------+
+	inner: Message
+}
+
+impl GetFilePart {
+	fn new(msg: Message) -> Result<Self> {
+		// make sure the body is at least 8bytes long
+		if msg.body().len() < 8 {
+			return Err(Error::Request(
+				"GetFilePart expects at least 8bytes".into()
+			))
+		}
+
+		Ok(Self { inner: msg })
+	}
+
+	/// Before sending this response you should check the hash
+	pub async fn from_file(
+		mut file: File,
+		start: u64,
+		len: u64
+	) -> Result<Self> {
+		let mut msg = Message::new();
+
+		let total_file_len = file.metadata().await
+			.map_err(|e| Error::Internal(e.to_string()))?
+			.len();
+
+		// let's calculate how much we need to read
+		let rem_max_len = total_file_len.checked_sub(start)
+			.ok_or(Error::StartUnreachable)?;
+
+		let len = len.min(rem_max_len);
+
+		let mut body = msg.body_mut();
+		body.reserve((8 + len + 1) as usize);
+		body.write_u64(total_file_len);
+
+		if len == 0 {
+			return Ok(Self { inner: msg })
+		}
+
+		file.seek(SeekFrom::Start(start)).await
+			.map_err(|e| Error::Internal(
+				format!("seeking file failed {}", e)
+			))?;
+
+		// make sure only to read at max len
+		let mut file_reader = file.take(len);
+
+		unsafe {
+			// safe because file.read_to_end only appends
+			let v = body.as_mut_vec();
+			file_reader.read_to_end(v).await
+				.map_err(|e| Error::Internal(
+					format!("could not read file {}", e)
+				))?;
+		}
+
+		Ok(Self { inner: msg })
+	}
+
+	pub fn total_file_len(&self) -> u64 {
+		let mut body = self.inner.body();
+		body.read_u64()
+	}
+
+	pub fn file_part(&self) -> &[u8] {
+		let mut body = self.inner.body();
+		let _ = body.read_u64();
+		body.remaining_ref()
+	}
+}
+
+impl SerdeMessage<Action, EncryptedBytes, Error> for GetFilePart {
+	fn into_message(self) -> Result<Message> {
+		Ok(self.inner)
+	}
+
+	fn from_message(msg: Message) -> Result<Self> {
+		Self::new(msg)
+	}
+}
+
+impl RawRequest<Action, EncryptedBytes> for GetFilePartReq {
+	type Response = GetFilePart;
+	type Error = Error;
+	const ACTION: Action = Action::GetFilePart;
+}
+
+/*
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetFilePartReq {
+	pub hash: Hash,
+	pub start: u64,
+	// can be longer that the file itself the returned file will tell you how
+	// long it is
+	pub len: u64
+}
+*/
+
+pub struct GetFileBuilder {
+	hash: Hash,
+	total_len: Option<u64>,
+	bytes: Vec<u8>,
+	// how big should each packet be
+	part_size: u64
+}
+
+impl GetFileBuilder {
+	/// part_size: how big should each part be, which we request
+	pub fn new(hash: Hash, part_size: u64) -> Self {
+		Self {
+			hash, part_size,
+			total_len: None,
+			bytes: vec![]
+		}
+	}
+
+	pub(crate) fn next_req(&self) -> GetFilePartReq {
+		GetFilePartReq {
+			hash: self.hash.clone(),
+			start: self.bytes.len() as u64,
+			len: self.part_size
+		}
+	}
+
+	pub(crate) fn add_resp(&mut self, resp: GetFilePart) {
+		self.total_len = Some(resp.total_file_len());
+		self.bytes.extend_from_slice(resp.file_part());
+	}
+
+	pub fn is_complete(&self) -> bool {
+		self.total_len.map(|l| self.bytes.len() as u64 >= l)
+			.unwrap_or(false)
+	}
+
+	/// you need to make sure the file is complete
+	pub fn file(&self) -> &[u8] {
+		&self.bytes
+	}
+
+	/// creates a hash of the file
+	pub fn hash(&self) -> Hash {
+		Hasher::hash(self.file())
+	}
 }
 
 

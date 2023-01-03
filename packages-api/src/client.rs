@@ -4,7 +4,7 @@ use crate::packages::{Channel, Package, BoardArch, TargetArch};
 use crate::requests::{
 	PackageInfoReq, DeviceId,
 	SetPackageInfoReq,
-	GetFileReq, GetFile,
+	GetFileReq, GetFile, GetFileBuilder,
 	SetFileReq,
 	AuthKey, AuthenticateReaderReq,
 	AuthenticateWriter1Req, AuthenticateWriter2Req,
@@ -74,6 +74,20 @@ impl Client {
 	pub async fn get_file(&self, hash: Hash) -> Result<GetFile> {
 		let req = GetFileReq { hash };
 		self.inner.raw_request(req).await
+	}
+
+	/// If this function returns Ok(())
+	/// and the builder is not completed you can call this function again
+	/// immediately
+	pub async fn get_file_with_builder(
+		&self,
+		builder: &mut GetFileBuilder
+	) -> Result<()> {
+		let r = builder.next_req();
+		let resp = self.inner.raw_request(r).await?;
+		builder.add_resp(resp);
+
+		Ok(())
 	}
 
 	/// you need to be authentiacated as a writer
