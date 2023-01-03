@@ -303,19 +303,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "fire-log-to-stdout"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "524831e35ab839fea8a9f7f01ca06d38082eae7dd1d5d7311338a77511cffaf6"
-
-[[package]]
 name = "fire-stream"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1884b841ab25f270b92bc54e2a42fecc3500b8bfcf31f5e709c75d108b588951"
+checksum = "6443818b62635ac120f303559f0ed43e4f907a548b43ae2b27cc5330bf3a16bb"
 dependencies = [
  "fire-crypto",
- "fire-log-to-stdout",
  "serde",
  "serde_json",
  "simple-bytes",
