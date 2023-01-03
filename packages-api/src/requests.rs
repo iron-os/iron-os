@@ -261,6 +261,13 @@ impl GetFilePart {
 		Ok(Self { inner: msg })
 	}
 
+	/// Creates an empty File
+	pub fn empty() -> Self {
+		let mut msg = Message::new();
+		msg.body_mut().write_u64(0);
+		Self { inner: msg }
+	}
+
 	pub fn total_file_len(&self) -> u64 {
 		let mut body = self.inner.body();
 		body.read_u64()
