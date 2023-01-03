@@ -1,4 +1,3 @@
-
 use stream_api::action;
 
 action! {
@@ -10,6 +9,7 @@ action! {
 		SetPackageInfo = 13,
 		ChangeWhitelist = 15,
 		GetFile = 20,
+		GetFilePart = 21,
 		SetFile = 22,
 
 		NewAuthKeyReader = 31,

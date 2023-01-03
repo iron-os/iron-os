@@ -18,6 +18,7 @@ pub enum Error {
 	NotAuthenticated,
 	SignatureIncorrect,
 	VersionNotFound,
+	StartUnreachable,
 	Internal(String),
 	Request(String),
 	Response(String),
