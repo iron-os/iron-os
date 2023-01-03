@@ -9,6 +9,7 @@ use packages::requests::{
 	PackageInfoReq, PackageInfo,
 	SetPackageInfoReq,
 	GetFileReq, GetFile,
+	GetFilePartReq, GetFilePart,
 	SetFileReq,
 	AuthenticateReaderReq, AuthKey,
 	AuthenticateWriter1Req, AuthenticateWriter1, Challenge,
@@ -77,6 +78,7 @@ pub async fn serve() -> Result<()> {
 	server.register_request(package_info);
 	server.register_request(set_package_info);
 	server.register_request(get_file);
+	server.register_request(get_file_part);
 	server.register_request(set_file);
 	server.register_request(authenticate_reader);
 	server.register_request(authenticate_writer1);
@@ -172,6 +174,21 @@ raw_request_handler!(
 		match file {
 			Some(file) => GetFile::from_file(file).await,
 			None => Ok(GetFile::empty())
+		}
+	}
+);
+
+raw_request_handler!(
+	async fn get_file_part<Action, EncryptedBytes>(
+		req: GetFilePartReq,
+		files: Files
+	) -> ApiResult<GetFilePart> {
+		let file = files.get(&req.hash).await;
+		match file {
+			Some(file) => {
+				GetFilePart::from_file(file, req.start, req.len).await
+			},
+			None => Ok(GetFilePart::empty())
 		}
 	}
 );
