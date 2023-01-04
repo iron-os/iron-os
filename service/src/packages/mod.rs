@@ -26,6 +26,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::collections::{HashMap, hash_map::Entry};
+use std::time::Instant;
 
 use tokio::fs;
 use tokio::task::JoinHandle;
@@ -40,6 +41,7 @@ use packages::packages::{
 	PackagesCfg, PackageCfg, Package as PackPackage, BoardArch,
 	Channel, Hash, Source
 };
+use packages::requests::GetFileBuilder;
 use api::requests::packages::Package;
 use file_db::FileDb;
 
@@ -104,7 +106,6 @@ impl Packages {
 #[derive(Debug)]
 enum PackRequest {
 	RequestUpdate(oneshot::Sender<()>),
-	// bool: true == package was added
 	AddPackage(String, oneshot::Sender<Option<Package>>)
 }
 
@@ -152,6 +153,9 @@ impl PackagesReceiver {
 	}
 }
 
+// if we look at release interval that means this may run for at least 120minutes
+const UPDATE_STATE_ERROR_LIMIT: usize = 120;
+
 pub async fn start(
 	client: Bootloader
 ) -> io::Result<(Packages, JoinHandle<()>)> {
@@ -182,6 +186,7 @@ pub async fn start(
 
 		let mut failed = false;
 		let mut update_state: Option<Update> = None;
+		let mut update_state_error = 0;
 		let mut req: Option<PackRequest> = None;
 
 		loop {
@@ -198,6 +203,13 @@ pub async fn start(
 				_ = sleep(time) => {}
 			};
 
+			if update_state_error >= UPDATE_STATE_ERROR_LIMIT {
+				eprintln!("update state error limit reached");
+				update_state = None;
+				update_state_error = 0;
+			}
+
+
 			if update_state.is_none() {
 				update_state = Some(
 					packages.prepare_update(&version_info).await
@@ -211,7 +223,7 @@ pub async fn start(
 					if !update_data.packages.contains_key(name) {
 						update_data.packages.insert(
 							name.clone(),
-							PackageUpdateState::ToUpdate {
+							PackageUpdateState::GatherInfo {
 								version: None,
 								new_folder: DEFAULT_FOLDER.to_string()
 							}
@@ -220,6 +232,8 @@ pub async fn start(
 				},
 				_ => {}
 			}
+
+			let update_start_time = Instant::now();
 
 			// update all packages and the image
 			let update_res = update(
@@ -232,6 +246,7 @@ pub async fn start(
 				Err(e) => {
 					eprintln!("update error {:?}", e);
 					failed = true;
+					update_state_error += 1;
 					continue
 				}
 			}
@@ -242,8 +257,14 @@ pub async fn start(
 			let image_was_updated = update_data.image.was_updated();
 			let any_package_was_updated = update_data.any_package_was_updated();
 
-			eprintln!("updated: {:?}", update_data);
+			eprintln!(
+				"updated: {:?} took {}ms and {} tries",
+				update_data,
+				update_start_time.elapsed().as_millis(),
+				update_state_error
+			);
 			update_state = None;
+			update_state_error = 0;
 
 			// send success
 			match req.take() {
@@ -288,12 +309,12 @@ impl UpdateIntervalTimes {
 		normal: UpdateInterval::Fixed(60)
 	};
 	const BETA: Self = Self {
-		failed: UpdateInterval::Range(30, 4 * 60),
+		failed: UpdateInterval::Range(30, 2 * 60),
 		normal: UpdateInterval::Range(2 * 60, 10 * 60)
 	};
 	const RELEASE: Self = Self {
-		// 2-8 minutes
-		failed: UpdateInterval::Range(2 * 60, 8 * 60),
+		// 1-5 minutes
+		failed: UpdateInterval::Range(60, 5 * 60),
 		// 5-15 minutes
 		normal: UpdateInterval::Range(5 * 60, 15 * 60)
 	};
@@ -366,7 +387,7 @@ impl Update {
 	}
 
 	/// Returns a list of package states which need to be updated
-	pub fn to_update(
+	pub fn not_finished_packages(
 		&mut self
 	) -> impl Iterator<Item=(&str, &mut PackageUpdateState)> {
 		self.packages.iter_mut()
@@ -382,9 +403,15 @@ impl Update {
 
 #[derive(Debug, Clone)]
 enum PackageUpdateState {
-	ToUpdate {
+	GatherInfo {
 		// name is stored in the table
+		/// version is used to check if the package needs to be updated
 		version: Option<Hash>,
+		new_folder: String
+	},
+	DownloadFile {
+		package: PackPackage,
+		get_file: GetFileBuilder,
 		new_folder: String
 	},
 	NoUpdate,
@@ -396,7 +423,13 @@ enum PackageUpdateState {
 
 impl PackageUpdateState {
 	pub fn is_finished(&self) -> bool {
-		!matches!(self, Self::ToUpdate {..})
+		match self {
+			Self::NoUpdate |
+			Self::Updated(_) |
+			Self::NotFound => true,
+			Self::GatherInfo { .. } |
+			Self::DownloadFile { .. } => false
+		}
 	}
 
 	pub fn was_updated(&self) -> bool {
@@ -406,8 +439,10 @@ impl PackageUpdateState {
 
 #[derive(Debug, Clone)]
 enum ImageUpdateState {
-	ToUpdate {
-		version: Hash
+	GatherInfo { version: Hash },
+	DownloadFile {
+		package: PackPackage,
+		get_file: GetFileBuilder
 	},
 	NoUpdate,
 	Updated(VersionInfo),
@@ -416,7 +451,13 @@ enum ImageUpdateState {
 
 impl ImageUpdateState {
 	pub fn is_finished(&self) -> bool {
-		!matches!(self, Self::ToUpdate {..})
+		match self {
+			Self::NoUpdate |
+			Self::Updated(_) |
+			Self::NotFound => true,
+			Self::GatherInfo { .. } |
+			Self::DownloadFile { .. } => false
+		}
 	}
 
 	pub fn was_updated(&self) -> bool {
@@ -515,7 +556,7 @@ impl RawPackages {
 		let mut packs = HashMap::new();
 
 		for (name, pack) in &self.list {
-			let state = PackageUpdateState::ToUpdate {
+			let state = PackageUpdateState::GatherInfo {
 				version: Some(pack.package().version.clone()),
 				// todo maybe store &'static str
 				new_folder: pack.other().to_string()
@@ -523,7 +564,7 @@ impl RawPackages {
 			packs.insert(name.clone(), state);
 		}
 
-		let image = ImageUpdateState::ToUpdate {
+		let image = ImageUpdateState::GatherInfo {
 			version: version.version.clone()
 		};
 
@@ -566,7 +607,8 @@ impl RawPackages {
 						}
 					};
 				},
-				PackageUpdateState::ToUpdate {..} => unreachable!(),
+				PackageUpdateState::GatherInfo {..} |
+				PackageUpdateState::DownloadFile {..} => unreachable!(),
 				PackageUpdateState::NotFound => {}
 			}
 		}
