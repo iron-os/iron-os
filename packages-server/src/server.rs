@@ -183,13 +183,10 @@ raw_request_handler!(
 		req: GetFilePartReq,
 		files: Files
 	) -> ApiResult<GetFilePart> {
-		let file = files.get(&req.hash).await;
-		match file {
-			Some(file) => {
-				GetFilePart::from_file(file, req.start, req.len).await
-			},
-			None => Ok(GetFilePart::empty())
-		}
+		let file = files.get(&req.hash).await
+			.ok_or(ApiError::FileNotFound)?;
+
+		GetFilePart::from_file(file, req.start, req.len).await
 	}
 );
 
