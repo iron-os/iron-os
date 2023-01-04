@@ -71,6 +71,7 @@ impl Client {
 	}
 
 	/// can be called by anyone
+	/// does not return FileNotFound
 	pub async fn get_file(&self, hash: Hash) -> Result<GetFile> {
 		let req = GetFileReq { hash };
 		self.inner.raw_request(req).await
@@ -79,6 +80,8 @@ impl Client {
 	/// If this function returns Ok(())
 	/// and the builder is not completed you can call this function again
 	/// immediately
+	/// 
+	/// can return FileNotFound
 	pub async fn get_file_with_builder(
 		&self,
 		builder: &mut GetFileBuilder

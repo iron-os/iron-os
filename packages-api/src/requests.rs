@@ -301,6 +301,7 @@ pub struct GetFilePartReq {
 }
 */
 
+#[derive(Debug, Clone)]
 pub struct GetFileBuilder {
 	hash: Hash,
 	total_len: Option<u64>,
