@@ -261,13 +261,6 @@ impl GetFilePart {
 		Ok(Self { inner: msg })
 	}
 
-	/// Creates an empty File
-	pub fn empty() -> Self {
-		let mut msg = Message::new();
-		msg.body_mut().write_u64(0);
-		Self { inner: msg }
-	}
-
 	pub fn total_file_len(&self) -> u64 {
 		let mut body = self.inner.body();
 		body.read_u64()
@@ -308,6 +301,7 @@ pub struct GetFilePartReq {
 }
 */
 
+#[derive(Debug, Clone)]
 pub struct GetFileBuilder {
 	hash: Hash,
 	total_len: Option<u64>,
