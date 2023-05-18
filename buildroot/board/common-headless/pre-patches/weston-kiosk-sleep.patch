@@ -43,7 +43,7 @@ index 927215380e..0000000000
 -GitLab
 -
 diff --git a/package/weston/weston.hash b/package/weston/weston.hash
-index d58ca1ef70..c08d43a896 100644
+index d58ca1ef70..48eb33399a 100644
 --- a/package/weston/weston.hash
 +++ b/package/weston/weston.hash
 @@ -1,4 +1 @@
@@ -51,9 +51,9 @@ index d58ca1ef70..c08d43a896 100644
 -sha256  8a9e52506a865a7410981b04f8341b89b84106db8531ab1f9fdd37b5dc034115  weston-10.0.1.tar.xz
 -sha512  688d843096a95b463161b98e85ca3443b31ba2ee49fc8d456a2780cc96f576e9d097054e9f361997a66e9cc8373cf29e406a742dae3884b3b50b26acf1710c8c  weston-10.0.1.tar.xz
 -sha256  fdb65868f65d0fbdb05c2d3b779e10ce9969fa0c4b9262ba4f260e87086ab860  COPYING
-+sha256  e9f96da87262825fc32e508341825583f466003a8ae9d775bc51d10196e15e84  kiosk-sleep-v11.0.1.tar.gz
++sha256 df7c990d54b65ad904423a4e1f0ed825899f69458c2fb20327c1addde6afb861  kiosk-sleep-v11.0.92.tar.gz
 diff --git a/package/weston/weston.mk b/package/weston/weston.mk
-index 76df9bf2dd..11d0f21be6 100644
+index 01f84178b2..429e925df3 100644
 --- a/package/weston/weston.mk
 +++ b/package/weston/weston.mk
 @@ -4,9 +4,9 @@
@@ -63,25 +63,36 @@ index 76df9bf2dd..11d0f21be6 100644
 -WESTON_VERSION = 10.0.1
 -WESTON_SITE = https://gitlab.freedesktop.org/wayland/weston/-/releases/$(WESTON_VERSION)/downloads
 -WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
-+WESTON_VERSION = 11.0.1
-+WESTON_SITE = https://repos.lvgd.ch/iron-os/weston/archive
++WESTON_VERSION = 11.0.92
++WESTON_SITE = https://github.com/iron-os/weston/archive/refs/heads
 +WESTON_SOURCE = kiosk-sleep-v$(WESTON_VERSION).tar.gz
  WESTON_LICENSE = MIT
  WESTON_LICENSE_FILES = COPYING
  WESTON_CPE_ID_VENDOR = wayland
-@@ -16,9 +16,10 @@ WESTON_DEPENDENCIES = host-pkgconf wayland wayland-protocols \
+@@ -17,7 +17,7 @@ WESTON_DEPENDENCIES = host-pkgconf wayland wayland-protocols \
  
  WESTON_CONF_OPTS = \
  	-Dbackend-headless=false \
 -	-Dcolor-management-colord=false \
++	-Dbackend-vnc=false \
  	-Ddoc=false \
  	-Dremoting=false \
-+	-Dlauncher-libseat=false \
-+	-Dcolor-management-lcms=false \
  	-Dtools=calibrator,debug,info,terminal,touch-calibrator
+@@ -29,13 +29,6 @@ else
+ WESTON_CONF_OPTS += -Dsimple-clients=
+ endif
  
- # Uses VIDIOC_EXPBUF, only available from 3.8+
-@@ -49,20 +50,6 @@ else
+-ifeq ($(BR2_PACKAGE_DBUS)$(BR2_PACKAGE_SYSTEMD),yy)
+-WESTON_CONF_OPTS += -Dlauncher-logind=true
+-WESTON_DEPENDENCIES += dbus systemd
+-else
+-WESTON_CONF_OPTS += -Dlauncher-logind=false
+-endif
+-
+ ifeq ($(BR2_PACKAGE_SEATD),y)
+ WESTON_CONF_OPTS += -Dlauncher-libseat=true
+ WESTON_DEPENDENCIES += seatd
+@@ -57,20 +50,6 @@ else
  WESTON_CONF_OPTS += -Dimage-webp=false
  endif
  
@@ -102,17 +113,3 @@ index 76df9bf2dd..11d0f21be6 100644
  ifeq ($(BR2_PACKAGE_HAS_LIBEGL_WAYLAND)$(BR2_PACKAGE_HAS_LIBGLES),yy)
  WESTON_CONF_OPTS += -Drenderer-gl=true
  WESTON_DEPENDENCIES += libegl libgles
-@@ -127,13 +114,6 @@ else
- WESTON_CONF_OPTS += -Dbackend-drm-screencast-vaapi=false
- endif
- 
--ifeq ($(BR2_PACKAGE_LCMS2),y)
--WESTON_CONF_OPTS += -Dcolor-management-lcms=true
--WESTON_DEPENDENCIES += lcms2
--else
--WESTON_CONF_OPTS += -Dcolor-management-lcms=false
--endif
--
- ifeq ($(BR2_PACKAGE_SYSTEMD),y)
- WESTON_CONF_OPTS += -Dsystemd=true
- WESTON_DEPENDENCIES += systemd
