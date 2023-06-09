@@ -639,6 +639,8 @@ pub fn update(path: &str) -> io::Result<()> {
 
 	// update bootloader
 	if Path::new("/boot/EFI/BOOT/grub.templ").is_file() {
+		// todo try to replace the file
+
 		// update grub
 		let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
 		let grub = grub.replace("ROOTFS_UUID", &&other_uuid.to_string());
@@ -647,6 +649,8 @@ pub fn update(path: &str) -> io::Result<()> {
 		fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
 
 	} else if Path::new("/boot/extlinux/extlinux.templ").is_file() {
+		// todo try to replace the file
+
 		// is uboot
 		let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
 		let uboot = uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
