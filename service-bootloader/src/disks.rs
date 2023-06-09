@@ -19,7 +19,7 @@ use linux_info::storage::{sector_size};
 
 use uuid::Uuid;
 
-use bootloader_api::requests::{Disk as ApiDisk};
+use bootloader_api::requests::{Disk as ApiDisk, VersionInfo, Architecture};
 
 // the size is set in genimage-efi.cfg
 // bzImage max size is 20m which allows to have a bzImage tmp
@@ -575,11 +575,13 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 
 // path to the folder 
 // ## Expects the current disk to be an installed disk
-pub fn update(path: &str) -> io::Result<()> {
+pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	let boot_img = boot_image()?;
 	let part_uuid = root_uuid()?;
 
 	let disk = Disks::root_disk()?;
+
+	// get all partitions
 
 	let boot_uuid = disk.get_part("boot")
 		.ok_or_else(|| io_other("boot partition not found"))?
@@ -602,6 +604,7 @@ pub fn update(path: &str) -> io::Result<()> {
 		return Err(io_other("root partition not found"))
 	};
 
+	// get the partition we wan't to write the update to
 	let part_path = disk.part_path(other).unwrap();
 	let mut part_file = OpenOptions::new()
 		.write(true)
@@ -610,10 +613,10 @@ pub fn update(path: &str) -> io::Result<()> {
 	let rootfs_path = format!("{path}/rootfs.ext2");
 	let mut rootfs_file = File::open(&rootfs_path)?;
 
+	// copy the rootfs to the partition
 	io::copy(&mut rootfs_file, &mut part_file)?;
 
-	// rootfs copied
-
+	// update fstab file to mount the correct partitions
 	mount(&part_path, "/mnt")?;
 	let fstab = read_to_string("/mnt/etc/fstab.templ")?;
 	let fstab = fstab.replace("EFI_UUID", &boot_uuid);
@@ -638,54 +641,89 @@ pub fn update(path: &str) -> io::Result<()> {
 	fs::copy(&kernel_image_path, &other_path)?;
 
 	// update bootloader
-	if Path::new("/boot/EFI/BOOT/grub.templ").is_file() {
-		// update grub cfg template
-		let new_grub_templ = Path::new(path).join("grub.templ");
-		if new_grub_templ.is_file() {
-			// first copy the file to the same mount point and the rename
-			// atomic
-			fs::copy(new_grub_templ, "/boot/EFI/BOOT/grub.templ.tmp")?;
+	match version.arch {
+		Architecture::Amd64 => {
+			let exists = Path::new("/boot/EFI/BOOT/grub.templ").is_file();
+			if !exists {
+				return Err(io::Error::new(
+					io::ErrorKind::NotFound,
+					"/boot/EFI/BOOT/grub.templ not found"
+				))
+			}
+
+			// update bootloader
+			let new_bootloader = Path::new(path).join("bootx64.efi");
+			if new_bootloader.is_file() {
+				fs::copy(new_bootloader, "/boot/EFI/BOOT/bootx64.efi.tmp")?;
+				fs::rename(
+					"/boot/EFI/BOOT/bootx64.efi.tmp",
+					"/boot/EFI/BOOT/bootx64.efi"
+				)?;
+			}
+
+			// update grub cfg template
+			let new_grub_templ = Path::new(path).join("grub.templ");
+			if new_grub_templ.is_file() {
+				// first copy the file to the same mount point and the rename
+				// atomic
+				fs::copy(new_grub_templ, "/boot/EFI/BOOT/grub.templ.tmp")?;
+				fs::rename(
+					"/boot/EFI/BOOT/grub.templ.tmp",
+					"/boot/EFI/BOOT/grub.templ"
+				)?;
+			}
+
+			// update grub
+			let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
+			let grub = grub.replace("ROOTFS_UUID", &&other_uuid.to_string());
+			let grub = grub.replace("KERNEL_NAME", other_kernel);
+			fs::write("/boot/EFI/BOOT/grub.tmp", grub)?;
+			fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
+		},
+		Architecture::Arm64 => {
+			let exists = Path::new("/boot/extlinux/extlinux.templ").is_file();
+			if !exists {
+				return Err(io::Error::new(
+					io::ErrorKind::NotFound,
+					"/boot/extlinux/extlinux.templ not found"
+				))
+			}
+
+			// update bootloader
+			let new_bootloader = Path::new(path).join("u-boot.bin");
+			if new_bootloader.is_file() {
+				fs::copy(new_bootloader, "/boot/u-boot.bin.tmp")?;
+				fs::rename(
+					"/boot/u-boot.bin.tmp",
+					"/boot/u-boot.bin"
+				)?;
+			}
+
+			// update uboot cfg template
+			let new_extlinux_templ = Path::new(path).join("extlinux.templ");
+			if new_extlinux_templ.is_file() {
+				// first copy the file to the same mount point and the rename
+				// atomic
+				fs::copy(
+					new_extlinux_templ,
+					"/boot/extlinux/extlinux.templ.tmp"
+				)?;
+				fs::rename(
+					"/boot/extlinux/extlinux.templ.tmp",
+					"/boot/extlinux/extlinux.templ"
+				)?;
+			}
+
+			// is uboot
+			let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
+			let uboot = uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
+			let uboot = uboot.replace("KERNEL_NAME", other_kernel);
+			fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
 			fs::rename(
-				"/boot/EFI/BOOT/grub.templ.tmp",
-				"/boot/EFI/BOOT/grub.templ"
+				"/boot/extlinux/extlinux.tmp",
+				"/boot/extlinux/extlinux.conf"
 			)?;
 		}
-
-		// update grub
-		let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
-		let grub = grub.replace("ROOTFS_UUID", &&other_uuid.to_string());
-		let grub = grub.replace("KERNEL_NAME", other_kernel);
-		fs::write("/boot/EFI/BOOT/grub.tmp", grub)?;
-		fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
-
-	} else if Path::new("/boot/extlinux/extlinux.templ").is_file() {
-		// update uboot cfg template
-		let new_extlinux_templ = Path::new(path).join("extlinux.templ");
-		if new_extlinux_templ.is_file() {
-			// first copy the file to the same mount point and the rename
-			// atomic
-			fs::copy(new_extlinux_templ, "/boot/extlinux/extlinux.templ.tmp")?;
-			fs::rename(
-				"/boot/extlinux/extlinux.templ.tmp",
-				"/boot/extlinux/extlinux.templ"
-			)?;
-		}
-
-		// is uboot
-		let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
-		let uboot = uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
-		let uboot = uboot.replace("KERNEL_NAME", other_kernel);
-		fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
-		fs::rename(
-			"/boot/extlinux/extlinux.tmp",
-			"/boot/extlinux/extlinux.conf"
-		)?;
-
-	} else {
-		return Err(io::Error::new(
-			io::ErrorKind::NotFound,
-			"bootloader not identified"
-		))
 	}
 
 	Ok(())

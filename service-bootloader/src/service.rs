@@ -139,7 +139,7 @@ request_handler!{
 			))
 		}
 
-		crate::disks::update(&req.path)
+		crate::disks::update(&req.path, &version)
 			.map_err(Error::internal_display)?;
 
 		let mut db = version_info_db()

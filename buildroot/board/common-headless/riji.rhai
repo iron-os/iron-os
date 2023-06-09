@@ -219,15 +219,11 @@ fn post_image_using_grub(
 	let data_uuid_reg = regex("DATA_UUID");
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-efi.cfg", data_uuid);
 
-	// let's create the startup.nsh file (some bios were using needs it)
-	let efi_file;
-	if fs::is_file(efi_dir + "/bootx64.efi") {
-		efi_file = "bootx64.efi";
-	} else if fs::is_file(efi_dir + "/bootaa64.efi") {
-		efi_file = "bootaa64.efi";
-	} else {
-		panic("did not file the correct efi file");
+	let efi_file = efi_dir + "/bootx64.efi";
+	if !fs::is_file(efi_file) {
+		panic("did not find " + efi_file);
 	}
+	// let's create the startup.nsh file (some bios were using needs it)
 	fs::write(binaries_dir + "/efi-part/startup.nsh", efi_file);
 }
 
