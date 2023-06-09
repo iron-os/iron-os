@@ -78,24 +78,41 @@ async fn create_tar_gz(cfg: &ImageToml) -> Result<()> {
 	let tmp_path = format!("./image_tmp/{}", cfg.name);
 	create_dir(&tmp_path).await?;
 
-	copy("./rootfs.ext2", &format!("{}/rootfs.ext2", tmp_path)).await?;
+	// copy the rootfs to the image
+	copy("./rootfs.ext2", &format!("{tmp_path}/rootfs.ext2")).await?;
+
+	// copy the kernel
 	let kernel_img = match cfg.arch {
 		Architecture::Amd64 => {
-			let img_path = format!("{}/bzImage", tmp_path);
+			let img_path = format!("{tmp_path}/bzImage");
+			// copy kernel
 			copy("./bzImage", &img_path).await?;
+			// copy bootloader
 			copy(
 				"./efi-part/EFI/BOOT/bootx64.efi",
-				&format!("{}/bootx64.efi", tmp_path)
+				&format!("{tmp_path}/bootx64.efi")
+			).await?;
+			// copy grub cfg
+			copy(
+				"./efi-part/EFI/BOOT/grub.templ",
+				&format!("{tmp_path}/grub.templ")
 			).await?;
 
 			img_path
 		},
 		Architecture::Arm64 => {
-			let img_path = format!("{}/Image.gz", tmp_path);
+			let img_path = format!("{tmp_path}/Image.gz");
+			// copy kernel
 			copy("./Image.gz", &img_path).await?;
+			// copy bootloader
 			copy(
 				"./u-boot.bin",
-				&format!("{}/u-boot.bin", tmp_path)
+				&format!("{tmp_path}/u-boot.bin")
+			).await?;
+			// copy uboot config
+			copy(
+				"./extlinux/extlinux.templ",
+				&format!("{tmp_path}/extlinux.templ")
 			).await?;
 
 			img_path
@@ -104,11 +121,12 @@ async fn create_tar_gz(cfg: &ImageToml) -> Result<()> {
 
 	let kernel_image_size = fs::metadata(kernel_img).await
 		.map_err(|e| {
-			err!(format!("{:?}", e), "could not read kernel image metadata")
+			err!(format!("{e:?}"), "could not read kernel image metadata")
 		})?
 		.len();
 
-	// 20mb
+	// check that kernel is not to big since we have limited space
+	// on the boot partition which needs to contain two kernel (a/b) 20mb
 	if kernel_image_size > 20 * 1_000_000 {
 		return Err(err!(
 			format!("{:.0}mb", kernel_image_size / 1_000_000),
