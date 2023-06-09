@@ -607,7 +607,7 @@ pub fn update(path: &str) -> io::Result<()> {
 		.write(true)
 		.open(&part_path)?;
 
-	let rootfs_path = format!("{}/rootfs.ext2", path);
+	let rootfs_path = format!("{path}/rootfs.ext2");
 	let mut rootfs_file = File::open(&rootfs_path)?;
 
 	io::copy(&mut rootfs_file, &mut part_file)?;
@@ -622,7 +622,7 @@ pub fn update(path: &str) -> io::Result<()> {
 
 	umount(&part_path)?;
 
-	let kernel_image_path = format!("{}/{}", path, IMAGE_NAME);
+	let kernel_image_path = Path::new(path).join(IMAGE_NAME);
 
 	let other_kernel = if boot_img.strip_prefix("/") == Some(IMAGE_NAME) {
 		IMAGE_NAME_B
@@ -632,14 +632,24 @@ pub fn update(path: &str) -> io::Result<()> {
 		return Err(io_other("kernel image not found"))
 	};
 
-	let other_path = format!("/boot/{}", other_kernel);
+	let other_path = format!("/boot/{other_kernel}");
 	let _ = fs::remove_file(&other_path);
 
 	fs::copy(&kernel_image_path, &other_path)?;
 
 	// update bootloader
 	if Path::new("/boot/EFI/BOOT/grub.templ").is_file() {
-		// todo try to replace the file
+		// update grub cfg template
+		let new_grub_templ = Path::new(path).join("grub.templ");
+		if new_grub_templ.is_file() {
+			// first copy the file to the same mount point and the rename
+			// atomic
+			fs::copy(new_grub_templ, "/boot/EFI/BOOT/grub.templ.tmp")?;
+			fs::rename(
+				"/boot/EFI/BOOT/grub.templ.tmp",
+				"/boot/EFI/BOOT/grub.templ"
+			)?;
+		}
 
 		// update grub
 		let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
@@ -649,14 +659,27 @@ pub fn update(path: &str) -> io::Result<()> {
 		fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
 
 	} else if Path::new("/boot/extlinux/extlinux.templ").is_file() {
-		// todo try to replace the file
+		// update uboot cfg template
+		let new_extlinux_templ = Path::new(path).join("extlinux.templ");
+		if new_extlinux_templ.is_file() {
+			// first copy the file to the same mount point and the rename
+			// atomic
+			fs::copy(new_extlinux_templ, "/boot/extlinux/extlinux.templ.tmp")?;
+			fs::rename(
+				"/boot/extlinux/extlinux.templ.tmp",
+				"/boot/extlinux/extlinux.templ"
+			)?;
+		}
 
 		// is uboot
 		let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
 		let uboot = uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
 		let uboot = uboot.replace("KERNEL_NAME", other_kernel);
 		fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
-		fs::rename("/boot/extlinux/extlinux.tmp", "/boot/extlinux/extlinux.conf")?;
+		fs::rename(
+			"/boot/extlinux/extlinux.tmp",
+			"/boot/extlinux/extlinux.conf"
+		)?;
 
 	} else {
 		return Err(io::Error::new(
