@@ -17,7 +17,7 @@ pub fn hardware_fixes() {
 	};
 
 	match (manufacturer.trim(), product_name.trim()) {
-		("AAEON", "FAY-003") => {
+		("AAEON", prod) if prod.starts_with("FAY") => {
 			eprintln!("applying fix: mask gpe07 interrupt");
 			if let Err(e) = mask_gpe07_interrupt() {
 				eprintln!("masking gpe07 failed with {:?}", e);
