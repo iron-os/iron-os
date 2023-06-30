@@ -46,6 +46,8 @@ fn mask_gpe07_interrupt() -> io::Result<()> {
 		.write_all(b"mask\n")
 }
 
+/// this changes the sim7600e mode from mbim to ndis (mbim is not compatible
+/// with linux)
 fn change_sim7600e_mode() -> io::Result<()> {
 	// set 1e0e:9011 to 1e0e:9001
 	const PATH: &str = "/sys/bus/usb/devices/usb1/1-6";
