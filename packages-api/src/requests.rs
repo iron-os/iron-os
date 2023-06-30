@@ -289,18 +289,6 @@ impl RawRequest<Action, EncryptedBytes> for GetFilePartReq {
 	const ACTION: Action = Action::GetFilePart;
 }
 
-/*
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GetFilePartReq {
-	pub hash: Hash,
-	pub start: u64,
-	// can be longer that the file itself the returned file will tell you how
-	// long it is
-	pub len: u64
-}
-*/
-
 #[derive(Debug, Clone)]
 pub struct GetFileBuilder {
 	hash: Hash,
@@ -496,7 +484,9 @@ pub struct ChangeWhitelistReq {
 	pub arch: TargetArch,
 	pub name: String,
 	pub version: Hash,
-	pub whitelist: HashSet<DeviceId>
+	pub whitelist: HashSet<DeviceId>,
+	#[serde(default)]
+	pub add: bool
 }
 
 impl<B> Request<Action, B> for ChangeWhitelistReq {

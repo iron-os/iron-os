@@ -4,6 +4,8 @@ use crate::auth::AuthDb;
 use crate::files::Files;
 use crate::error::{Result, Error};
 
+use tracing::error;
+
 use stream_api::{request_handler, raw_request_handler};
 use packages::requests::{
 	PackageInfoReq, PackageInfo,
@@ -28,8 +30,8 @@ pub async fn serve() -> Result<()> {
 	let cfg = match Config::read().await {
 		Ok(cfg) => cfg,
 		Err(e) => {
-			eprintln!("reading configuration failed");
-			eprintln!("to create a configuration use the command `create`");
+			error!("reading configuration failed\nto create a configuration \
+				use the command `create`");
 			return Err(e)
 		}
 	};
@@ -42,10 +44,8 @@ pub async fn serve() -> Result<()> {
 	let pack_db = match PackagesDb::read().await {
 		Ok(p) => p,
 		Err(e) => {
-			eprintln!("reading packages db failed");
-			eprintln!(
-				"to create the packages db file use the command `create`"
-			);
+			error!("reading packages db failed\nto create the packages db file \
+				use the command `create`");
 			return Err(e)
 		}
 	};
@@ -55,8 +55,8 @@ pub async fn serve() -> Result<()> {
 	let auth_db = match AuthDb::read().await {
 		Ok(a) => a,
 		Err(e) => {
-			eprintln!("reading auth db failed");
-			eprintln!("to create the auth db file use the command `create`");
+			error!("reading auth db failed\nto create the auth db file use the \
+				command `create`");
 			return Err(e)
 		}
 	};
@@ -237,39 +237,6 @@ request_handler!(
 		session.set(AuthReader(channel));
 
 		Ok(())
-
-		// if let Some(sign) = req.sign {
-		// 	let chall = session.get::<Challenge>();
-		// 	let valid = match chall {
-		// 		Some(chal) => {
-		// 			let sign_key = cfg.sign_key.as_ref().unwrap();
-		// 			sign_key.verify(chal.0.as_ref(), &sign)
-		// 		},
-		// 		None => false
-		// 	};
-
-		// 	if !valid {
-		// 		return Err(ApiError::Request("Signature incorrect".into()))
-		// 	}
-
-		// 	let key = AuthKey::new();
-		// 	session.set(key.clone());
-		// 	auth_db.insert(key.clone()).await;
-		// 	return Ok(NewAuthKey {
-		// 		kind: NewAuthKeyKind::NewKey,
-		// 		key
-		// 	})
-		// }
-
-		// // create a challenge
-		// let key = AuthKey::new();
-		// let chall = Challenge(key.clone());
-		// session.set(chall);
-
-		// Ok(NewAuthKey {
-		// 	kind: NewAuthKeyKind::Challenge,
-		// 	key
-		// })
 	}
 );
 
@@ -348,7 +315,8 @@ request_handler!(
 			&req.arch,
 			&req.name,
 			&req.version,
-			req.whitelist
+			req.whitelist,
+			req.add
 		).await;
 
 		if changed {

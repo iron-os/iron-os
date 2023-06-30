@@ -29,7 +29,9 @@ pub struct ChangeWhitelistOpts {
 	#[clap(long)]
 	arch: Option<BoardArch>,
 	#[clap(long, num_args(0..))]
-	whitelist: Vec<DeviceId>
+	whitelist: Vec<DeviceId>,
+	#[clap(long)]
+	add: bool
 }
 
 pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
@@ -65,6 +67,7 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 	println!("channel: {}", opts.channel);
 	println!("version: {:?}", opts.version);
 	println!("archs: {:?}", target_archs);
+	println!("add: {:?}", if opts.add { "yes" } else { "no" });
 	println!("whitelist: {:?}", whitelist);
 	println!();
 	println!("Enter YES to confirm");
@@ -83,7 +86,8 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 			arch,
 			package.name.clone(),
 			opts.version.clone(),
-			whitelist.clone()
+			whitelist.clone(),
+			opts.add
 		).await;
 		match r {
 			Ok(_) => {

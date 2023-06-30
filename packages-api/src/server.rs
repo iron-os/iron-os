@@ -1,4 +1,3 @@
-
 use crate::action::Action;
 use crate::error::{Result, Error};
 
@@ -26,7 +25,6 @@ pub struct Server {
 }
 
 impl Server {
-
 	pub async fn new<A>(addr: A, priv_key: Keypair) -> Result<Self>
 	where A: ToSocketAddrs {
 		let listener = TcpListener::bind(addr).await
@@ -55,5 +53,4 @@ impl Server {
 		self.inner.run().await
 			.map_err(|e| Error::Other(format!("server failed {}", e)))
 	}
-
 }
