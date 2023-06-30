@@ -77,6 +77,7 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	let journald = target_dir + "/etc/systemd/journald.conf";
 	if fs::contains(journald, "SystemMaxUse=40M") == false {
 		fs::append(journald, [
+			"Storage=persistent",
 			"SystemMaxUse=40M",
 			"Compress=yes"
 		]);
