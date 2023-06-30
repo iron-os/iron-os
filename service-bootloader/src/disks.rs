@@ -559,7 +559,6 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 		let uboot = uboot.replace("KERNEL_NAME", IMAGE_NAME);
 		fs::write("/mnt/extlinux/extlinux.tmp", uboot)?;
 		fs::rename("/mnt/extlinux/extlinux.tmp", "/mnt/extlinux/extlinux.conf")?;
-
 	} else {
 		return Err(io::Error::new(
 			io::ErrorKind::NotFound,
@@ -725,6 +724,12 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			)?;
 		}
 	}
+
+	// wait until really all files are written to disk
+	// i just had a system after an update not restart
+	// pulling the plug and powering it on again, everything works fine
+	// maybe something was not fully readable or something???
+	thread::sleep(Duration::from_secs(10));
 
 	Ok(())
 }
