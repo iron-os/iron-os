@@ -14,10 +14,13 @@ use crate::packages::PackagesDb;
 use clap::Parser;
 use crypto::signature::Keypair;
 
+
 #[derive(Parser)]
 struct Args {
 	#[clap(subcommand)]
-	subcmd: Option<SubCommand>
+	subcmd: Option<SubCommand>,
+	#[clap(long, default_value = "packages_server=warn,error")]
+	tracing: String
 }
 
 #[derive(Parser)]
@@ -31,6 +34,10 @@ pub enum SubCommand {
 #[tokio::main]
 async fn main() -> Result<()> {
 	let args = Args::parse();
+
+	tracing_subscriber::fmt()
+		.with_env_filter(args.tracing)
+		.init();
 
 	match args.subcmd {
 		Some(SubCommand::Create) => {

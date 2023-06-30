@@ -10,6 +10,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Error {
 	ConnectionClosed,
 	RequestDropped,

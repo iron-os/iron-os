@@ -15,3 +15,5 @@ crypto = { package = "fire-crypto", version = "0.3", features = ["cipher", "sign
 toml = "0.5"
 clap = { version = "3.0.10", features = ["derive"] }
 stream-api = { package = "fire-stream-api", version = "0.1.2", features = ["encrypted"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.2", features = ["env-filter"] }

@@ -15,6 +15,7 @@ use packages::requests::DeviceId;
 
 use file_db::FileDb;
 
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct IndexKey {
 	channel: Channel,
@@ -96,7 +97,8 @@ impl PackagesDbFile {
 		arch: &TargetArch,
 		name: &str,
 		version: &Hash,
-		whitelist: HashSet<DeviceId>
+		whitelist: HashSet<DeviceId>,
+		add: bool
 	) -> bool {
 		let entry = self.indexes.get_mut(&IndexKey {
 			channel: *channel,
@@ -104,7 +106,14 @@ impl PackagesDbFile {
 		}).and_then(|i| i.mut_with_version(name, version));
 
 		if let Some(entry) = entry {
-			entry.whitelist = whitelist;
+			if add {
+				for dev in whitelist {
+					entry.whitelist.insert(dev);
+				}
+			} else {
+				entry.whitelist = whitelist;
+			}
+
 			true
 		} else {
 			false
@@ -137,7 +146,6 @@ pub struct PackagesIndex {
 }
 
 impl PackagesIndex {
-
 	fn new() -> Self {
 		Self {
 			list: HashMap::new()
@@ -188,7 +196,6 @@ impl PackagesIndex {
 			}
 		}
 	}
-
 }
 
 #[derive(Debug)]
@@ -197,7 +204,6 @@ pub struct PackagesDb {
 }
 
 impl PackagesDb {
-
 	pub async fn create() -> Result<Self> {
 		if fs::metadata("./packages.fdb").await.is_ok() {
 			return Self::read().await;
@@ -249,16 +255,23 @@ impl PackagesDb {
 		arch: &TargetArch,
 		name: &str,
 		version: &Hash,
-		whitelist: HashSet<DeviceId>
+		whitelist: HashSet<DeviceId>,
+		add: bool
 	) -> bool {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
-		let r = db.change_whitelist(channel, arch, name, version, whitelist);
+		let r = db.change_whitelist(
+			channel,
+			arch,
+			name,
+			version,
+			whitelist,
+			add
+		);
 		lock.write().await
 			.expect("writing failed unexpectetly");
 		r
 	}
-
 }
 
 // process of updating a package

@@ -122,16 +122,22 @@ impl Client {
 		self.inner.request(NewAuthKeyReaderReq).await
 	}
 
-	/// need to be authenticate as a writer
+	/// Allows to change the whitelist. The whitelist can either be replaced
+	/// or can be additive.
+	/// 
+	/// ## Auth
+	/// need to be authenticate as a writer.
 	pub async fn change_whitelist(
 		&self,
 		arch: TargetArch,
 		name: String,
 		version: Hash,
-		whitelist: HashSet<DeviceId>
+		whitelist: HashSet<DeviceId>,
+		// if the whitelist should added or replaced
+		add: bool
 	) -> Result<()> {
 		self.inner.request(ChangeWhitelistReq {
-			arch, name, version, whitelist
+			arch, name, version, whitelist, add
 		}).await
 	}
 
