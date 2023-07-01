@@ -12,8 +12,8 @@ packages = { package = "packages-api", version = "0.1", path = "./../packages-ap
 serde = { version = "1.0", features = ["derive"] }
 file-db = { version = "0.1", features = ["async"], path = "./../file-db" }
 crypto = { package = "fire-crypto", version = "0.3", features = ["cipher", "signature", "serde", "b64"] }
-toml = "0.5"
-clap = { version = "3.0.10", features = ["derive"] }
+toml = "0.7"
+clap = { version = "4.0", features = ["derive"] }
 stream-api = { package = "fire-stream-api", version = "0.1.2", features = ["encrypted"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.2", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
