@@ -3,6 +3,7 @@ mod error;
 mod util;
 mod script;
 mod info;
+mod get_file;
 mod upload;
 mod download;
 mod pack_image;
@@ -11,6 +12,7 @@ mod auth;
 mod change_whitelist;
 
 use info::Info;
+use get_file::GetFile;
 use upload::Upload;
 use download::Download;
 use pack_image::PackImage;
@@ -35,6 +37,7 @@ struct Opts {
 #[derive(clap::Parser)]
 enum SubCommand {
 	Info(Info),
+	GetFile(GetFile),
 	Upload(Upload),
 	Download(Download),
 	PackImage(PackImage),
@@ -50,6 +53,9 @@ async fn main() {
 	let r = match opts.subcmd {
 		SubCommand::Info(i) => {
 			info::info(i).await
+		},
+		SubCommand::GetFile(g) => {
+			get_file::get_file(g).await
 		},
 		SubCommand::Upload(u) => {
 			upload::upload(u).await
