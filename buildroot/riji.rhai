@@ -184,10 +184,15 @@ fn _upload(board, channel, pub_channel, whitelist) {
 }
 
 fn create_image() {
-	print("create_image <product> <board> <channel>");	
+	print("create_image <product> <board> <channel> <?device-id>");	
 }
 
+/// before you can call this you need to upload
 fn create_image(product, board, channel) {
+	create_image(product, board, channel, "");
+}
+
+fn create_image(product, board, channel, device_id) {
 	let buildroot = "./buildroot";
 	let full_buildroot = fs::full_path(buildroot);
 
@@ -205,6 +210,9 @@ fn create_image(product, board, channel) {
 	let publisher = cmd([
 		"publisher", "download", product_file
 	]);
+	if !device_id.is_empty() {
+		publisher.args(["--device-id", device_id]);
+	}
 	publisher.dir(images);
 	publisher.execute();
 
