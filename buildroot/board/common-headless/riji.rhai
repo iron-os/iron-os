@@ -334,7 +334,6 @@ fn create_image(binaries_dir, buildroot_dir) {
 	]);
 	publisher.dir(binaries_dir);
 	publisher.execute();
-	
 
 	let genimage_cfg;
 	if fs::is_file(binaries_dir + "/genimage-efi.cfg") {

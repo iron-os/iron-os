@@ -3,14 +3,7 @@
 
 ## Fresh start
 To install and use the custom os, a packages server is needed.
-Before that, make sure to have the correct folder structure.
-
-### Required folder structure
-- custom-os
-- riji
-- fire-stream
-- fire-http
-- magma-css
+Before that.
 
 ### Setup Packages Server
 
@@ -38,15 +31,11 @@ And now make a symlink so you can call it only with `publisher`
 
 ### Publish chromium
 
-Make sure the folder `out/release/chromium` exists.
-
-Publish: `publisher upload <Channel> <address> <public-key>`
+Publish: `publisher upload <Channel>`
 
 ### Publish service
 
-Make sure the folder `extension/fire-html` and `www/fire-html` exists.
-
-Publish: `publisher upload <Channel> <address> <public-key>`
+Publish: `publisher upload <Channel>`
 
 ### Publish user programm (TODO)
 
