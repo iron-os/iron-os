@@ -13,8 +13,10 @@ use packages::packages::{
 	Channel, Source, Package, PackageCfg, PackagesCfg, BoardArch
 };
 use packages::client::Client;
+use packages::requests::DeviceId;
 
 use serde::{Serialize, Deserialize};
+
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourceToml {
@@ -61,7 +63,11 @@ pub struct ProductToml {
 pub struct Download {
 	/// the location of packages.toml  
 	/// should be an absolute path
-	config: String
+	config: String,
+
+	/// If you want to specificy as which device we make the request
+	#[clap(long)]
+	device_id: Option<DeviceId>
 }
 
 pub async fn download(opts: Download) -> Result<()> {
@@ -100,6 +106,7 @@ pub async fn download(opts: Download) -> Result<()> {
 			&mut list,
 			&mut packs,
 			&image_cfg.arch,
+			opts.device_id.as_ref(),
 			&cfg.channel,
 			&source,
 			&local_packages
@@ -172,6 +179,7 @@ async fn download_from_source(
 	list: &mut Vec<Option<String>>,
 	packs: &mut Vec<Package>,
 	arch: &BoardArch,
+	device_id: Option<&DeviceId>,
 	channel: &Channel,
 	source: &SourceToml,
 	packages_dir: &str
@@ -188,7 +196,12 @@ async fn download_from_source(
 
 		paint_act!("checking {}", name);
 
-		let pack = client.package_info(*channel, *arch, None, name.clone()).await
+		let pack = client.package_info(
+			*channel,
+			*arch,
+			device_id.cloned(),
+			name.clone()
+		).await
 			.map_err(|e| err!(e, "could not get package info"))?;
 		let pack = match pack {
 			Some(p) => p,
