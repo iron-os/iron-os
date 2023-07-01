@@ -225,7 +225,10 @@ fn post_image_using_grub(
 		panic("did not find " + efi_file);
 	}
 	// let's create the startup.nsh file (some bios were using needs it)
-	fs::write(binaries_dir + "/efi-part/startup.nsh", efi_file);
+	fs::write(
+		binaries_dir + "/efi-part/startup.nsh",
+		"fs0:\\EFI\\BOOT\\bootx64.efi"
+	);
 }
 
 fn post_image_using_uboot(

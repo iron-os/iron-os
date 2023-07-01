@@ -210,7 +210,7 @@ fn create_image(product, board, channel, device_id) {
 	let publisher = cmd([
 		"publisher", "download", product_file
 	]);
-	if !device_id.is_empty() {
+	if device_id != "" {
 		publisher.args(["--device-id", device_id]);
 	}
 	publisher.dir(images);
