@@ -388,6 +388,13 @@ fn board_by_arch(arch) {
 	panic("no board found for arch " + arch);
 }
 
+fn rust_version(board, channel) {
+	let host = full_host_path(board, channel);
+	let cargo_bin = host + "/bin/cargo";
+
+	cmd([cargo_bin, "--version"]).execute();
+}
+
 fn rust_build(arch, channel, path, binary) {
 	rust_build(arch, channel, path, binary, "Release");
 }

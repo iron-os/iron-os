@@ -8,6 +8,9 @@
 Iron OS is an operation system based on linux/buildroot
 with chromium as it's gui.
 
+## Rust
+MSRV: 1.67
+
 ## image
 the image of iron should be for all uses the same
 
