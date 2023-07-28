@@ -20,6 +20,11 @@ ws_route!{
 						None => return Ok(())
 					}
 				},
+				// this will always trigger the first time
+				// because ws route clones the ApiReceiver and
+				// nobody previously read from it
+				// and since this is a copy nobody will ever
+				// read from the api in data
 				url = api.on_open_page() => {
 					ws.send(url).await?;
 				}

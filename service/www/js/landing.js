@@ -11,7 +11,7 @@ export default class Landing {
 
 		this.loading = c('p');
 		this.loading.id = 'loading-text';
-		this.loading.innerText = 'Loading';
+		this.loading.innerText = 'Service: Loading Page';
 
 		this.el.appendChild(this.loading);
 
@@ -25,6 +25,9 @@ export default class Landing {
 	}
 
 	openPage(url) {
+		if (!url)
+			return;
+
 		if (this.active === null) {
 			// no page was ever opened
 			this.loading.remove();

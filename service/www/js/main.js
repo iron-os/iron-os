@@ -1,10 +1,8 @@
-
 import { timeout, c } from './util.js';
 import Connection from './connection.js';
 import Landing from './landing.js';
 
 async function main() {
-
 	const main = c('main');
 	main.classList.add('abs-full');
 	document.body.appendChild(main);
@@ -18,9 +16,7 @@ async function main() {
 
 	con.connect();// wait until a connection is made
 
-	// main.clear();
 	main.appendChild(page.el);
-
 }
 
 main();

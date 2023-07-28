@@ -1,4 +1,3 @@
-
 import { timeout } from './util.js';
 
 export default class Connection {
@@ -19,6 +18,14 @@ export default class Connection {
 		}
 
 		const ws = new WebSocket('ws://127.0.0.1:8888/service-stream');
+
+		ws.addEventListener('open', e => {
+			try {
+				ws.send('StillAlive');
+			} catch (e) {
+				console.log('failed to do initial requests', e);
+			}
+		});
 
 		ws.addEventListener('close', async e => {
 			console.log('connection failed');
