@@ -128,6 +128,10 @@ fn fakeroot(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/fstab", target_dir + "/etc/fstab.templ");
 	data_uuid_reg.replace_file(target_dir + "/etc/fstab", data_uuid);
 
+	let machine_id = util::random_machine_id();
+	fs::write(target_dir + "/etc/machine-id", machine_id + "\n");
+	print("writing machineid: " + machine_id);
+
 	let boot_uuid = uuid_v4();
 	let boot_uuid_reg = regex("EFI_UUID");
 	boot_uuid_reg.replace_file(target_dir + "/etc/fstab", boot_uuid);
