@@ -36,7 +36,6 @@ If changes are done with `riji config` call `riji save`.
 1. EFI
 2. Linux
 3. Systemd
-4. psplash
 5. service_bootloader
 6. > weston
 7. service
