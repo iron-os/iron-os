@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::time::Duration;
 use std::thread;
+use std::fmt::Write as FmtWrite;
 
 use gpt::{GptConfig, GptDisk};
 use gpt::partition::{Partition as GptPartition};
@@ -20,6 +21,7 @@ use linux_info::storage::{sector_size};
 use uuid::Uuid;
 
 use bootloader_api::requests::{Disk as ApiDisk, VersionInfo, Architecture};
+use rand::RngCore;
 
 // the size is set in genimage-efi.cfg
 // bzImage max size is 20m which allows to have a bzImage tmp
@@ -510,17 +512,28 @@ fn copy_len_to_new(
 	Ok(())
 }
 
+fn random_machine_id() -> String {
+	let mut bytes = [0u8; 16];
+	rand::thread_rng().fill_bytes(&mut bytes);
+
+	let mut s = String::with_capacity(32);
+	for b in bytes {
+		write!(s, "{b:02x}").unwrap();
+	}
+
+	s
+}
+
+// configure the newly installed disk
 fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	// update fstab to with the new uuid
 	let root_path = disk.part_path("root a")
 		.ok_or_else(|| io_other("could not get root path"))?;
 
-	// now replace DATA_UUID with the uuid
 	let boot_uuid = disk.get_part("boot")
 		.ok_or_else(|| io_other("could not get boot partition"))?
 		.part_guid.to_string();
 
-	// now replace DATA_UUID with the uuid
 	let data_uuid = disk.get_part("data")
 		.ok_or_else(|| io_other("could not get data partition"))?
 		.part_guid.to_string();
@@ -530,6 +543,11 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	let fstab = fstab.replace("EFI_UUID", &boot_uuid);
 	let fstab = fstab.replace("DATA_UUID", &data_uuid);
 	fs::write("/mnt/etc/fstab", fstab)?;
+
+	// since we are on a newly installed disk
+	// let's create a new machine-id
+	fs::write("/mnt/etc/machine-id", format!("{}\n", random_machine_id()))
+		.map_err(|_| io_other("could not write the machine-id"))?;
 
 	umount(&root_path)?;
 
@@ -621,6 +639,17 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	let fstab = fstab.replace("EFI_UUID", &boot_uuid);
 	let fstab = fstab.replace("DATA_UUID", &data_uuid);
 	fs::write("/mnt/etc/fstab", fstab)?;
+
+	let machine_id = match read_to_string("/etc/machine-id") {
+		Ok(s) => s,
+		Err(e) => {
+			eprintln!("could not read machine-id {e}");
+			format!("{}\n", random_machine_id())
+		}
+	};
+
+	fs::write("/mnt/etc/machine-id", machine_id)
+		.map_err(|_| io_other("could not write the machine-id"))?;
 
 	umount(&part_path)?;
 
