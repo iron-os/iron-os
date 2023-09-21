@@ -1,3 +1,6 @@
+## Installed version
+Rust: 1.58
+
 ## Installing
 
 After cloning and installing riji execute:
