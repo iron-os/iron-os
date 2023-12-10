@@ -18,7 +18,7 @@ fn help() {
 fn download() {
 	// download buildroot
 	let buildroot = git_clone("git://git.buildroot.net/buildroot", "./buildroot");
-	buildroot.checkout_tag("2023.02.4");
+	buildroot.checkout_tag("2023.11");
 }
 
 fn validate_channel(channel) {
