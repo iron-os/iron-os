@@ -1,0 +1,14 @@
+services:
+  packages-server:
+    image: packages-server
+    ports:
+      - "5426:5426"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - '/host-data-folder:/data'
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 2s
+        window: 5s

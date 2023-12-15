@@ -13,7 +13,6 @@ pub struct Files {
 }
 
 impl Files {
-
 	pub async fn create(cfg: &Config) -> Result<Self> {
 		if fs::metadata(&cfg.files_dir).await.is_ok() {
 			return Self::read(cfg).await;
@@ -69,5 +68,4 @@ impl Files {
 		let path = self.path.join(hash.to_string());
 		fs::metadata(&path).await.is_ok()
 	}
-
 }

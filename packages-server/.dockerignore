@@ -1,8 +1,6 @@
-/target
-/config.toml
 /files
-/packages.fdb
-/keys.txt
+/target
 /auths.fdb
-/deps
+/config.toml
+/packages.fdb
 /images

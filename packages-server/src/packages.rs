@@ -1,3 +1,4 @@
+use crate::Config;
 use crate::error::{Error, Result};
 
 use std::result::Result as StdResult;
@@ -204,12 +205,12 @@ pub struct PackagesDb {
 }
 
 impl PackagesDb {
-	pub async fn create() -> Result<Self> {
-		if fs::metadata("./packages.fdb").await.is_ok() {
-			return Self::read().await;
+	pub async fn create(cfg: &Config) -> Result<Self> {
+		if fs::metadata(&cfg.packages_file).await.is_ok() {
+			return Self::read(cfg).await;
 		}
 
-		let db = FileDb::new("./packages.fdb", PackagesDbFile::new());
+		let db = FileDb::new(&cfg.packages_file, PackagesDbFile::new());
 		db.write().await
 			.map_err(|e| Error::new("could not write packages.fdb", e))?;
 
@@ -218,8 +219,8 @@ impl PackagesDb {
 		})
 	}
 
-	pub async fn read() -> Result<Self> {
-		let db = FileDb::open("./packages.fdb").await
+	pub async fn read(cfg: &Config) -> Result<Self> {
+		let db = FileDb::open(&cfg.packages_file).await
 			.map_err(|e| Error::new("packages.fdb could not be opened", e))?;
 
 		Ok(Self {

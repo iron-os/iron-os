@@ -1,3 +1,4 @@
+use crate::Config;
 use crate::error::{Error, Result};
 
 use std::collections::HashMap;
@@ -43,15 +44,13 @@ pub struct AuthDb {
 	inner: RwLock<FileDb<AuthDbFile>>
 }
 
-const AUTH_PATH: &'static str = "./auths.fdb";
-
 impl AuthDb {
-	pub async fn create() -> Result<Self> {
-		if fs::metadata(AUTH_PATH).await.is_ok() {
-			return Self::read().await;
+	pub async fn create(cfg: &Config) -> Result<Self> {
+		if fs::metadata(&cfg.auths_file).await.is_ok() {
+			return Self::read(&cfg).await;
 		}
 
-		let db = FileDb::new(AUTH_PATH, AuthDbFile::new());
+		let db = FileDb::new(&cfg.auths_file, AuthDbFile::new());
 		db.write().await
 			.map_err(|e| Error::new("could not write auths.fdb", e))?;
 
@@ -60,8 +59,8 @@ impl AuthDb {
 		})
 	}
 
-	pub async fn read() -> Result<Self> {
-		let db = FileDb::open(AUTH_PATH).await
+	pub async fn read(cfg: &Config) -> Result<Self> {
+		let db = FileDb::open(&cfg.auths_file).await
 			.map_err(|e| Error::new("auths.fdb could not be opened", e))?;
 
 		Ok(Self {

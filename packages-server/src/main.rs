@@ -20,7 +20,9 @@ struct Args {
 	#[clap(subcommand)]
 	subcmd: Option<SubCommand>,
 	#[clap(long, default_value = "packages_server=warn,error")]
-	tracing: String
+	tracing: String,
+	#[clap(long, default_value = "./config.toml")]
+	config: String
 }
 
 #[derive(Parser)]
@@ -43,19 +45,19 @@ async fn main() -> Result<()> {
 		Some(SubCommand::Create) => {
 			println!("creating config files if they dont exist");
 
-			let cfg = Config::create().await?;
+			let cfg = Config::create(&args.config).await?;
 
-			let _pack_db = PackagesDb::create().await?;
+			let _pack_db = PackagesDb::create(&cfg).await?;
 
 			let _files = Files::create(&cfg).await?;
 
-			let _auths = AuthDb::create().await?;
+			let _auths = AuthDb::create(&cfg).await?;
 
 			return Ok(())
 		},
 		Some(SubCommand::Keys) => {
 			// get connection public key
-			let cfg = Config::read().await?;
+			let cfg = Config::read(&args.config).await?;
 			println!("Connection public key: {}", cfg.con_key.public());
 
 			println!("cfg debug: {:?}", cfg.debug);
@@ -72,5 +74,5 @@ async fn main() -> Result<()> {
 		None => {}
 	}
 
-	server::serve().await
+	server::serve(&args.config).await
 }

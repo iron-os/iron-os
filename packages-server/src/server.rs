@@ -26,8 +26,8 @@ use packages::server::{
 	Server, Session, Configurator, Config as ServerConfig, EncryptedBytes
 	};
 
-pub async fn serve() -> Result<()> {
-	let cfg = match Config::read().await {
+pub async fn serve(path: &str) -> Result<()> {
+	let cfg = match Config::read(path).await {
 		Ok(cfg) => cfg,
 		Err(e) => {
 			error!("reading configuration failed\nto create a configuration \
@@ -41,7 +41,7 @@ pub async fn serve() -> Result<()> {
 		return Ok(())
 	}
 
-	let pack_db = match PackagesDb::read().await {
+	let pack_db = match PackagesDb::read(&cfg).await {
 		Ok(p) => p,
 		Err(e) => {
 			error!("reading packages db failed\nto create the packages db file \
@@ -52,7 +52,7 @@ pub async fn serve() -> Result<()> {
 
 	let files = Files::read(&cfg).await?;
 
-	let auth_db = match AuthDb::read().await {
+	let auth_db = match AuthDb::read(&cfg).await {
 		Ok(a) => a,
 		Err(e) => {
 			error!("reading auth db failed\nto create the auth db file use the \

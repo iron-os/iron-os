@@ -12,6 +12,10 @@ pub struct Config {
 	pub port: u16,
 	#[serde(rename = "files-dir")]
 	pub files_dir: String,
+	#[serde(rename = "auths-file", default = "default_auths_file")]
+	pub auths_file: String,
+	#[serde(rename = "packages-file", default = "default_packages_file")]
+	pub packages_file: String,
 	#[serde(rename = "con-key")]
 	pub con_key: Keypair,
 	#[serde(rename = "sign-key", skip_serializing_if = "Option::is_none")]
@@ -23,19 +27,27 @@ pub struct Config {
 	pub release: Option<ChannelCfg>
 }
 
+fn default_auths_file() -> String {
+	"./auths.fdb".into()
+}
+
+fn default_packages_file() -> String {
+	"./packages.fdb".into()
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChannelCfg {
 	#[serde(rename = "sign-key")]
 	sign_key: PublicKey
 }
 
-const CONF_PATH: &'static str = "./config.toml";
-
 impl Default for Config {
 	fn default() -> Self {
 		Self {
 			port: 5426,
 			files_dir: "./files".into(),
+			auths_file: default_auths_file(),
+			packages_file: default_packages_file(),
 			con_key: Keypair::new(),
 			sign_key: None,
 			debug: None,
@@ -47,23 +59,23 @@ impl Default for Config {
 }
 
 impl Config {
-	pub async fn create() -> Result<Self> {
-		if fs::metadata(CONF_PATH).await.is_ok() {
-			return Self::read().await;
+	pub async fn create(path: &str) -> Result<Self> {
+		if fs::metadata(path).await.is_ok() {
+			return Self::read(path).await;
 		}
 
 		let me = Self::default();
 		let s = toml::to_string(&me)
 			.expect("could not serialize config.toml");
 
-		fs::write(CONF_PATH, s).await
+		fs::write(path, s).await
 			.map_err(|e| Error::new("could not create config.toml", e))?;
 
 		Ok(me)
 	}
 
-	pub async fn read() -> Result<Self> {
-		let s = fs::read_to_string(CONF_PATH).await
+	pub async fn read(path: &str) -> Result<Self> {
+		let s = fs::read_to_string(path).await
 			.map_err(|e| Error::new("config.toml not found", e))?;
 		let mut s: Self = toml::from_str(&s)
 			.map_err(|e| Error::other("config.toml error", e))?;
