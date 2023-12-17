@@ -1,5 +1,5 @@
 diff --git a/package/weston/weston.hash b/package/weston/weston.hash
-index 0ecbaa4168..9cb80d9c4e 100644
+index 0ecbaa4168..dd5904be94 100644
 --- a/package/weston/weston.hash
 +++ b/package/weston/weston.hash
 @@ -1,4 +1 @@
@@ -7,9 +7,9 @@ index 0ecbaa4168..9cb80d9c4e 100644
 -sha256  b18591eab278bc191720f6c09158040b795e7118af1d5ddca6acd9a8e2039535  weston-12.0.1.tar.xz
 -sha512  3dcfa1a2a6b9a605d3ecd597bf7ac0f87b0fd1971845b6e5c44b5e34296943ac146dae6e1cfea9be14ad7a9a8b6d30dc765f9289ef80920d7c516ebba1ba4688  weston-12.0.1.tar.xz
 -sha256  fdb65868f65d0fbdb05c2d3b779e10ce9969fa0c4b9262ba4f260e87086ab860  COPYING
-+sha256 18f278b8a84938858ce90e91794351ea40ed3d97b30573e36861f38344c7bf8d  kiosk-sleep-v12.0.2.tar.gz
++sha256 f8f4dd85d54792469ec679827db963838b8bae106dc1f19177e19faec41498d7  kiosk-sleep-v13.0.0.tar.gz
 diff --git a/package/weston/weston.mk b/package/weston/weston.mk
-index 6a5c0e57f5..9c1fc819c5 100644
+index 6a5c0e57f5..f5b21f972f 100644
 --- a/package/weston/weston.mk
 +++ b/package/weston/weston.mk
 @@ -4,9 +4,9 @@
@@ -19,9 +19,17 @@ index 6a5c0e57f5..9c1fc819c5 100644
 -WESTON_VERSION = 12.0.1
 -WESTON_SITE = https://gitlab.freedesktop.org/wayland/weston/-/releases/$(WESTON_VERSION)/downloads
 -WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
-+WESTON_VERSION = 12.0.2
++WESTON_VERSION = 13.0.0
 +WESTON_SITE = https://github.com/iron-os/weston/archive/refs/heads
 +WESTON_SOURCE = kiosk-sleep-v$(WESTON_VERSION).tar.gz
  WESTON_LICENSE = MIT
  WESTON_LICENSE_FILES = COPYING
  WESTON_CPE_ID_VENDOR = wayland
+@@ -19,7 +19,6 @@ WESTON_CONF_OPTS = \
+ 	-Ddoc=false \
+ 	-Dremoting=false \
+ 	-Dbackend-vnc=false \
+-	-Dlauncher-libseat=true \
+ 	-Dtools=calibrator,debug,info,terminal,touch-calibrator
+ 
+ ifeq ($(BR2_PACKAGE_WESTON_SIMPLE_CLIENTS),y)
