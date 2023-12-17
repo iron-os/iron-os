@@ -184,6 +184,8 @@ async fn download_from_source(
 	source: &SourceToml,
 	packages_dir: &str
 ) -> Result<()> {
+	paint_act!("connecting to {}", source.address);
+
 	// should we delete the packages folder
 	let client = Client::connect(&source.address, source.pub_key.clone()).await
 		.map_err(|e| err!(e, "connect to {} failed", source.address))?;
