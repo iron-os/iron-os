@@ -4,7 +4,8 @@ use crate::packages::{Channel, Package, BoardArch, TargetArch};
 use crate::requests::{
 	PackageInfoReq, DeviceId,
 	SetPackageInfoReq,
-	GetFileReq, GetFile, GetFileBuilder,
+	GetFileReq, GetFile,
+	GetFileBuilder,
 	SetFileReq,
 	AuthKey, AuthenticateReaderReq,
 	AuthenticateWriter1Req, AuthenticateWriter2Req,
@@ -35,7 +36,7 @@ impl Client {
 		let stream = TcpStream::connect(addr).await
 			.map_err(|e| Error::Other(format!("could not connect {}", e)))?;
 		Ok(Self {
-			inner: StreamClient::<_, EncryptedBytes>::new(
+			inner: StreamClient::<_, EncryptedBytes>::new_encrypted(
 				stream,
 				Config {
 					timeout: TIMEOUT,
@@ -68,13 +69,17 @@ impl Client {
 	) -> Result<()> {
 		let req = SetPackageInfoReq { package, whitelist };
 		self.inner.request(req).await
+			.map(|_r| ())
 	}
 
 	/// can be called by anyone
 	/// does not return FileNotFound
-	pub async fn get_file(&self, hash: Hash) -> Result<GetFile> {
-		let req = GetFileReq { hash };
-		self.inner.raw_request(req).await
+	pub async fn get_file(
+		&self,
+		hash: Hash
+	) -> Result<GetFile<EncryptedBytes>> {
+		let req = GetFileReq::new(hash);
+		self.inner.request(req).await
 	}
 
 	/// If this function returns Ok(())
@@ -86,21 +91,26 @@ impl Client {
 		&self,
 		builder: &mut GetFileBuilder
 	) -> Result<()> {
-		let r = builder.next_req();
-		let resp = self.inner.raw_request(r).await?;
+		let r = builder.next_req::<Action, _>();
+		let resp = self.inner.request(r).await?;
 		builder.add_resp(resp);
 
 		Ok(())
 	}
 
 	/// you need to be authentiacated as a writer
-	pub async fn set_file(&self, req: SetFileReq) -> Result<()> {
-		self.inner.raw_request(req).await
+	pub async fn set_file(
+		&self,
+		req: SetFileReq<Action, EncryptedBytes>
+	) -> Result<()> {
+		self.inner.request(req).await
+			.map(|_| ())
 	}
 
 	/// authenticate as reader
 	pub async fn authenticate_reader(&self, key: AuthKey) -> Result<()> {
 		self.inner.request(AuthenticateReaderReq { key }).await
+			.map(|_| ())
 	}
 
 	/// authenticate as writer
@@ -115,11 +125,13 @@ impl Client {
 		self.inner.request(AuthenticateWriter2Req {
 			signature: key.sign(&resp.challenge)
 		}).await
+			.map(|_| ())
 	}
 
 	/// need to be authenticate as a writer
 	pub async fn new_auth_key_reader(&self) -> Result<AuthKey> {
 		self.inner.request(NewAuthKeyReaderReq).await
+			.map(|r| r.0)
 	}
 
 	/// Allows to change the whitelist. The whitelist can either be replaced
@@ -139,9 +151,10 @@ impl Client {
 		self.inner.request(ChangeWhitelistReq {
 			arch, name, version, whitelist, add
 		}).await
+			.map(|_| ())
 	}
 
 	pub async fn close(self) {
-		self.inner.close().await
+		let _ = self.inner.close().await;
 	}
 }
