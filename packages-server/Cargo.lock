@@ -348,22 +348,23 @@ dependencies = [
 
 [[package]]
 name = "fire-stream"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2aa6b67a4b4a703ecb308a20ba5ec6594580f25b867a744008a1dc3297dd641e"
+checksum = "74baf21bef804e917b3042d55440546fb69c5ac4919b194a2f87cbecbf291f12"
 dependencies = [
  "fire-crypto",
  "serde",
  "serde_json",
  "simple-bytes",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
 name = "fire-stream-api"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2171bf59c790fa035cb42153c9fe320d83cb149e1edcb162d21609888397e4e"
+checksum = "b9a758b4f19212d61ff6ee6fe411d65d4615ac06848ed841e609e0edebd2985f"
 dependencies = [
  "fire-crypto",
  "fire-stream",
@@ -372,13 +373,14 @@ dependencies = [
  "serde_json",
  "simple-bytes",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
 name = "fire-stream-api-codegen"
-version = "0.1.4"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc4016b2669395032fb8ba83787917d3246375439459dfb085366a5a5fa68804"
+checksum = "ba9d42eeffa26aa21c7b26bde7372f6ade606d6529cbdbae939fcc368678cc51"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",

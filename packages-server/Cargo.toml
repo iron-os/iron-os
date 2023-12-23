@@ -17,3 +17,6 @@ clap = { version = "4.0", features = ["derive"] }
 stream-api = { package = "fire-stream-api", version = "0.3.0", features = ["encrypted"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# [patch.crates-io]
+# fire-stream-api-codegen = { path = "../../fire-stream/fire-stream-api-codegen" }

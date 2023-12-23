@@ -91,7 +91,7 @@ impl Client {
 		&self,
 		builder: &mut GetFileBuilder
 	) -> Result<()> {
-		let r = builder.next_req::<Action, _>();
+		let r = builder.next_req();
 		let resp = self.inner.request(r).await?;
 		builder.add_resp(resp);
 
@@ -101,7 +101,7 @@ impl Client {
 	/// you need to be authentiacated as a writer
 	pub async fn set_file(
 		&self,
-		req: SetFileReq<Action, EncryptedBytes>
+		req: SetFileReq<EncryptedBytes>
 	) -> Result<()> {
 		self.inner.request(req).await
 			.map(|_| ())

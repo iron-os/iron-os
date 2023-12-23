@@ -11,7 +11,7 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
 
 use stream_api::{IntoMessage, FromMessage};
 use stream_api::message::{
-	Message, IntoMessage, FromMessage, Action as ActionTrait, PacketBytes
+	Message, IntoMessage, FromMessage, PacketBytes
 };
 use stream_api::error::MessageError;
 use stream_api::request::Request;
@@ -383,7 +383,7 @@ impl GetFileBuilder {
 		}
 	}
 
-	pub(crate) fn next_req<A, B>(&self) -> GetFilePartReq<B> {
+	pub(crate) fn next_req<B>(&self) -> GetFilePartReq<B> {
 		GetFilePartReq::new(
 			self.hash.clone(),
 			// start
@@ -420,15 +420,14 @@ impl GetFileBuilder {
 ///
 /// Needs to be authenticated as a writer
 #[derive(Debug)]
-pub struct SetFileReq<A, B> {
+pub struct SetFileReq<B> {
 	signature: Signature,
 	// message contains signature + 
-	message: Message<A, B>
+	message: Message<Action, B>
 }
 
-impl<A, B> SetFileReq<A, B>
+impl<B> SetFileReq<B>
 where
-	A: ActionTrait,
 	B: PacketBytes
 {
 	pub async fn new(sign: Signature, mut file: File) -> Result<Self> {
@@ -474,22 +473,20 @@ where
 	}
 }
 
-impl<A, B> IntoMessage<A, B> for SetFileReq<A, B>
+impl<B> IntoMessage<Action, B> for SetFileReq<B>
 where
-	A: ActionTrait,
 	B: PacketBytes
 {
-	fn into_message(self) -> StdResult<Message<A, B>, MessageError> {
+	fn into_message(self) -> StdResult<Message<Action, B>, MessageError> {
 		Ok(self.message)
 	}
 }
 
-impl<A, B> FromMessage<A, B> for SetFileReq<A, B>
+impl<B> FromMessage<Action, B> for SetFileReq<B>
 where
-	A: ActionTrait,
 	B: PacketBytes
 {
-	fn from_message(msg: Message<A, B>) -> StdResult<Self, MessageError> {
+	fn from_message(msg: Message<Action, B>) -> StdResult<Self, MessageError> {
 		if msg.body().len() <= Signature::LEN {
 			return Err(MessageError::Other("no signature".into()))
 		}
@@ -505,7 +502,7 @@ where
 	}
 }
 
-impl<A, B> Request for SetFileReq<A, B> {
+impl<B> Request for SetFileReq<B> {
 	type Action = Action;
 	type Response = EmptyJson;
 	type Error = Error;
