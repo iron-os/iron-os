@@ -3,13 +3,18 @@ use crate::action::Action;
 use crate::packages::{Channel, Package, BoardArch, TargetArch};
 
 use std::collections::HashSet;
+use std::marker::PhantomData;
+use std::result::Result as StdResult;
 
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
 
-use stream_api::derive_serde_message;
-use stream_api::message::{SerdeMessage, EncryptedBytes};
-use stream_api::request::{Request, RawRequest};
+use stream_api::{IntoMessage, FromMessage};
+use stream_api::message::{
+	Message, IntoMessage, FromMessage, PacketBytes
+};
+use stream_api::error::MessageError;
+use stream_api::request::Request;
 
 use serde::{Serialize, Deserialize};
 
@@ -19,7 +24,7 @@ use crypto::token::Token;
 
 use bytes::{BytesRead, BytesReadRef, BytesWrite};
 
-type Message = stream_api::message::Message<Action, EncryptedBytes>;
+// type Message = stream_api::message::Message<Action, EncryptedBytes>;
 
 pub type DeviceId = Token<32>;
 
@@ -44,12 +49,18 @@ pub type DeviceId = Token<32>;
 // 	const ACTION: Action = Action::AllPackages;
 // }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize,
+	IntoMessage, FromMessage)]
+#[message(json)]
+pub struct EmptyJson;
+
 
 /// Package Info
 ///
 /// Can be called by anyone
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct PackageInfoReq {
 	pub channel: Channel,
 	pub arch: BoardArch,
@@ -59,32 +70,38 @@ pub struct PackageInfoReq {
 	pub device_id: Option<DeviceId>
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct PackageInfo {
 	// there may not exist any info
 	pub package: Option<Package>
 }
 
-impl<B> Request<Action, B> for PackageInfoReq {
+impl Request for PackageInfoReq {
+	type Action = Action;
 	type Response = PackageInfo;
 	type Error = Error;
+
 	const ACTION: Action = Action::PackageInfo;
 }
 
 
 /// Needs to be authenticated as a writer
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct SetPackageInfoReq {
 	pub package: Package,
 	// if empty no whitelist is applied
 	pub whitelist: HashSet<DeviceId>
 }
 
-impl<B> Request<Action, B> for SetPackageInfoReq {
-	type Response = ();
+impl Request for SetPackageInfoReq {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
+
 	const ACTION: Action = Action::SetPackageInfo;
 }
 
@@ -94,19 +111,43 @@ impl<B> Request<Action, B> for SetPackageInfoReq {
 /// Can be accessed by anyone
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GetFileReq {
-	pub hash: Hash
+pub struct GetFileReq<B> {
+	pub hash: Hash,
+	#[serde(skip)]
+	_bytes: PhantomData<B>
 }
 
-derive_serde_message!(GetFileReq);
+impl<B> GetFileReq<B> {
+	pub fn new(hash: Hash) -> Self {
+		Self {
+			hash,
+			_bytes: PhantomData
+		}
+	}
+}
+
+impl<B> IntoMessage<Action, B> for GetFileReq<B>
+where B: PacketBytes {
+	fn into_message(self) -> StdResult<Message<Action, B>, MessageError> {
+		stream_api::encdec::json::encode(self)
+	}
+}
+
+impl<B> FromMessage<Action, B> for GetFileReq<B>
+where B: PacketBytes {
+	fn from_message(msg: Message<Action, B>) -> StdResult<Self, MessageError> {
+		stream_api::encdec::json::decode(msg)
+	}
+}
 
 #[derive(Debug)]
-pub struct GetFile {
+pub struct GetFile<B> {
 	// we keep the message so no new allocation is done
-	inner: Message
+	inner: Message<Action, B>
 }
 
-impl GetFile {
+impl<B> GetFile<B>
+where B: PacketBytes {
 	/// Before sending this response you should check the hash
 	pub async fn from_file(mut file: File) -> Result<Self> {
 		let mut msg = Message::new();
@@ -149,19 +190,25 @@ impl GetFile {
 	}
 }
 
-impl SerdeMessage<Action, EncryptedBytes, Error> for GetFile {
-	fn into_message(self) -> Result<Message> {
+impl<B> IntoMessage<Action, B> for GetFile<B>
+where B: PacketBytes {
+	fn into_message(self) -> StdResult<Message<Action, B>, MessageError> {
 		Ok(self.inner)
 	}
+}
 
-	fn from_message(msg: Message) -> Result<Self> {
+impl<B> FromMessage<Action, B> for GetFile<B>
+where B: PacketBytes {
+	fn from_message(msg: Message<Action, B>) -> StdResult<Self, MessageError> {
 		Ok(Self { inner: msg })
 	}
 }
 
-impl RawRequest<Action, EncryptedBytes> for GetFileReq {
-	type Response = GetFile;
+impl<B> Request for GetFileReq<B> {
+	type Action = Action;
+	type Response = GetFile<B>;
 	type Error = Error;
+
 	const ACTION: Action = Action::GetFile;
 }
 
@@ -180,18 +227,41 @@ pub struct Range {
 /// Can be accessed by anyone
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GetFilePartReq {
+pub struct GetFilePartReq<B> {
 	pub hash: Hash,
 	pub start: u64,
 	// can be longer that the file itself the returned file will tell you how
 	// long it is
-	pub len: u64
+	pub len: u64,
+	#[serde(skip)]
+	_bytes: PhantomData<B>
 }
 
-derive_serde_message!(GetFilePartReq);
+impl<B> GetFilePartReq<B> {
+	pub fn new(hash: Hash, start: u64, len: u64) -> Self {
+		Self {
+			hash, start, len,
+			_bytes: PhantomData
+		}
+	}
+}
+
+impl<B> IntoMessage<Action, B> for GetFilePartReq<B>
+where B: PacketBytes {
+	fn into_message(self) -> StdResult<Message<Action, B>, MessageError> {
+		stream_api::encdec::json::encode(self)
+	}
+}
+
+impl<B> FromMessage<Action, B> for GetFilePartReq<B>
+where B: PacketBytes {
+	fn from_message(msg: Message<Action, B>) -> StdResult<Self, MessageError> {
+		stream_api::encdec::json::decode(msg)
+	}
+}
 
 #[derive(Debug)]
-pub struct GetFilePart {
+pub struct GetFilePart<B> {
 	// we keep the message so no new allocation is done
 	// +------------------------+
 	// |          Body          |
@@ -200,11 +270,12 @@ pub struct GetFilePart {
 	// +--------------+---------+
 	// |     u64      |   ...   |
 	// +--------------+---------+
-	inner: Message
+	inner: Message<Action, B>
 }
 
-impl GetFilePart {
-	fn new(msg: Message) -> Result<Self> {
+impl<B> GetFilePart<B>
+where B: PacketBytes {
+	fn new(msg: Message<Action, B>) -> Result<Self> {
 		// make sure the body is at least 8bytes long
 		if msg.body().len() < 8 {
 			return Err(Error::Request(
@@ -273,19 +344,25 @@ impl GetFilePart {
 	}
 }
 
-impl SerdeMessage<Action, EncryptedBytes, Error> for GetFilePart {
-	fn into_message(self) -> Result<Message> {
+impl<B> IntoMessage<Action, B> for GetFilePart<B>
+where B: PacketBytes {
+	fn into_message(self) -> StdResult<Message<Action, B>, MessageError> {
 		Ok(self.inner)
-	}
-
-	fn from_message(msg: Message) -> Result<Self> {
-		Self::new(msg)
 	}
 }
 
-impl RawRequest<Action, EncryptedBytes> for GetFilePartReq {
-	type Response = GetFilePart;
+impl<B> FromMessage<Action, B> for GetFilePart<B>
+where B: PacketBytes {
+	fn from_message(msg: Message<Action, B>) -> StdResult<Self, MessageError> {
+		Self::new(msg).map_err(|e| MessageError::Other(e.to_string().into()))
+	}
+}
+
+impl<B> Request for GetFilePartReq<B> {
+	type Action = Action;
+	type Response = GetFilePart<B>;
 	type Error = Error;
+
 	const ACTION: Action = Action::GetFilePart;
 }
 
@@ -308,15 +385,18 @@ impl GetFileBuilder {
 		}
 	}
 
-	pub(crate) fn next_req(&self) -> GetFilePartReq {
-		GetFilePartReq {
-			hash: self.hash.clone(),
-			start: self.bytes.len() as u64,
-			len: self.part_size
-		}
+	pub(crate) fn next_req<B>(&self) -> GetFilePartReq<B> {
+		GetFilePartReq::new(
+			self.hash.clone(),
+			// start
+			self.bytes.len() as u64,
+			// len
+			self.part_size
+		)
 	}
 
-	pub(crate) fn add_resp(&mut self, resp: GetFilePart) {
+	pub(crate) fn add_resp<B>(&mut self, resp: GetFilePart<B>)
+	where B: PacketBytes {
 		self.total_len = Some(resp.total_file_len());
 		self.bytes.extend_from_slice(resp.file_part());
 	}
@@ -342,13 +422,16 @@ impl GetFileBuilder {
 ///
 /// Needs to be authenticated as a writer
 #[derive(Debug)]
-pub struct SetFileReq {
+pub struct SetFileReq<B> {
 	signature: Signature,
 	// message contains signature + 
-	message: Message
+	message: Message<Action, B>
 }
 
-impl SetFileReq {
+impl<B> SetFileReq<B>
+where
+	B: PacketBytes
+{
 	pub async fn new(sign: Signature, mut file: File) -> Result<Self> {
 		let mut msg = Message::new();
 
@@ -360,7 +443,7 @@ impl SetFileReq {
 		let mut body = msg.body_mut();
 		body.reserve(buf_size + Signature::LEN);
 
-		body.write(&sign);
+		body.write(sign.to_bytes());
 
 		unsafe {
 			// safe because file.read_to_end only appends
@@ -392,14 +475,22 @@ impl SetFileReq {
 	}
 }
 
-impl SerdeMessage<Action, EncryptedBytes, Error> for SetFileReq {
-	fn into_message(self) -> Result<Message> {
+impl<B> IntoMessage<Action, B> for SetFileReq<B>
+where
+	B: PacketBytes
+{
+	fn into_message(self) -> StdResult<Message<Action, B>, MessageError> {
 		Ok(self.message)
 	}
+}
 
-	fn from_message(msg: Message) -> Result<Self> {
+impl<B> FromMessage<Action, B> for SetFileReq<B>
+where
+	B: PacketBytes
+{
+	fn from_message(msg: Message<Action, B>) -> StdResult<Self, MessageError> {
 		if msg.body().len() <= Signature::LEN {
-			return Err(Error::Request("no signature".into()))
+			return Err(MessageError::Other("no signature".into()))
 		}
 
 		let sign = Signature::from_slice(
@@ -413,65 +504,85 @@ impl SerdeMessage<Action, EncryptedBytes, Error> for SetFileReq {
 	}
 }
 
-impl RawRequest<Action, EncryptedBytes> for SetFileReq {
-	type Response = ();
+impl<B> Request for SetFileReq<B> {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
+
 	const ACTION: Action = Action::SetFile;
 }
 
 
 pub type AuthKey = Token<32>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct AuthenticateReaderReq {
 	pub key: AuthKey
 }
 
-impl<B> Request<Action, B> for AuthenticateReaderReq {
-	type Response = ();
+impl Request for AuthenticateReaderReq {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
+
 	const ACTION: Action = Action::AuthenticateReader;
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct AuthenticateWriter1Req {
 	pub channel: Channel
 }
 
 pub type Challenge = Token<32>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct AuthenticateWriter1 {
 	pub challenge: Challenge
 }
 
-impl<B> Request<Action, B> for AuthenticateWriter1Req {
+impl Request for AuthenticateWriter1Req {
+	type Action = Action;
 	type Response = AuthenticateWriter1;
 	type Error = Error;
+
 	const ACTION: Action = Action::AuthenticateWriter1;
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct AuthenticateWriter2Req {
 	pub signature: Signature
 }
 
-impl<B> Request<Action, B> for AuthenticateWriter2Req {
-	type Response = ();
+impl Request for AuthenticateWriter2Req {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
+
 	const ACTION: Action = Action::AuthenticateWriter2;
 }
 
 
 /// Needs to be authenticated as a writer
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct NewAuthKeyReaderReq;
 
-impl<B> Request<Action, B> for NewAuthKeyReaderReq {
-	type Response = AuthKey;
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
+#[repr(transparent)]
+pub struct NewAuthKeyReader(pub AuthKey);
+
+impl Request for NewAuthKeyReaderReq {
+	type Action = Action;
+	type Response = NewAuthKeyReader;
 	type Error = Error;
+
 	const ACTION: Action = Action::NewAuthKeyReader;
 }
 
@@ -479,7 +590,8 @@ impl<B> Request<Action, B> for NewAuthKeyReaderReq {
 /// Changewhitelist
 ///
 /// Needs to be authenticated as a writer
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct ChangeWhitelistReq {
 	pub arch: TargetArch,
 	pub name: String,
@@ -489,8 +601,10 @@ pub struct ChangeWhitelistReq {
 	pub add: bool
 }
 
-impl<B> Request<Action, B> for ChangeWhitelistReq {
-	type Response = ();
+impl Request for ChangeWhitelistReq {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
+
 	const ACTION: Action = Action::ChangeWhitelist;
 }

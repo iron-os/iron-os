@@ -1,20 +1,18 @@
-use stream_api::action;
+use stream_api::Action as ActionTrait;
 
-action! {
-	#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-	pub enum Action {
-		Empty = 0,
-		// AllPackages = 10,
-		PackageInfo = 11,
-		SetPackageInfo = 13,
-		ChangeWhitelist = 15,
-		GetFile = 20,
-		GetFilePart = 21,
-		SetFile = 22,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ActionTrait)]
+#[repr(u16)]
+pub enum Action {
+	// AllPackages = 10,
+	PackageInfo = 11,
+	SetPackageInfo = 13,
+	ChangeWhitelist = 15,
+	GetFile = 20,
+	GetFilePart = 21,
+	SetFile = 22,
 
-		NewAuthKeyReader = 31,
-		AuthenticateReader = 32,
-		AuthenticateWriter1 = 34,
-		AuthenticateWriter2 = 35
-	}
+	NewAuthKeyReader = 31,
+	AuthenticateReader = 32,
+	AuthenticateWriter1 = 34,
+	AuthenticateWriter2 = 35
 }
