@@ -7,9 +7,9 @@ edition = "2021"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 riji = "0.1.6"
 packages = { package = "packages-api", version = "0.1", path = "./../packages-api" }
-crypto = { package = "fire-crypto", version = "0.3" }
+crypto = { package = "fire-crypto", version = "0.4" }
 clap = { version = "4.0", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.7"
+toml = "0.8"
 file-db = { version = "0.1", features = ["async"], path = "./../file-db" }
 bootloader-api = { package = "service-bootloader-api", version = "0.2", path = "./../service-bootloader-api" }

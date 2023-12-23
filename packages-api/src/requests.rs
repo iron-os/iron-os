@@ -113,6 +113,7 @@ impl Request for SetPackageInfoReq {
 #[serde(rename_all = "camelCase")]
 pub struct GetFileReq<B> {
 	pub hash: Hash,
+	#[serde(skip)]
 	_bytes: PhantomData<B>
 }
 
@@ -232,6 +233,7 @@ pub struct GetFilePartReq<B> {
 	// can be longer that the file itself the returned file will tell you how
 	// long it is
 	pub len: u64,
+	#[serde(skip)]
 	_bytes: PhantomData<B>
 }
 
