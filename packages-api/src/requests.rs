@@ -94,7 +94,9 @@ impl Request for PackageInfoReq {
 pub struct SetPackageInfoReq {
 	pub package: Package,
 	// if empty no whitelist is applied
-	pub whitelist: HashSet<DeviceId>
+	pub whitelist: HashSet<DeviceId>,
+	#[serde(default)]
+	pub auto_whitelist_limit: u32
 }
 
 impl Request for SetPackageInfoReq {
@@ -598,7 +600,14 @@ pub struct ChangeWhitelistReq {
 	pub version: Hash,
 	pub whitelist: HashSet<DeviceId>,
 	#[serde(default)]
-	pub add: bool
+	pub add: bool,
+	/// if auto_whitelist_limit is > 0 and whitelist is empty the whitelist is
+	/// not touched even tough add might not be set
+	///
+	/// if the whitelist get's set and auto_whitelist_limit is == 0 it does not
+	/// get updated
+	#[serde(default)]
+	pub auto_whitelist_limit: u32
 }
 
 impl Request for ChangeWhitelistReq {

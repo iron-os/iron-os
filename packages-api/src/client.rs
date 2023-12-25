@@ -65,9 +65,12 @@ impl Client {
 	pub async fn set_package_info(
 		&self,
 		package: Package,
-		whitelist: HashSet<DeviceId>
+		whitelist: HashSet<DeviceId>,
+		auto_whitelist_limit: u32
 	) -> Result<()> {
-		let req = SetPackageInfoReq { package, whitelist };
+		let req = SetPackageInfoReq {
+			package, whitelist, auto_whitelist_limit
+		};
 		self.inner.request(req).await
 			.map(|_r| ())
 	}
@@ -146,10 +149,12 @@ impl Client {
 		version: Hash,
 		whitelist: HashSet<DeviceId>,
 		// if the whitelist should added or replaced
-		add: bool
+		add: bool,
+		auto_whitelist_limit: u32
 	) -> Result<()> {
 		self.inner.request(ChangeWhitelistReq {
-			arch, name, version, whitelist, add
+			arch, name, version, whitelist, add,
+			auto_whitelist_limit
 		}).await
 			.map(|_| ())
 	}

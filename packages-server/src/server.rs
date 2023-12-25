@@ -157,7 +157,8 @@ async fn set_package_info(
 	// now set it
 	packages.push_package(channel, PackageEntry {
 		package: req.package,
-		whitelist: req.whitelist
+		whitelist: req.whitelist,
+		auto_whitelist_limit: req.auto_whitelist_limit
 	}).await;
 
 	Ok(EmptyJson)
@@ -305,7 +306,8 @@ async fn change_whitelist(
 		&req.name,
 		&req.version,
 		req.whitelist,
-		req.add
+		req.add,
+		req.auto_whitelist_limit
 	).await;
 
 	if changed {

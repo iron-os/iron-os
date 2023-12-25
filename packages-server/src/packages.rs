@@ -99,12 +99,20 @@ impl PackagesDbFile {
 		name: &str,
 		version: &Hash,
 		whitelist: HashSet<DeviceId>,
-		add: bool
+		mut add: bool,
+		auto_whitelist_limit: u32
 	) -> bool {
 		let entry = self.indexes.get_mut(&IndexKey {
 			channel: *channel,
 			arch: *arch
 		}).and_then(|i| i.mut_with_version(name, version));
+
+		// make sure we don't remove whitelist entries if it is probably not
+		// intended
+		if whitelist.is_empty() && auto_whitelist_limit > 0 {
+			add = true;
+		}
+		let whitelist_empty = whitelist.is_empty();
 
 		if let Some(entry) = entry {
 			if add {
@@ -113,6 +121,11 @@ impl PackagesDbFile {
 				}
 			} else {
 				entry.whitelist = whitelist;
+			}
+
+			// now set auto_whitelist_limit
+			if whitelist_empty || auto_whitelist_limit > 0 {
+				entry.auto_whitelist_limit = auto_whitelist_limit;
 			}
 
 			true
@@ -127,7 +140,11 @@ pub struct PackageEntry {
 	pub package: Package,
 	// if the whitelist is empty this means that all devices are allowed
 	// to use the package
-	pub whitelist: HashSet<DeviceId>
+	pub whitelist: HashSet<DeviceId>,
+	// if this is > 0 every device which request info about the package will be
+	// added to the whitelist until the whitelist.len is >= than this value
+	#[serde(default)]
+	pub auto_whitelist_limit: u32
 }
 
 impl PackageEntry {
@@ -237,6 +254,10 @@ impl PackagesDb {
 	) -> Option<PackageEntry> {
 		let lock = self.inner.read().await;
 		let db = lock.data();
+
+		// we should 
+
+
 		db.get(arch, channel, name, device_id)
 			.map(Clone::clone)
 	}
@@ -257,7 +278,8 @@ impl PackagesDb {
 		name: &str,
 		version: &Hash,
 		whitelist: HashSet<DeviceId>,
-		add: bool
+		add: bool,
+		auto_whitelist_limit: u32
 	) -> bool {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
@@ -267,7 +289,8 @@ impl PackagesDb {
 			name,
 			version,
 			whitelist,
-			add
+			add,
+			auto_whitelist_limit
 		);
 		lock.write().await
 			.expect("writing failed unexpectetly");
