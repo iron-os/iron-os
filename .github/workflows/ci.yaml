@@ -18,8 +18,32 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.67
+        uses: dtolnay/rust-toolchain@1.71
       - name: Check
         run: cd packages-server && cargo check
       - name: Run tests
         run: cd packages-server && cargo test
+
+  packages_publisher:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.71
+      - name: Check
+        run: cd packages-publisher && cargo check
+      - name: Run tests
+        run: cd packages-publisher && cargo test
+
+  service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.67
+      - name: Check
+        run: cd service && cargo check
+      - name: Run tests
+        run: cd service && cargo test
