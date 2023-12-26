@@ -28,10 +28,12 @@ pub struct ChangeWhitelistOpts {
 	version: Hash,
 	#[clap(long)]
 	arch: Option<BoardArch>,
-	#[clap(long, num_args(0..))]
-	whitelist: Vec<DeviceId>,
 	#[clap(long)]
-	add: bool
+	auto_whitelist: u32,
+	#[clap(long)]
+	add: bool,
+	#[clap(long, num_args(0..))]
+	whitelist: Vec<DeviceId>
 }
 
 pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
@@ -87,7 +89,8 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 			package.name.clone(),
 			opts.version.clone(),
 			whitelist.clone(),
-			opts.add
+			opts.add,
+			opts.auto_whitelist
 		).await;
 		match r {
 			Ok(_) => {

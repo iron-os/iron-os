@@ -432,9 +432,9 @@ dependencies = [
 
 [[package]]
 name = "fire-stream"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74baf21bef804e917b3042d55440546fb69c5ac4919b194a2f87cbecbf291f12"
+checksum = "28a3a69427125c38f66d27d70faad67232c50c92730503eb882ff22e8befc2cb"
 dependencies = [
  "fire-crypto",
  "serde",
@@ -446,9 +446,9 @@ dependencies = [
 
 [[package]]
 name = "fire-stream-api"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9a758b4f19212d61ff6ee6fe411d65d4615ac06848ed841e609e0edebd2985f"
+checksum = "4b68be2ce04505433b656325357de7c04187eafabdb85d120220b3036226b35d"
 dependencies = [
  "fire-crypto",
  "fire-stream",

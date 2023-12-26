@@ -58,6 +58,8 @@ pub struct Upload {
 	arch: Option<BoardArch>,
 	#[clap(long)]
 	host_channel: Option<Channel>,
+	#[clap(long)]
+	auto_whitelist: u32,
 	#[clap(long, num_args(0..))]
 	whitelist: Vec<DeviceId>
 }
@@ -148,7 +150,8 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 		client.set_package_info(
 			package,
-			HashSet::from_iter(cfg.whitelist.clone())
+			HashSet::from_iter(cfg.whitelist.clone()),
+			cfg.auto_whitelist
 		).await
 			.map_err(|e| err!(e, "failed to upload package"))?;
 
