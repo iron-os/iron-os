@@ -38,7 +38,7 @@ fn default_packages_file() -> String {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChannelCfg {
 	#[serde(rename = "sign-key")]
-	sign_key: PublicKey
+	pub sign_key: PublicKey
 }
 
 impl Default for Config {

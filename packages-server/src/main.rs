@@ -4,6 +4,8 @@ mod packages;
 mod server;
 mod files;
 mod auth;
+#[cfg(test)]
+mod testing_requests;
 
 use config::Config;
 use files::Files;

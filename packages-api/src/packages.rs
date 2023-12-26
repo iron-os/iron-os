@@ -121,7 +121,7 @@ impl fmt::Display for BoardArch {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Package {
 	pub name: String,

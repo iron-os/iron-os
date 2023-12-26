@@ -45,6 +45,13 @@ impl<'de> Deserialize<'de> for IndexKey {
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EntryIndex {
+	packages_index: IndexKey,
+	name: String,
+	idx: usize
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesDbFile {
 	indexes: HashMap<IndexKey, PackagesIndex>
@@ -57,30 +64,61 @@ impl PackagesDbFile {
 		}
 	}
 
-	fn get(
+	pub fn get(&self, idx: &EntryIndex) -> Option<&PackageEntry> {
+		self.indexes.get(&idx.packages_index)
+			.and_then(|packages| packages.get(&idx.name, idx.idx))
+	}
+
+	pub fn get_mut(&mut self, idx: &EntryIndex) -> Option<&mut PackageEntry> {
+		self.indexes.get_mut(&idx.packages_index)
+			.and_then(|packages| packages.get_mut(&idx.name, idx.idx))
+	}
+
+	/// Returns a package which the device has either access to
+	/// or might be able to get access to with get_mut
+	///
+	/// ## Important
+	/// Do not just return this check `PackageEntry::needs_write(device_id)`
+	/// if you need to call get_mut
+	// todo this api needs to be improved
+	fn get_latest(
 		&self,
 		arch: &BoardArch,
 		channel: &Channel,
 		name: &str,
 		device_id: &Option<DeviceId>
-	) -> Option<&PackageEntry> {
-		self.get_inner(&(*arch).into(), channel, name, device_id)
+	) -> Option<EntryIndex> {
+		// first try with the provided arch
+		// else try with the any arch
+
+		self.get_latest_inner(&(*arch).into(), channel, name, device_id)
 			.or_else(|| {
-				self.get_inner(&TargetArch::Any, channel, name, device_id)
+				self.get_latest_inner(
+					&TargetArch::Any, channel, name, device_id
+				)
 			})
 	}
 
-	fn get_inner(
+	fn get_latest_inner(
 		&self,
 		arch: &TargetArch,
 		channel: &Channel,
 		name: &str,
 		device_id: &Option<DeviceId>
-	) -> Option<&PackageEntry> {
-		self.indexes.get(&IndexKey {
-			channel: *channel,
-			arch: *arch
-		}).and_then(|idx| idx.get_latest(name, device_id))
+	) -> Option<EntryIndex> {
+		let mut idx = EntryIndex {
+			packages_index: IndexKey {
+				channel: *channel,
+				arch: *arch
+			},
+			name: name.into(),
+			idx: 0
+		};
+
+		let packages = self.indexes.get(&idx.packages_index)?;
+		idx.idx = packages.get_latest(name, device_id)?;
+
+		Some(idx)
 	}
 
 	fn push(&mut self, channel: Channel, entry: PackageEntry) {
@@ -135,6 +173,32 @@ impl PackagesDbFile {
 	}
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InWhitelist {
+	Yes,
+	CanBe,
+	No
+}
+
+impl InWhitelist {
+	pub fn is_or_can_be(&self) -> bool {
+		!matches!(self, Self::No)
+	}
+
+	pub fn can_be(&self) -> bool {
+		matches!(self, Self::CanBe)
+	}
+}
+
+impl From<bool> for InWhitelist {
+	fn from(b: bool) -> Self {
+		match b {
+			true => Self::Yes,
+			false => Self::No
+		}
+	}
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageEntry {
 	pub package: Package,
@@ -148,11 +212,30 @@ pub struct PackageEntry {
 }
 
 impl PackageEntry {
-	pub fn in_whitelist(&self, device_id: &Option<DeviceId>) -> bool {
+	fn in_whitelist(&self, device_id: &Option<DeviceId>) -> InWhitelist {
 		match device_id {
-			None => self.whitelist.is_empty(),
-			Some(_) if self.whitelist.is_empty() => true,
-			Some(device_id) => self.whitelist.contains(device_id)
+			None => self.whitelist.is_empty().into(),
+			Some(_) if self.whitelist.is_empty() => InWhitelist::Yes,
+			Some(device_id) if self.whitelist.contains(device_id) => {
+				InWhitelist::Yes
+			},
+			// might be added to the whitelist
+			Some(_) => {
+				if self.auto_whitelist_limit as usize > self.whitelist.len() {
+					InWhitelist::CanBe
+				} else {
+					InWhitelist::No
+				}
+			}
+		}
+	}
+
+	/// Only call this if it is fine to add the user to the whitelist
+	pub fn update_whitelist(&mut self, device_id: &Option<DeviceId>) {
+		debug_assert!(self.in_whitelist(device_id).is_or_can_be());
+
+		if let Some(device_id) = device_id {
+			self.whitelist.insert(device_id.clone());
 		}
 	}
 }
@@ -170,16 +253,24 @@ impl PackagesIndex {
 		}
 	}
 
+	fn get(&self, name: &str, idx: usize) -> Option<&PackageEntry> {
+		self.list.get(name).and_then(|list| list.get(idx))
+	}
+
+	fn get_mut(&mut self, name: &str, idx: usize) -> Option<&mut PackageEntry> {
+		self.list.get_mut(name).and_then(|list| list.get_mut(idx))
+	}
+
+	/// returns the index of the lastest entry
 	fn get_latest(
 		&self,
 		name: &str,
 		device_id: &Option<DeviceId>
-	) -> Option<&PackageEntry> {
+	) -> Option<usize> {
 		self.list.get(name)?
-			.iter().rev()
-			.find(|e| {
-				e.in_whitelist(device_id)
-			})
+			.iter().enumerate().rev()
+			.find(|(_, e)| e.in_whitelist(device_id).is_or_can_be())
+			.map(|(idx, _)| idx)
 	}
 
 	fn mut_with_version(
@@ -218,10 +309,22 @@ impl PackagesIndex {
 
 #[derive(Debug)]
 pub struct PackagesDb {
-	inner: RwLock<FileDb<PackagesDbFile>>
+	inner: RwLock<FileDb<PackagesDbFile>>,
+	write: bool
 }
 
 impl PackagesDb {
+	/// Creates a new empty PackagesDb without writing anything to file
+	#[cfg(test)]
+	pub fn new(cfg: &Config) -> Self {
+		let db = FileDb::new(&cfg.packages_file, PackagesDbFile::new());
+
+		Self {
+			inner: RwLock::new(db),
+			write: false
+		}
+	}
+
 	pub async fn create(cfg: &Config) -> Result<Self> {
 		if fs::metadata(&cfg.packages_file).await.is_ok() {
 			return Self::read(cfg).await;
@@ -232,7 +335,8 @@ impl PackagesDb {
 			.map_err(|e| Error::new("could not write packages.fdb", e))?;
 
 		Ok(Self {
-			inner: RwLock::new(db)
+			inner: RwLock::new(db),
+			write: true
 		})
 	}
 
@@ -241,7 +345,8 @@ impl PackagesDb {
 			.map_err(|e| Error::new("packages.fdb could not be opened", e))?;
 
 		Ok(Self {
-			inner: RwLock::new(db)
+			inner: RwLock::new(db),
+			write: true
 		})
 	}
 
@@ -252,22 +357,39 @@ impl PackagesDb {
 		name: &str,
 		device_id: &Option<DeviceId>
 	) -> Option<PackageEntry> {
-		let lock = self.inner.read().await;
-		let db = lock.data();
+		{
+			let lock = self.inner.read().await;
+			let db = lock.data();
 
-		// we should 
+			let idx = db.get_latest(arch, channel, name, device_id)?;
+			let package = db.get(&idx).unwrap();
 
+			// check if we need to add us to the whitelist
+			if !package.in_whitelist(device_id).can_be() {
+				return Some(package.clone())
+			}
+		};
 
-		db.get(arch, channel, name, device_id)
-			.map(Clone::clone)
+		let mut lock = self.inner.write().await;
+		let db = lock.data_mut();
+
+		let idx = db.get_latest(arch, channel, name, device_id)?;
+		let package = db.get_mut(&idx).unwrap();
+
+		package.update_whitelist(device_id);
+
+		Some(package.clone())
 	}
 
 	pub async fn push_package(&self, channel: Channel, entry: PackageEntry) {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
 		db.push(channel, entry);
-		lock.write().await
-			.expect("writing failed unexpectetly")
+
+		if self.write {
+			lock.write().await
+				.expect("writing failed unexpectetly")
+		}
 	}
 
 	// returns true if the whitelist could be changed
@@ -292,8 +414,12 @@ impl PackagesDb {
 			add,
 			auto_whitelist_limit
 		);
-		lock.write().await
-			.expect("writing failed unexpectetly");
+
+		if self.write {
+			lock.write().await
+				.expect("writing failed unexpectetly");
+		}
+
 		r
 	}
 }

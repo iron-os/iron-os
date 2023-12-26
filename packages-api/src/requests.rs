@@ -214,15 +214,6 @@ impl<B> Request for GetFileReq<B> {
 	const ACTION: Action = Action::GetFile;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Range {
-	start: u64,
-	// can be longer that the file itself the returned file will tell you how
-	// long it is
-	len: u64
-}
-
 
 /// Get File Part
 ///
@@ -387,7 +378,8 @@ impl GetFileBuilder {
 		}
 	}
 
-	pub(crate) fn next_req<B>(&self) -> GetFilePartReq<B> {
+	#[doc(hidden)]
+	pub fn next_req<B>(&self) -> GetFilePartReq<B> {
 		GetFilePartReq::new(
 			self.hash.clone(),
 			// start
@@ -397,7 +389,8 @@ impl GetFileBuilder {
 		)
 	}
 
-	pub(crate) fn add_resp<B>(&mut self, resp: GetFilePart<B>)
+	#[doc(hidden)]
+	pub fn add_resp<B>(&mut self, resp: GetFilePart<B>)
 	where B: PacketBytes {
 		self.total_len = Some(resp.total_file_len());
 		self.bytes.extend_from_slice(resp.file_part());
@@ -460,6 +453,19 @@ where
 			signature: sign,
 			message: msg
 		})
+	}
+
+	pub fn from_bytes(sign: Signature, ctn: &[u8]) -> Self {
+		let mut msg = Message::new();
+
+		let mut body = msg.body_mut();
+		body.write(sign.to_bytes());
+		body.write(ctn);
+
+		Self {
+			signature: sign,
+			message: msg
+		}
 	}
 
 	pub fn signature(&self) -> &Signature {

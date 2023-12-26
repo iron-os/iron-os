@@ -9,10 +9,23 @@ use tokio::io::{self, AsyncWriteExt};
 use crypto::hash::Hash;
 
 pub struct Files {
+	// used as a drop holder
+	#[allow(dead_code)]
+	holder: Box<dyn std::any::Any + Send + Sync>,
 	path: PathBuf
 }
 
 impl Files {
+	#[cfg(test)]
+	pub fn new_temp() -> Self {
+		let tmp = tempfile::tempdir().unwrap();
+
+		Self {
+			path: tmp.as_ref().into(),
+			holder: Box::new(tmp)
+		}
+	}
+
 	pub async fn create(cfg: &Config) -> Result<Self> {
 		if fs::metadata(&cfg.files_dir).await.is_ok() {
 			return Self::read(cfg).await;
@@ -27,7 +40,10 @@ impl Files {
 	pub async fn read(cfg: &Config) -> Result<Self> {
 		let path = fs::canonicalize(&cfg.files_dir).await
 			.map_err(|e| Error::new("files dir not found", e))?;
-		Ok(Self { path })
+		Ok(Self {
+			holder: Box::new(path.clone()),
+			path
+		})
 	}
 
 	pub async fn get(&self, hash: &Hash) -> Option<File> {

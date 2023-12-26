@@ -75,6 +75,14 @@ pub async fn serve(path: &str) -> Result<()> {
 	server.register_data(cfg);
 	server.register_data(auth_db);
 	// server.register_request(all_packages);
+	
+	register_requests(&mut server);
+
+	server.run().await
+		.map_err(|e| Error::other("server failed", e))
+}
+
+pub fn register_requests<L>(server: &mut Server<L>) {
 	server.register_request(package_info);
 	server.register_request(set_package_info);
 	server.register_request(get_file);
@@ -85,9 +93,6 @@ pub async fn serve(path: &str) -> Result<()> {
 	server.register_request(authenticate_writer2);
 	server.register_request(new_auth_key_reader);
 	server.register_request(change_whitelist);
-
-	server.run().await
-		.map_err(|e| Error::other("server failed", e))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -267,11 +272,15 @@ async fn authenticate_writer2(
 	session.set(AuthWriter(channel));
 
 	// need to increase the body limit (since we are a writer)
-	let conf = session.get::<Configurator<ServerConfig>>().unwrap();
-	let mut cfg = conf.read();
-	// the limit should be 200mb
-	cfg.body_limit = 200_000_000;
-	conf.update(cfg);
+	if let Some(conf) = session.get::<Configurator<ServerConfig>>() {
+		// this should always be available instead while testing
+		tracing::warn!("no conf");
+
+		let mut cfg = conf.read();
+		// the limit should be 200mb
+		cfg.body_limit = 200_000_000;
+		conf.update(cfg);
+	}
 
 	Ok(EmptyJson)
 }
