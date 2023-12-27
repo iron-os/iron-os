@@ -420,8 +420,8 @@ fn apply_patch(channel, buildroot) {
 	print("patch pipewire");
 	let pipwire_diff = diff_from_file("./pre-patches/pipewire-build-fails-with-vulkan.patch");
 	buildroot_repo.apply_diff(pipwire_diff);
-	print("patch rust 1.64");
-	let rust_diff = diff_from_file("./pre-patches/update-rust-1.64.patch");
+	print("patch rust 1.71");
+	let rust_diff = diff_from_file("./pre-patches/update-rust-1.71.patch");
 	buildroot_repo.apply_diff(rust_diff);
 	print("patch wayland-protocols");
 	let wayland_diff = diff_from_file("./pre-patches/wayland-protocols.patch");
