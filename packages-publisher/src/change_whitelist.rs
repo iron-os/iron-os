@@ -28,7 +28,7 @@ pub struct ChangeWhitelistOpts {
 	version: Hash,
 	#[clap(long)]
 	arch: Option<BoardArch>,
-	#[clap(long)]
+	#[clap(long, default_value = "0")]
 	auto_whitelist: u32,
 	#[clap(long)]
 	add: bool,

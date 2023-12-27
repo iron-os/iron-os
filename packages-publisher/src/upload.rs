@@ -58,7 +58,7 @@ pub struct Upload {
 	arch: Option<BoardArch>,
 	#[clap(long)]
 	host_channel: Option<Channel>,
-	#[clap(long)]
+	#[clap(long, default_value = "0")]
 	auto_whitelist: u32,
 	#[clap(long, num_args(0..))]
 	whitelist: Vec<DeviceId>
