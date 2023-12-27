@@ -9,6 +9,7 @@ lto = true
 [dependencies]
 tokio = { version = "1.0", features = ["time", "macros", "rt-multi-thread", "fs"] }
 bootloader-api = { package = "service-bootloader-api", version = "0.2", features = ["async"], path = "./../service-bootloader-api" }
+stdio-api = { version = "0.1", path = "./../stdio-api", features = ["serde"] }
 fire = { package = "fire-http", version = "0.2", features = ["fs", "json", "ws"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

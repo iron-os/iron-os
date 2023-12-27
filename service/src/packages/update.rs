@@ -6,15 +6,17 @@ use crate::Bootloader;
 use crate::util::io_other;
 
 use std::{io, mem};
+use std::path::Path;
 
 use tokio::fs;
+use tokio::process::Command;
 
 use packages::packages::{Package, Source};
 use packages::client::Client;
 use packages::requests::GetFileBuilder;
 use packages::error::Error;
 
-use bootloader_api::requests::UpdateReq;
+use bootloader_api::requests::{UpdateReq, VersionInfo};
 
 /// if this functions returns Ok(()) the PackageUpdateState::ToUpdate will never
 /// be set
@@ -314,9 +316,12 @@ async fn update_image(
 		path: img_path.clone()
 	};
 
+	// let version = bootloader.update(&req).await
+	// 	.map_err(io_other)?;
+
 	// because the native service-bootloader is broken we ship our own for the
 	// moment see #10
-	fix_10_update_image(bootloader, &req).await?;
+	let version = fix_10_update_image(bootloader, &req).await?;
 
 	// remove the folder
 	let _ = fs::remove_dir_all(&img_path).await;
@@ -330,10 +335,40 @@ async fn update_image(
 async fn fix_10_update_image(
 	bootloader: &Bootloader,
 	req: &UpdateReq
-) -> io::Result<()> {
+) -> io::Result<VersionInfo> {
 	// make sure we have the new service-bootloader in the correct folder
-	let path = "/data/tmp/service-bootloader";
+	let path = "/data/tmp-service-bootloader";
+	let _ = fs::remove_dir_all(&path).await;
 	let _ = fs::create_dir_all(&path).await;
 
-	if fs::
+	let service_bootloader_file = Path::new(path).join("service_bootloader");
+
+	fs::copy("./service_bootloader", &service_bootloader_file).await?;
+
+	// make sure it can be executed as root
+	bootloader.make_root(service_bootloader_file.to_str().unwrap()).await
+		.map_err(io_other)?;
+
+	eprintln!("executing command update_image_fix_10 {}", stdio_api::serialize(req).unwrap());
+
+	// now call the bootloader
+	let output = Command::new(service_bootloader_file)
+		.arg("update_image_fix_10")
+		.arg(stdio_api::serialize(req).unwrap())
+		.output().await?;
+
+	if !output.status.success() {
+		eprintln!(
+			"update_image_fix_10 failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
+
+		return Err(io_other("failed to update image"))
+	}
+
+	// now parse the version info
+	let output = String::from_utf8(output.stdout).map_err(io_other)?;
+
+	stdio_api::deserialize(&output)
+		.map_err(io_other)
 }
