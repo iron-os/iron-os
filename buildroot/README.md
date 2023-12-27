@@ -1,5 +1,5 @@
 ## Installed version
-Rust: 1.58
+Rust: 1.71
 
 ## Installing
 
