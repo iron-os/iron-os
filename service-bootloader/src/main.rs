@@ -16,6 +16,14 @@ use std::time::Duration;
 
 // get's started as root
 fn main() {
+	let args: Vec<_> = std::env::args().collect();
+
+	if args.len() >= 2 {
+		if args[1] == "version" {
+			eprintln!("service-bootloader {}", env!("CARGO_PKG_VERSION"));
+			return
+		}
+	}
 
 	hardware_fixes();
 

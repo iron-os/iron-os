@@ -35,8 +35,13 @@ pub fn mount(path: impl AsRef<Path>, dest: impl AsRef<Path>) -> io::Result<()> {
 }
 
 pub fn umount(path: impl AsRef<Path>) -> io::Result<()> {
+	// todo make sure the status was ok
+	// we might wan't to do it but the -f was added because of
+	// umount: /mnt: not mounted.
+	// we can do without -f since it works but checking the status code needs
+	// some user code?
+
 	Command::new("umount")
-		.arg("-f")
 		.arg(path.as_ref())
 		.exec()
 }
