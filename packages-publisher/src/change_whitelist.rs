@@ -70,6 +70,7 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 	println!("version: {:?}", opts.version);
 	println!("archs: {:?}", target_archs);
 	println!("add: {:?}", if opts.add { "yes" } else { "no" });
+	println!("auto-whitelist: {:?}", opts.auto_whitelist);
 	println!("whitelist: {:?}", whitelist);
 	println!();
 	println!("Enter YES to confirm");

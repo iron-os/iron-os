@@ -115,6 +115,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	for (tar_path, pack) in packages.iter() {
 		print_package(tar_path, pack).await;
 	}
+	println!("auto-whitelist: {:?}", opts.auto_whitelist);
 	println!("whitelist: {:?}", cfg.whitelist);
 	println!();
 	println!("Enter YES to confirm");
