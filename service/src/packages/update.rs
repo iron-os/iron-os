@@ -191,6 +191,7 @@ async fn update_package(
 
 	let other_path = format!("{}/{}", package_dir, new_folder);
 	// remove other folder
+	// todo this should be a root call since chromium has a file owned by root
 	let _ = fs::remove_dir_all(&other_path).await;
 
 	// extract
@@ -312,8 +313,10 @@ async fn update_image(
 		signature: package.signature.clone(),
 		path: img_path.clone()
 	};
-	let version = bootloader.update(&req).await
-		.map_err(io_other)?;
+
+	// because the native service-bootloader is broken we ship our own for the
+	// moment see #10
+	fix_10_update_image(bootloader, &req).await?;
 
 	// remove the folder
 	let _ = fs::remove_dir_all(&img_path).await;
@@ -321,4 +324,16 @@ async fn update_image(
 	*state = ImageUpdateState::Updated(version);
 
 	Ok(())
+}
+
+// see #10
+async fn fix_10_update_image(
+	bootloader: &Bootloader,
+	req: &UpdateReq
+) -> io::Result<()> {
+	// make sure we have the new service-bootloader in the correct folder
+	let path = "/data/tmp/service-bootloader";
+	let _ = fs::create_dir_all(&path).await;
+
+	if fs::
 }
