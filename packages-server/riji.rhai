@@ -1,9 +1,13 @@
 fn docker_build() {
+	docker_build("packages-server")
+}
+
+fn docker_build(name) {
 	fs::create_dir("./deps");
 	_copy_dep("file-db");
 	_copy_dep("packages-api");
 
-	let docker = cmd(["docker", "build", "-t", "packages-server", "."]);
+	let docker = cmd(["docker", "build", "-t", name, "."]);
 	docker.execute();
 }
 
