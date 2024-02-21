@@ -1,0 +1,176 @@
+diff --git a/package/rpi-firmware/Config.in b/package/rpi-firmware/Config.in
+index a9aeaed745..90ad35fd3c 100644
+--- a/package/rpi-firmware/Config.in
++++ b/package/rpi-firmware/Config.in
+@@ -14,9 +14,9 @@  if BR2_PACKAGE_RPI_FIRMWARE
+ config BR2_PACKAGE_RPI_FIRMWARE_BOOTCODE_BIN
+ 	bool "rpi 0/1/2/3 bootcode.bin"
+ 	help
+-	  The bootcode.bin for versions Zero/1/2/3 (not needed on rpi4,
+-	  because it has been replaced by boot code in the onboard
+-	  EEPROM).
++	  The bootcode.bin for versions Zero/1/2/3 (not needed on
++	  rpi4/5, because it has been replaced by boot code in the
++	  onboard EEPROM).
+ 
+ config BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI
+ 	bool "rpi 0/1/2/3 (default)"
+@@ -41,27 +41,27 @@  config BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI_DB
+ 	  The debug set of files for versions Zero/1/2/3.
+ 
+ config BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4
+-	bool "rpi 4 (default)"
++	bool "rpi 4/5 (default)"
+ 	help
+-	  The default set of files for versions 4 (standard GPU
++	  The default set of files for versions 4/5 (standard GPU
+ 	  features).
+ 
+ config BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4_X
+-	bool "rpi 4 (extended)"
++	bool "rpi 4/5 (extended)"
+ 	help
+-	  The extended set of files for versions 4 (additional GPU
++	  The extended set of files for versions 4/5 (additional GPU
+ 	  features, eg. more audio/video codecs).
+ 
+ config BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4_CD
+-	bool "rpi 4 (cut-down)"
++	bool "rpi 4/5 (cut-down)"
+ 	help
+-	  The cut-down set of files for versions 4 (only features
++	  The cut-down set of files for versions 4/5 (only features
+ 	  required to boot a Linux kernel).
+ 
+ config BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4_DB
+-	bool "rpi 4 (debug)"
++	bool "rpi 4/5 (debug)"
+ 	help
+-	  The debug set of files for versions 4.
++	  The debug set of files for versions 4/5.
+ 
+ config BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE
+ 	string "Path to a file stored as boot/config.txt"
+diff --git a/package/rpi-firmware/rpi-firmware.hash b/package/rpi-firmware/rpi-firmware.hash
+index ec13115f3b..659613591d 100644
+--- a/package/rpi-firmware/rpi-firmware.hash
++++ b/package/rpi-firmware/rpi-firmware.hash
+@@ -1,3 +1,3 @@ 
+ # Locally computed
+-sha256  33aea2cb9c3be94c3dd6a96fbb3443eee5af1dc5fc9140e1fadc50832983064e  rpi-firmware-3f20b832b27cd730deb6419b570f31a98167eef6.tar.gz
++sha256  f3442fb80966faf1e28a32f9d9b91acb4b87c6ff33f0ced4179ec6ccbfa92c65  rpi-firmware-7e9c2063fc15274fbc4dab1ca614f9228834d881.tar.gz
+ sha256  c7283ff51f863d93a275c66e3b4cb08021a5dd4d8c1e7acc47d872fbe52d3d6b  boot/LICENCE.broadcom
+diff --git a/package/rpi-firmware/rpi-firmware.mk b/package/rpi-firmware/rpi-firmware.mk
+index 53d6d8ca06..e765d0ea82 100644
+--- a/package/rpi-firmware/rpi-firmware.mk
++++ b/package/rpi-firmware/rpi-firmware.mk
+@@ -4,7 +4,7 @@ 
+ #
+ ################################################################################
+ 
+-RPI_FIRMWARE_VERSION = 3f20b832b27cd730deb6419b570f31a98167eef6
++RPI_FIRMWARE_VERSION = 7e9c2063fc15274fbc4dab1ca614f9228834d881
+ RPI_FIRMWARE_SITE = $(call github,raspberrypi,firmware,$(RPI_FIRMWARE_VERSION))
+ RPI_FIRMWARE_LICENSE = BSD-3-Clause
+ RPI_FIRMWARE_LICENSE_FILES = boot/LICENCE.broadcom
+
+diff --git a/board/raspberrypi/config_5_64bit.txt b/board/raspberrypi/config_5_64bit.txt
+new file mode 100644
+index 0000000000..0511f2c400
+--- /dev/null
++++ b/board/raspberrypi/config_5_64bit.txt
+@@ -0,0 +1,30 @@ 
++# Please note that this is only a sample, we recommend you to change it to fit
++# your needs.
++# You should override this file using BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE.
++# See http://buildroot.org/manual.html#rootfs-custom
++# and http://elinux.org/RPiconfig for a description of config.txt syntax
++
++start_file=start4.elf
++fixup_file=fixup4.dat
++
++kernel=Image
++
++# To use an external initramfs file
++#initramfs rootfs.cpio.gz
++
++# Disable overscan assuming the display supports displaying the full resolution
++# If the text shown on the screen disappears off the edge, comment this out
++disable_overscan=1
++
++# How much memory in MB to assign to the GPU on Pi models having
++# 256, 512 or 1024 MB total memory
++gpu_mem_256=100
++gpu_mem_512=100
++gpu_mem_1024=100
++
++dtoverlay=vc4-kms-v3d-pi5
++dtoverlay=imx219
++#dtoverlay=ov5647
++
++# enable 64bits support
++arm_64bit=1
+diff --git a/board/raspberrypi/readme.txt b/board/raspberrypi/readme.txt
+index c81fd801ae..f2af502251 100644
+--- a/board/raspberrypi/readme.txt
++++ b/board/raspberrypi/readme.txt
+@@ -90,6 +90,7 @@  After building, you should obtain this tree:
+     +-- bcm2710-rpi-cm3.dtb         [1]
+     +-- bcm2711-rpi-4-b.dtb         [1]
+     +-- bcm2711-rpi-cm4.dtb         [1]
++    +-- bcm2712-rpi-5-b.dtb         [1]
+     +-- bcm2837-rpi-3-b.dtb         [1]
+     +-- boot.vfat
+     +-- rootfs.ext4
+diff --git a/board/raspberrypi5-64 b/board/raspberrypi5-64
+new file mode 120000
+index 0000000000..fcdafc81ed
+--- /dev/null
++++ b/board/raspberrypi5-64
+@@ -0,0 +1 @@ 
++raspberrypi
+\ No newline at end of file
+diff --git a/configs/raspberrypi5_64_defconfig b/configs/raspberrypi5_64_defconfig
+new file mode 100644
+index 0000000000..717082f215
+--- /dev/null
++++ b/configs/raspberrypi5_64_defconfig
+@@ -0,0 +1,38 @@ 
++BR2_aarch64=y
++BR2_cortex_a76_a55=y
++BR2_ARM_FPU_VFPV4=y
++
++BR2_TOOLCHAIN_BUILDROOT_CXX=y
++
++BR2_SYSTEM_DHCP="eth0"
++
++# Linux headers same as kernel, a 6.1 series
++BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_6_1=y
++
++BR2_LINUX_KERNEL=y
++BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
++BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION="$(call github,raspberrypi,linux,feb4ea51e77af09c1a4c7c3e5dd33237750f95cd)/linux-feb4ea51e77af09c1a4c7c3e5dd33237750f95cd.tar.gz"
++BR2_LINUX_KERNEL_DEFCONFIG="bcm2712"
++
++# Build the DTB from the kernel sources
++BR2_LINUX_KERNEL_DTS_SUPPORT=y
++BR2_LINUX_KERNEL_INTREE_DTS_NAME="broadcom/bcm2712-rpi-5-b"
++
++BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
++
++BR2_PACKAGE_RPI_FIRMWARE=y
++BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4=y
++BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="board/raspberrypi5-64/config_5_64bit.txt"
++
++# Required tools to create the SD image
++BR2_PACKAGE_HOST_DOSFSTOOLS=y
++BR2_PACKAGE_HOST_GENIMAGE=y
++BR2_PACKAGE_HOST_MTOOLS=y
++
++# Filesystem / image
++BR2_TARGET_ROOTFS_EXT2=y
++BR2_TARGET_ROOTFS_EXT2_4=y
++BR2_TARGET_ROOTFS_EXT2_SIZE="120M"
++# BR2_TARGET_ROOTFS_TAR is not set
++BR2_ROOTFS_POST_BUILD_SCRIPT="board/raspberrypi5-64/post-build.sh"
++BR2_ROOTFS_POST_IMAGE_SCRIPT="board/raspberrypi5-64/post-image.sh"
