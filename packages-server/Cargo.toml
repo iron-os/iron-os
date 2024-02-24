@@ -17,6 +17,8 @@ clap = { version = "4.0", features = ["derive"] }
 stream-api = { package = "fire-stream-api", version = "0.3.3", features = ["encrypted"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sentry = "0.32.2"
+sentry-tracing = "0.32.2"
 
 [dev-dependencies]
 tempfile = "3.8"

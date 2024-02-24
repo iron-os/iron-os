@@ -8,17 +8,17 @@ use packages::packages::Channel;
 use tokio::fs;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
 	pub port: u16,
-	#[serde(rename = "files-dir")]
+	pub sentry_url: Option<String>,
 	pub files_dir: String,
-	#[serde(rename = "auths-file", default = "default_auths_file")]
+	#[serde(default = "default_auths_file")]
 	pub auths_file: String,
-	#[serde(rename = "packages-file", default = "default_packages_file")]
+	#[serde(default = "default_packages_file")]
 	pub packages_file: String,
-	#[serde(rename = "con-key")]
 	pub con_key: Keypair,
-	#[serde(rename = "sign-key", skip_serializing_if = "Option::is_none")]
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub sign_key: Option<PublicKey>,
 	// channels
 	pub debug: Option<ChannelCfg>,
@@ -45,6 +45,7 @@ impl Default for Config {
 	fn default() -> Self {
 		Self {
 			port: 5426,
+			sentry_url: None,
 			files_dir: "./files".into(),
 			auths_file: default_auths_file(),
 			packages_file: default_packages_file(),

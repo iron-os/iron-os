@@ -4,7 +4,7 @@ use crate::auth::AuthDb;
 use crate::files::Files;
 use crate::error::{Result, Error};
 
-use tracing::error;
+use sentry::ClientInitGuard;
 
 use stream_api::api;
 use packages::requests::{
@@ -26,11 +26,15 @@ use packages::server::{
 	Server, Session, Configurator, Config as ServerConfig
 };
 
-pub async fn serve(path: &str) -> Result<()> {
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, EnvFilter};
+use tracing::error;
+
+pub async fn serve(tracing: &str, path: &str) -> Result<()> {
 	let cfg = match Config::read(path).await {
 		Ok(cfg) => cfg,
 		Err(e) => {
-			error!("reading configuration failed\nto create a configuration \
+			eprintln!("reading configuration failed\nto create a configuration \
 				use the command `create`");
 			return Err(e)
 		}
@@ -40,6 +44,8 @@ pub async fn serve(path: &str) -> Result<()> {
 		eprintln!("please define the signature public key `sign-key`");
 		return Ok(())
 	}
+
+	let _sentry_guard = enable_tracing(tracing, cfg.sentry_url.as_deref());
 
 	let pack_db = match PackagesDb::read(&cfg).await {
 		Ok(p) => p,
@@ -80,6 +86,37 @@ pub async fn serve(path: &str) -> Result<()> {
 
 	server.run().await
 		.map_err(|e| Error::other("server failed", e))
+}
+
+fn enable_tracing(tracing: &str, sentry_url: Option<&str>) -> Option<ClientInitGuard> {
+	// setup tracing
+	let tracing_reg = tracing_subscriber::registry()
+		.with(EnvFilter::from(tracing))
+		.with(fmt::layer());
+
+	let enable_sentry = !cfg!(debug_assertions) && sentry_url.is_some();
+
+	let (guard, sentry_layer) = if enable_sentry {
+		let guard = sentry::init((
+			sentry_url.clone().unwrap(),
+			sentry::ClientOptions {
+				release: sentry::release_name!(),
+				..Default::default()
+			},
+		));
+
+		(Some(guard), Some(sentry_tracing::layer()))
+	} else {
+		(None, None)
+	};
+
+	tracing_reg.with(sentry_layer).init();
+
+	if enable_sentry {
+		tracing::info!("using sentry");
+	}
+
+	guard
 }
 
 pub fn register_requests<L>(server: &mut Server<L>) {
