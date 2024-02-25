@@ -1,9 +1,11 @@
 [package]
-name = "file-db"
-version = "0.1.1"
+name = "iron-os-file-db"
+description = "Iron OS File DB"
+version = "0.2.0"
+authors = ["Sören meier <info@soerenmeier.ch>"]
+repository = "https://github.com/iron-os/iron-os"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT OR Apache-2.0"
 
 [features]
 async = ["tokio"]
