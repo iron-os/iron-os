@@ -11,7 +11,7 @@ image-debug = []
 lto = true
 
 [dependencies]
-file-db = { version = "0.1", path = "./../file-db" }
+file-db = { package = "iron-os-file-db", version = "0.2" }
 serde = { version = "1.0", features = ["derive"] }
 linux-info = "0.1.8"
 gpt = { version = "3.0", git = "https://github.com/soerenmeier/gpt", branch = "tmp_master" }

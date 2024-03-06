@@ -8,13 +8,20 @@ lto = true
 
 [dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "fs"] }
-packages = { package = "packages-api", version = "0.1", path = "./../packages-api" }
+packages = { package = "iron-os-packages-api", version = "0.1", path = "../packages-api" }
 serde = { version = "1.0", features = ["derive"] }
-file-db = { version = "0.1", features = ["async"], path = "./../file-db" }
-crypto = { package = "fire-crypto", version = "0.4", features = ["cipher", "signature", "serde", "b64"] }
+file-db = { package = "iron-os-file-db", version = "0.2", features = ["async"] }
+crypto = { package = "fire-crypto", version = "0.4", features = [
+    "cipher",
+    "signature",
+    "serde",
+    "b64",
+] }
 toml = "0.8"
 clap = { version = "4.0", features = ["derive"] }
-stream-api = { package = "fire-stream-api", version = "0.3.3", features = ["encrypted"] }
+stream-api = { package = "fire-stream-api", version = "0.3.3", features = [
+    "encrypted",
+] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sentry = "0.32.2"

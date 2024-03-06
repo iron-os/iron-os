@@ -7,15 +7,26 @@ edition = "2021"
 lto = true
 
 [dependencies]
-tokio = { version = "1.0", features = ["time", "macros", "rt-multi-thread", "fs"] }
-bootloader-api = { package = "service-bootloader-api", version = "0.2", features = ["async"], path = "./../service-bootloader-api" }
-fire = { package = "fire-http", version = "0.2", features = ["fs", "json", "ws"] }
+tokio = { version = "1.0", features = [
+    "time",
+    "macros",
+    "rt-multi-thread",
+    "fs",
+] }
+bootloader-api = { package = "service-bootloader-api", version = "0.2", features = [
+    "async",
+], path = "./../service-bootloader-api" }
+fire = { package = "fire-http", version = "0.2", features = [
+    "fs",
+    "json",
+    "ws",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-file-db = { version = "0.1", features = ["async"], path = "./../file-db" }
-packages = { package = "packages-api", version = "0.1", path = "./../packages-api" }
+file-db = { package = "iron-os-file-db", version = "0.2", features = ["async"] }
+packages = { package = "iron-os-packages-api", version = "0.1" }
 rand = "0.8"
-api = { package = "service-api", version = "0.2", path = "./../service-api" }
+api = { package = "iron-os-service-api", version = "0.2", path = "../service-api" }
 # display
 wayland-client = "0.29"
 wayland-commons = "0.29"
