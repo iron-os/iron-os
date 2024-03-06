@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 
-use serde::{Serialize, Deserialize};
 use crypto::signature::{Keypair, PublicKey};
+use serde::{Deserialize, Serialize};
 
 use packages::packages::Channel;
 
@@ -24,7 +24,7 @@ pub struct Config {
 	pub debug: Option<ChannelCfg>,
 	pub alpha: Option<ChannelCfg>,
 	pub beta: Option<ChannelCfg>,
-	pub release: Option<ChannelCfg>
+	pub release: Option<ChannelCfg>,
 }
 
 fn default_auths_file() -> String {
@@ -38,7 +38,7 @@ fn default_packages_file() -> String {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChannelCfg {
 	#[serde(rename = "sign-key")]
-	pub sign_key: PublicKey
+	pub sign_key: PublicKey,
 }
 
 impl Default for Config {
@@ -54,7 +54,7 @@ impl Default for Config {
 			debug: None,
 			alpha: None,
 			beta: None,
-			release: None
+			release: None,
 		}
 	}
 }
@@ -66,33 +66,34 @@ impl Config {
 		}
 
 		let me = Self::default();
-		let s = toml::to_string(&me)
-			.expect("could not serialize config.toml");
+		let s = toml::to_string(&me).expect("could not serialize config.toml");
 
-		fs::write(path, s).await
+		fs::write(path, s)
+			.await
 			.map_err(|e| Error::new("could not create config.toml", e))?;
 
 		Ok(me)
 	}
 
 	pub async fn read(path: &str) -> Result<Self> {
-		let s = fs::read_to_string(path).await
+		let s = fs::read_to_string(path)
+			.await
 			.map_err(|e| Error::new("config.toml not found", e))?;
 		let mut s: Self = toml::from_str(&s)
 			.map_err(|e| Error::other("config.toml error", e))?;
 
 		if let Some(sign_key) = &s.sign_key {
 			s.debug.get_or_insert_with(|| ChannelCfg {
-				sign_key: sign_key.clone()
+				sign_key: sign_key.clone(),
 			});
-			s.alpha.get_or_insert_with(||
-				ChannelCfg { sign_key: sign_key.clone()
+			s.alpha.get_or_insert_with(|| ChannelCfg {
+				sign_key: sign_key.clone(),
 			});
-			s.beta.get_or_insert_with(||
-				ChannelCfg { sign_key: sign_key.clone()
+			s.beta.get_or_insert_with(|| ChannelCfg {
+				sign_key: sign_key.clone(),
 			});
-			s.release.get_or_insert_with(||
-				ChannelCfg { sign_key: sign_key.clone()
+			s.release.get_or_insert_with(|| ChannelCfg {
+				sign_key: sign_key.clone(),
 			});
 		}
 
@@ -100,16 +101,16 @@ impl Config {
 	}
 
 	pub fn has_sign_key(&self) -> bool {
-		self.debug.is_some() ||
-		self.alpha.is_some() ||
-		self.beta.is_some() ||
-		self.release.is_some()
+		self.debug.is_some()
+			|| self.alpha.is_some()
+			|| self.beta.is_some()
+			|| self.release.is_some()
 	}
 
 	/// you need to call has_sign_key before calling this
 	pub fn sign_pub_key_by_channel(
 		&self,
-		channel: Channel
+		channel: Channel,
 	) -> Option<&PublicKey> {
 		match channel {
 			Channel::Debug => self.debug.as_ref().map(|c| &c.sign_key),

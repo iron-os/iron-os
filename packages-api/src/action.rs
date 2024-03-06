@@ -14,5 +14,5 @@ pub enum Action {
 	NewAuthKeyReader = 31,
 	AuthenticateReader = 32,
 	AuthenticateWriter1 = 34,
-	AuthenticateWriter2 = 35
+	AuthenticateWriter2 = 35,
 }

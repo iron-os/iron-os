@@ -1,18 +1,18 @@
 mod command;
-mod service;
 mod disks;
-mod version_info;
-mod util;
 mod hardware_fixes;
+mod service;
+mod util;
+mod version_info;
 
 #[cfg(not(feature = "headless"))]
 use command::Command;
 use hardware_fixes::hardware_fixes;
 
-use std::{io, fs};
 use std::error::Error as StdError;
 use std::thread;
 use std::time::Duration;
+use std::{fs, io};
 
 // get's started as root
 fn main() {
@@ -21,7 +21,7 @@ fn main() {
 	if args.len() >= 2 {
 		if args[1] == "version" {
 			eprintln!("service-bootloader {}", env!("CARGO_PKG_VERSION"));
-			return
+			return;
 		}
 	}
 
@@ -45,7 +45,6 @@ fn main() {
 
 	// now we need to get the service binary
 	loop {
-
 		let e = service::start();
 		if let Err(e) = e {
 			eprintln!("service error {:?}", e);
@@ -56,6 +55,8 @@ fn main() {
 }
 
 fn io_other<E>(e: E) -> io::Error
-where E: Into<Box<dyn StdError + Send + Sync>> {
+where
+	E: Into<Box<dyn StdError + Send + Sync>>,
+{
 	io::Error::new(io::ErrorKind::Other, e)
 }

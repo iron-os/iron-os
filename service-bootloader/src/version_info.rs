@@ -1,12 +1,10 @@
-
 use std::io;
 
-use bootloader_api::requests::{VersionInfo, DeviceId};
+use bootloader_api::requests::{DeviceId, VersionInfo};
 use file_db::FileDb;
 
 pub fn version_info() -> io::Result<VersionInfo> {
-	FileDb::open_sync("/boot/version.fdb")
-		.map(FileDb::into_data)
+	FileDb::open_sync("/boot/version.fdb").map(FileDb::into_data)
 }
 
 pub fn version_info_db() -> io::Result<FileDb<VersionInfo>> {

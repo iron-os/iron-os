@@ -1,26 +1,26 @@
-use crate::io_other;
 use crate::command::Command;
+use crate::io_other;
+use crate::util::{boot_image, cp, list_files, mount, root_uuid, umount};
 use crate::version_info::update_version_info;
-use crate::util::{list_files, root_uuid, mount, cp, umount, boot_image};
 
-use std::path::{Path, PathBuf};
-use std::fs::{self, File, read_to_string, create_dir_all, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
-use std::time::Duration;
-use std::thread;
 use std::fmt::Write as FmtWrite;
+use std::fs::{self, create_dir_all, read_to_string, File, OpenOptions};
+use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
-use gpt::{GptConfig, GptDisk};
-use gpt::partition::{Partition as GptPartition};
-use gpt::mbr::ProtectiveMBR;
 use gpt::disk::LogicalBlockSize;
-use linux_info::storage::{sector_size};
+use gpt::mbr::ProtectiveMBR;
+use gpt::partition::Partition as GptPartition;
+use gpt::{GptConfig, GptDisk};
+use linux_info::storage::sector_size;
 
 use uuid::Uuid;
 
-use bootloader_api::requests::{Disk as ApiDisk, VersionInfo, Architecture};
+use bootloader_api::requests::{Architecture, Disk as ApiDisk, VersionInfo};
 use rand::RngCore;
 
 // the size is set in genimage-efi.cfg
@@ -48,7 +48,9 @@ const IMAGE_NAME_B: &str = "ImageB.gz";
 pub fn api_disks() -> io::Result<Vec<ApiDisk>> {
 	let disks = Disks::read()?;
 
-	let list = disks.inner.into_iter()
+	let list = disks
+		.inner
+		.into_iter()
 		.map(|(name, disk)| {
 			ApiDisk {
 				name,
@@ -57,7 +59,7 @@ pub fn api_disks() -> io::Result<Vec<ApiDisk>> {
 				// there exist devices which are block devices but don't have a
 				// file in /dev/.. (or maybe a driver is missing)
 				// we don't skip those devices but set the size to 0
-				size: disk.size().unwrap_or(0)
+				size: disk.size().unwrap_or(0),
 			}
 		})
 		.collect();
@@ -67,7 +69,7 @@ pub fn api_disks() -> io::Result<Vec<ApiDisk>> {
 
 enum NewDisk {
 	New(Disk),
-	Active
+	Active,
 }
 
 pub fn install_on(name: String) -> io::Result<()> {
@@ -81,40 +83,43 @@ pub fn install_on(name: String) -> io::Result<()> {
 			(true, true) => {
 				active = Some(disk);
 				new = Some(NewDisk::Active);
-			},
+			}
 			(true, false) => {
 				active = Some(disk);
-			},
+			}
 			(false, true) => {
 				new = Some(NewDisk::New(disk));
-			},
+			}
 			_ => {}
 		}
 	}
 
-	let (mut active, new) = active.and_then(|a| new.map(|b| (a, b)))
+	let (mut active, new) = active
+		.and_then(|a| new.map(|b| (a, b)))
 		.ok_or_else(|| io_other("active or new disk not found"))?;
 
 	match new {
 		NewDisk::New(mut disk) => {
 			install_to_new_disk(&mut active, &mut disk)?;
 			Ok(())
-		},
-		NewDisk::Active => todo!("not allowed")
+		}
+		NewDisk::Active => todo!("not allowed"),
 	}
 }
 
 macro_rules! try_cont {
-	($ex:expr) => (match $ex {
-		Some(o) => o,
-		None => continue
-	})
+	($ex:expr) => {
+		match $ex {
+			Some(o) => o,
+			None => continue,
+		}
+	};
 }
 
 #[derive(Debug)]
 struct Disks {
 	// the path (sda, sdb)
-	inner: HashMap<String, Disk>
+	inner: HashMap<String, Disk>,
 }
 
 impl Disks {
@@ -129,7 +134,7 @@ impl Disks {
 			let name = try_cont!(name.to_str());
 			// raspberry has disks that are named like ram1 ...
 			if name.starts_with("loop") || name.starts_with("ram") {
-				continue
+				continue;
 			}
 
 			let name = name.to_string();
@@ -137,7 +142,6 @@ impl Disks {
 			let disk = Disk::new(&name);
 
 			list.insert(name, disk);
-
 		}
 
 		let mut me = Self { inner: list };
@@ -155,11 +159,10 @@ impl Disks {
 
 	fn root_disk() -> io::Result<Disk> {
 		let disks = Disks::read()?;
-		disks.inner.into_iter()
-			.find_map(|(_, disk)|
-				disk.is_root
-					.then(|| disk)
-			)
+		disks
+			.inner
+			.into_iter()
+			.find_map(|(_, disk)| disk.is_root.then(|| disk))
 			.ok_or_else(|| io_other("root disk not found"))
 	}
 }
@@ -168,7 +171,7 @@ impl Disks {
 struct Disk {
 	path: PathBuf,
 	gpt_disk: Option<GptDisk<'static>>,
-	is_root: bool
+	is_root: bool,
 }
 
 impl Disk {
@@ -178,7 +181,7 @@ impl Disk {
 		let mut me = Self {
 			path,
 			gpt_disk: None,
-			is_root: false
+			is_root: false,
 		};
 
 		if let Err(e) = me.open_gpt() {
@@ -190,9 +193,7 @@ impl Disk {
 	}
 
 	fn open_gpt(&mut self) -> io::Result<()> {
-		let disk = GptConfig::new()
-			.writable(false)
-			.open(&self.path)?;
+		let disk = GptConfig::new().writable(false).open(&self.path)?;
 
 		self.gpt_disk = Some(disk);
 		Ok(())
@@ -201,7 +202,7 @@ impl Disk {
 	fn set_root(&mut self, uuid: &Uuid) -> bool {
 		let disk = match &self.gpt_disk {
 			Some(d) => d,
-			None => return false
+			None => return false,
 		};
 
 		if disk.guid() == uuid {
@@ -226,7 +227,8 @@ impl Disk {
 
 	/// returns the sector size if gpt was opened
 	fn sector_size(&self) -> Option<u64> {
-		self.gpt_disk.as_ref()
+		self.gpt_disk
+			.as_ref()
 			.map(|d| (*d.logical_block_size()).into())
 	}
 
@@ -236,9 +238,7 @@ impl Disk {
 	}
 
 	pub fn readable_file(&self) -> io::Result<File> {
-		fs::OpenOptions::new()
-			.read(true)
-			.open(&self.path)
+		fs::OpenOptions::new().read(true).open(&self.path)
 	}
 
 	pub fn writable_file(&self) -> io::Result<File> {
@@ -249,20 +249,22 @@ impl Disk {
 	}
 
 	pub fn get_part(&self, name: &str) -> Option<&GptPartition> {
-		self.gpt_disk.as_ref()?
+		self.gpt_disk
+			.as_ref()?
 			.partitions()
 			.values()
 			.find(|v| v.name == name)
 	}
 
 	pub fn clone_part(&self, name: &str) -> Option<GptPartition> {
-		self.get_part(name)
-			.map(Clone::clone)
+		self.get_part(name).map(Clone::clone)
 	}
 
 	pub fn part_path(&self, name: &str) -> Option<PathBuf> {
 		// get partition number
-		let uuid = self.gpt_disk.as_ref()?
+		let uuid = self
+			.gpt_disk
+			.as_ref()?
 			.partitions()
 			.values()
 			.find(|v| v.name == name)
@@ -282,10 +284,10 @@ impl Disk {
 /// writes a new partition
 fn install_to_new_disk(
 	install_disk: &mut Disk,
-	new_disk: &mut Disk
+	new_disk: &mut Disk,
 ) -> io::Result<()> {
 	// do we need to write the entire drive
-	// or is it enough to 
+	// or is it enough to
 	write_gpt_to_new_disk(install_disk, new_disk)?;
 
 	// wait until linux reads the new gpt table
@@ -306,11 +308,10 @@ fn install_to_new_disk(
 
 fn write_gpt_to_new_disk(
 	install_disk: &mut Disk,
-	new_disk: &mut Disk
+	new_disk: &mut Disk,
 ) -> io::Result<()> {
 	// delete previous gpt if it exists
 	new_disk.gpt_disk = None;
-
 
 	let sector_size = new_disk.raw_sector_size()?;
 	let lbs = LogicalBlockSize::try_from(sector_size)?;
@@ -320,7 +321,8 @@ fn write_gpt_to_new_disk(
 		let prev_mbr = install_disk.read_mbr()?;
 
 		let len = new_disk.size()?;
-		let sectors = len.checked_div(sector_size)
+		let sectors = len
+			.checked_div(sector_size)
 			.ok_or_else(|| io_other("file len not % sector size"))?;
 
 		let mut file = new_disk.writable_file()?;
@@ -344,17 +346,19 @@ fn write_gpt_to_new_disk(
 	let header = disk.primary_header().unwrap();
 
 	// now add boot partition
-	let mut boot = install_disk.clone_part("boot")
+	let mut boot = install_disk
+		.clone_part("boot")
 		.ok_or_else(|| io_other("could not get boot partition"))?;
 	boot.part_guid = Uuid::new_v4();
 	let boot_sectors = BOOT_SIZE / sector_size;
 	boot.first_lba = header.first_usable;
-	boot.last_lba = boot.first_lba + boot_sectors - 1;// -1 because inclusive
+	boot.last_lba = boot.first_lba + boot_sectors - 1; // -1 because inclusive
 
 	let rootfs_sectors = ROOTFS_SIZE / sector_size;
 
 	// now create first root fs partition
-	let mut root_a = install_disk.clone_part("root")
+	let mut root_a = install_disk
+		.clone_part("root")
 		.ok_or_else(|| io_other("could not get root partition"))?;
 	root_a.part_guid = Uuid::new_v4();
 	root_a.first_lba = boot.last_lba + 1;
@@ -370,7 +374,8 @@ fn write_gpt_to_new_disk(
 
 	// data partition
 	let data_lba = (header.last_usable - root_b.last_lba) / 2;
-	let mut data = install_disk.clone_part("data")
+	let mut data = install_disk
+		.clone_part("data")
 		.ok_or_else(|| io_other("could not get data partition"))?;
 	data.part_guid = Uuid::new_v4();
 	data.first_lba = root_b.last_lba + 1;
@@ -397,49 +402,67 @@ fn write_gpt_to_new_disk(
 /// all new partitions to be bigger or the same size as the previous ones
 fn copy_to_new_disk(
 	install_disk: &mut Disk,
-	new_disk: &mut Disk
+	new_disk: &mut Disk,
 ) -> io::Result<()> {
-	let old_sector_size = install_disk.sector_size()
+	let old_sector_size = install_disk
+		.sector_size()
 		.ok_or_else(|| io_other("could not get sector_size"))?;
-	let new_sector_size = new_disk.sector_size()
+	let new_sector_size = new_disk
+		.sector_size()
 		.ok_or_else(|| io_other("could not get sector_size"))?;
 
 	// copy boot to new boot
-	let old_boot = install_disk.get_part("boot")
+	let old_boot = install_disk
+		.get_part("boot")
 		.ok_or_else(|| io_other("could not get old boot partition"))?;
-	let new_boot = new_disk.get_part("boot")
+	let new_boot = new_disk
+		.get_part("boot")
 		.ok_or_else(|| io_other("could not get new boot partition"))?;
 
 	let old_first_byte = old_boot.first_lba * old_sector_size;
 	let new_first_byte = new_boot.first_lba * new_sector_size;
 	let length = (old_boot.last_lba + 1 - old_boot.first_lba) * old_sector_size;
-	copy_len_to_new(install_disk, old_first_byte, length, new_disk, new_first_byte)?;
-
+	copy_len_to_new(
+		install_disk,
+		old_first_byte,
+		length,
+		new_disk,
+		new_first_byte,
+	)?;
 
 	// copy rootfs to new rootfs
-	let old_root = install_disk.get_part("root")
+	let old_root = install_disk
+		.get_part("root")
 		.ok_or_else(|| io_other("could not get old root partition"))?;
-	let new_root = new_disk.get_part("root a")
+	let new_root = new_disk
+		.get_part("root a")
 		.ok_or_else(|| io_other("could not get new root a partition"))?;
 
 	let old_first_byte = old_root.first_lba * old_sector_size;
 	let new_first_byte = new_root.first_lba * new_sector_size;
 	let length = (old_root.last_lba + 1 - old_root.first_lba) * old_sector_size;
-	copy_len_to_new(install_disk, old_first_byte, length, new_disk, new_first_byte)?;
+	copy_len_to_new(
+		install_disk,
+		old_first_byte,
+		length,
+		new_disk,
+		new_first_byte,
+	)?;
 
 	// since the data filesystem is mounted rw
 	// and /var can write to it
 	// we need to copy the files manually
 	// for this we need to first create a filesystem
-	// 
-	let data_path = new_disk.part_path("data")
+	//
+	let data_path = new_disk
+		.part_path("data")
 		.ok_or_else(|| io_other("could not get data partition path"))?;
 
 	// wait max 10s until the path exists
 	for _ in 0..10 {
 		thread::sleep(Duration::from_secs(1));
 		if data_path.exists() {
-			break
+			break;
 		}
 	}
 
@@ -468,9 +491,8 @@ fn copy_len_to_new(
 	install_first_byte: u64,
 	length: u64,
 	new_disk: &mut Disk,
-	new_first_byte: u64
+	new_first_byte: u64,
 ) -> io::Result<()> {
-
 	let mut install = install_disk.readable_file()?;
 	let mut new = new_disk.writable_file()?;
 
@@ -482,25 +504,23 @@ fn copy_len_to_new(
 	new.seek(SeekFrom::Start(new_first_byte))?;
 
 	loop {
-
 		let rem = (length - read).min(buf.len() as u64) as usize;
 
 		if rem == 0 {
-			break
+			break;
 		}
 
 		// fill buffer
 		let read_b = install.read(&mut buf[..rem])?;
 		if read_b == 0 {
-			return Err(io_other("returned 0 bytes but did not read all"))
+			return Err(io_other("returned 0 bytes but did not read all"));
 		}
 
 		// this is just an info
 		if rem != read_b {
 			println!(
 				"could not fill entire buffer expected {} filled {}",
-				rem,
-				read_b
+				rem, read_b
 			);
 		}
 
@@ -527,16 +547,21 @@ fn random_machine_id() -> String {
 // configure the newly installed disk
 fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	// update fstab to with the new uuid
-	let root_path = disk.part_path("root a")
+	let root_path = disk
+		.part_path("root a")
 		.ok_or_else(|| io_other("could not get root path"))?;
 
-	let boot_uuid = disk.get_part("boot")
+	let boot_uuid = disk
+		.get_part("boot")
 		.ok_or_else(|| io_other("could not get boot partition"))?
-		.part_guid.to_string();
+		.part_guid
+		.to_string();
 
-	let data_uuid = disk.get_part("data")
+	let data_uuid = disk
+		.get_part("data")
 		.ok_or_else(|| io_other("could not get data partition"))?
-		.part_guid.to_string();
+		.part_guid
+		.to_string();
 
 	mount(&root_path, "/mnt")?;
 	let fstab = read_to_string("/mnt/etc/fstab.templ")?;
@@ -553,12 +578,15 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 
 	// update grub
 
-	let boot_path = disk.part_path("boot")
+	let boot_path = disk
+		.part_path("boot")
 		.ok_or_else(|| io_other("could not get boot path"))?;
 
-	let root_uuid = disk.get_part("root a")
+	let root_uuid = disk
+		.get_part("root a")
 		.ok_or_else(|| io_other("could not get root partition"))?
-		.part_guid.to_string();
+		.part_guid
+		.to_string();
 
 	mount(&boot_path, "/mnt")?;
 	// update bootloader
@@ -569,19 +597,21 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 		let grub = grub.replace("KERNEL_NAME", IMAGE_NAME);
 		fs::write("/mnt/EFI/BOOT/grub.tmp", grub)?;
 		fs::rename("/mnt/EFI/BOOT/grub.tmp", "/mnt/EFI/BOOT/grub.cfg")?;
-
 	} else if Path::new("/mnt/extlinux/extlinux.templ").is_file() {
 		// is uboot
 		let uboot = read_to_string("/mnt/extlinux/extlinux.templ")?;
 		let uboot = uboot.replace("ROOTFS_UUID", &root_uuid);
 		let uboot = uboot.replace("KERNEL_NAME", IMAGE_NAME);
 		fs::write("/mnt/extlinux/extlinux.tmp", uboot)?;
-		fs::rename("/mnt/extlinux/extlinux.tmp", "/mnt/extlinux/extlinux.conf")?;
+		fs::rename(
+			"/mnt/extlinux/extlinux.tmp",
+			"/mnt/extlinux/extlinux.conf",
+		)?;
 	} else {
 		return Err(io::Error::new(
 			io::ErrorKind::NotFound,
-			"bootloader not identified"
-		))
+			"bootloader not identified",
+		));
 	}
 
 	// update version info
@@ -590,7 +620,7 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 	Ok(())
 }
 
-// path to the folder 
+// path to the folder
 // ## Expects the current disk to be an installed disk
 pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	let boot_img = boot_image()?;
@@ -600,32 +630,36 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 
 	// get all partitions
 
-	let boot_uuid = disk.get_part("boot")
+	let boot_uuid = disk
+		.get_part("boot")
 		.ok_or_else(|| io_other("boot partition not found"))?
-		.part_guid.to_string();
+		.part_guid
+		.to_string();
 
-	let part_a = disk.get_part("root a")
+	let part_a = disk
+		.get_part("root a")
 		.ok_or_else(|| io_other("root a partition not found"))?;
-	let part_b = disk.get_part("root b")
+	let part_b = disk
+		.get_part("root b")
 		.ok_or_else(|| io_other("root b partition not found"))?;
 
-	let data_uuid = disk.get_part("data")
+	let data_uuid = disk
+		.get_part("data")
 		.ok_or_else(|| io_other("data partition not found"))?
-		.part_guid.to_string();
+		.part_guid
+		.to_string();
 
 	let (other_uuid, other) = if part_a.part_guid == part_uuid {
 		(part_b.part_guid, "root b")
 	} else if part_b.part_guid == part_uuid {
 		(part_a.part_guid, "root a")
 	} else {
-		return Err(io_other("root partition not found"))
+		return Err(io_other("root partition not found"));
 	};
 
 	// get the partition we wan't to write the update to
 	let part_path = disk.part_path(other).unwrap();
-	let mut part_file = OpenOptions::new()
-		.write(true)
-		.open(&part_path)?;
+	let mut part_file = OpenOptions::new().write(true).open(&part_path)?;
 
 	let rootfs_path = format!("{path}/rootfs.ext2");
 	let mut rootfs_file = File::open(&rootfs_path)?;
@@ -660,7 +694,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	} else if boot_img.strip_prefix("/") == Some(IMAGE_NAME_B) {
 		IMAGE_NAME
 	} else {
-		return Err(io_other("kernel image not found"))
+		return Err(io_other("kernel image not found"));
 	};
 
 	let other_path = format!("/boot/{other_kernel}");
@@ -675,8 +709,8 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			if !exists {
 				return Err(io::Error::new(
 					io::ErrorKind::NotFound,
-					"/boot/EFI/BOOT/grub.templ not found"
-				))
+					"/boot/EFI/BOOT/grub.templ not found",
+				));
 			}
 
 			// update bootloader
@@ -685,7 +719,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 				fs::copy(new_bootloader, "/boot/EFI/BOOT/bootx64.efi.tmp")?;
 				fs::rename(
 					"/boot/EFI/BOOT/bootx64.efi.tmp",
-					"/boot/EFI/BOOT/bootx64.efi"
+					"/boot/EFI/BOOT/bootx64.efi",
 				)?;
 			}
 
@@ -697,7 +731,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 				fs::copy(new_grub_templ, "/boot/EFI/BOOT/grub.templ.tmp")?;
 				fs::rename(
 					"/boot/EFI/BOOT/grub.templ.tmp",
-					"/boot/EFI/BOOT/grub.templ"
+					"/boot/EFI/BOOT/grub.templ",
 				)?;
 			}
 
@@ -707,24 +741,21 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			let grub = grub.replace("KERNEL_NAME", other_kernel);
 			fs::write("/boot/EFI/BOOT/grub.tmp", grub)?;
 			fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
-		},
+		}
 		Architecture::Arm64 => {
 			let exists = Path::new("/boot/extlinux/extlinux.templ").is_file();
 			if !exists {
 				return Err(io::Error::new(
 					io::ErrorKind::NotFound,
-					"/boot/extlinux/extlinux.templ not found"
-				))
+					"/boot/extlinux/extlinux.templ not found",
+				));
 			}
 
 			// update bootloader
 			let new_bootloader = Path::new(path).join("u-boot.bin");
 			if new_bootloader.is_file() {
 				fs::copy(new_bootloader, "/boot/u-boot.bin.tmp")?;
-				fs::rename(
-					"/boot/u-boot.bin.tmp",
-					"/boot/u-boot.bin"
-				)?;
+				fs::rename("/boot/u-boot.bin.tmp", "/boot/u-boot.bin")?;
 			}
 
 			// update uboot cfg template
@@ -734,11 +765,11 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 				// atomic
 				fs::copy(
 					new_extlinux_templ,
-					"/boot/extlinux/extlinux.templ.tmp"
+					"/boot/extlinux/extlinux.templ.tmp",
 				)?;
 				fs::rename(
 					"/boot/extlinux/extlinux.templ.tmp",
-					"/boot/extlinux/extlinux.templ"
+					"/boot/extlinux/extlinux.templ",
 				)?;
 			}
 
@@ -749,7 +780,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
 			fs::rename(
 				"/boot/extlinux/extlinux.tmp",
-				"/boot/extlinux/extlinux.conf"
+				"/boot/extlinux/extlinux.conf",
 			)?;
 		}
 	}

@@ -1,9 +1,10 @@
-
-use std::io;
 use std::error::Error;
+use std::io;
 
 pub fn io_other<E>(e: E) -> io::Error
-where E: Into<Box<dyn Error + Send + Sync>> {
+where
+	E: Into<Box<dyn Error + Send + Sync>>,
+{
 	io::Error::new(io::ErrorKind::Other, e)
 }
 

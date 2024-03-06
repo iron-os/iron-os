@@ -1,17 +1,16 @@
-
 // - SystemInfo (VersionInfo, Packages)
 // - DeviceInfo (Cpu, Disks, Ram, Processes?)
 // - OpenPage (open a web page)
-// - 
+// -
 // - DisplayState (turn on off)
 
 pub mod device;
 pub mod network;
 
-use crate::Action;
 use crate::error::Error;
+use crate::Action;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use stream_api::request::Request;
 
@@ -41,7 +40,7 @@ pub mod system {
 		pub packages: Vec<ShortPackage>,
 		pub channel: Channel,
 		pub device_id: Option<DeviceId>,
-		pub installed: bool
+		pub installed: bool,
 	}
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,7 +48,7 @@ pub mod system {
 	pub struct ShortPackage {
 		pub name: String,
 		pub version: String,
-		pub path: String
+		pub path: String,
 	}
 
 	impl<B> Request<Action, B> for SystemInfoReq {
@@ -59,13 +58,12 @@ pub mod system {
 		const ACTION: Action = Action::SystemInfo;
 	}
 
-
 	/// This request should only be used if `SystemInfo.installed == false`
 	#[derive(Debug, Serialize, Deserialize)]
 	#[serde(rename_all = "camelCase")]
 	pub struct InstallOnReq {
 		/// The name of a disk that is returned from DisksReq
-		pub disk: String
+		pub disk: String,
 	}
 
 	impl<B> Request<Action, B> for InstallOnReq {
@@ -74,7 +72,6 @@ pub mod system {
 
 		const ACTION: Action = Action::InstallOn;
 	}
-
 }
 
 pub mod ui {
@@ -88,7 +85,7 @@ pub mod ui {
 	#[derive(Debug, Serialize, Deserialize)]
 	#[serde(rename_all = "camelCase")]
 	pub struct OpenPageReq {
-		pub url: String
+		pub url: String,
 	}
 
 	impl<B> Request<Action, B> for OpenPageReq {
@@ -97,9 +94,7 @@ pub mod ui {
 
 		const ACTION: Action = Action::OpenPage;
 	}
-
 }
-
 
 pub mod packages {
 
@@ -111,7 +106,7 @@ pub mod packages {
 
 	use super::*;
 
-	pub use packages_api::packages::{Source, Channel, Hash, Signature};
+	pub use packages_api::packages::{Channel, Hash, Signature, Source};
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct ListPackagesReq;
@@ -123,7 +118,7 @@ pub mod packages {
 		pub packages: Vec<Package>,
 		pub sources: Vec<Source>,
 		pub channel: Channel,
-		pub on_run: String
+		pub on_run: String,
 	}
 
 	impl ListPackages {
@@ -142,7 +137,7 @@ pub mod packages {
 		pub version: Hash,
 		pub signature: Signature,
 		pub binary: Option<String>,
-		pub path: String
+		pub path: String,
 	}
 
 	impl<B> Request<Action, B> for ListPackagesReq {
@@ -152,18 +147,17 @@ pub mod packages {
 		const ACTION: Action = Action::ListPackages;
 	}
 
-
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	#[serde(rename_all = "camelCase")]
 	pub struct AddPackageReq {
-		pub name: String
+		pub name: String,
 	}
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	#[serde(rename_all = "camelCase")]
 	pub struct AddPackage {
 		/// Returns None if the package was not found
-		pub package: Option<Package>
+		pub package: Option<Package>,
 	}
 
 	impl<B> Request<Action, B> for AddPackageReq {
@@ -173,12 +167,11 @@ pub mod packages {
 		const ACTION: Action = Action::AddPackage;
 	}
 
-
 	/// Not implemented
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	#[serde(rename_all = "camelCase")]
 	pub struct RemovePackageReq {
-		pub name: String
+		pub name: String,
 	}
 
 	impl<B> Request<Action, B> for RemovePackageReq {

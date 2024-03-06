@@ -1,10 +1,9 @@
-
 use super::Data;
 
+use fire::ws::{Error, Message};
 use fire::ws_route;
-use fire::ws::{Message, Error};
 
-ws_route!{
+ws_route! {
 	MainWs, "/service-stream", |ws, api, web_watchdog| -> Result<(), Error> {
 		loop {
 			tokio::select! {

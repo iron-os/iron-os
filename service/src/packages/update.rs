@@ -1,18 +1,17 @@
 use super::{
-	Update, PACKAGES_DIR, extract, PackageUpdateState,
-	ImageUpdateState
+	extract, ImageUpdateState, PackageUpdateState, Update, PACKAGES_DIR,
 };
-use crate::Bootloader;
 use crate::util::io_other;
+use crate::Bootloader;
 
 use std::{io, mem};
 
 use tokio::fs;
 
-use packages::packages::{Package, Source};
 use packages::client::Client;
-use packages::requests::GetFileBuilder;
 use packages::error::Error;
+use packages::packages::{Package, Source};
+use packages::requests::GetFileBuilder;
 
 use bootloader_api::requests::UpdateReq;
 
@@ -21,18 +20,14 @@ use bootloader_api::requests::UpdateReq;
 pub(super) async fn update(
 	sources: &[Source],
 	update: &mut Update,
-	bootloader: &Bootloader
+	bootloader: &Bootloader,
 ) -> io::Result<()> {
 	for source in sources.iter().rev() {
 		if update.is_finished() {
-			break
+			break;
 		}
 
-		update_from_source(
-			source,
-			update,
-			bootloader
-		).await?;
+		update_from_source(source, update, bootloader).await?;
 	}
 
 	// packages that where not found are still in the GatherInfo or DownloadFile
@@ -54,11 +49,11 @@ const FILE_PART_SIZE: u64 = 16384;
 async fn update_from_source(
 	source: &Source,
 	update: &mut Update,
-	bootloader: &Bootloader
+	bootloader: &Bootloader,
 ) -> io::Result<()> {
-
 	// build connection
-	let client = Client::connect(&source.addr, source.public_key.clone()).await
+	let client = Client::connect(&source.addr, source.public_key.clone())
+		.await
 		.map_err(io_other)?;
 
 	let arch = update.arch;
@@ -67,69 +62,77 @@ async fn update_from_source(
 
 	'package_loop: for (name, state) in update.not_finished_packages() {
 		let (package, get_file, new_folder) = match state {
-			PackageUpdateState::GatherInfo { version, new_folder } => {
+			PackageUpdateState::GatherInfo {
+				version,
+				new_folder,
+			} => {
 				// let's gather some information
 
 				// check package info
-				let package = client.package_info(
-					channel,
-					arch,
-					device_id.clone(),
-					name.to_string()
-				).await.map_err(io_other)?;
+				let package = client
+					.package_info(
+						channel,
+						arch,
+						device_id.clone(),
+						name.to_string(),
+					)
+					.await
+					.map_err(io_other)?;
 
 				// skip if the package was not found
 				let package = match package {
 					Some(p) => p,
-					None => continue
+					None => continue,
 				};
 
 				// if the version is the same
 				// skip downloading and updating
 				if matches!(version, Some(v) if *v == package.version) {
 					*state = PackageUpdateState::NoUpdate;
-					continue
+					continue;
 				}
 
 				// validate signature
-				if !source.sign_key.verify(
-					&package.version,
-					&package.signature
-				) {
+				if !source.sign_key.verify(&package.version, &package.signature)
+				{
 					eprintln!("signature mismatch for {:?}", package);
 					// this was a hard error but we don't wan't to brick the
 					// whole update process if a package was uploaded with the
 					// wrong signature
 
 					// this is not optimal since it might be flagged as NotFound
-					continue
+					continue;
 				}
 
 				// now we know we should download the file
 				*state = PackageUpdateState::DownloadFile {
 					get_file: GetFileBuilder::new(
 						package.version.clone(),
-						FILE_PART_SIZE
+						FILE_PART_SIZE,
 					),
 					package,
-					new_folder: mem::take(new_folder)
+					new_folder: mem::take(new_folder),
 				};
 
 				match state {
 					PackageUpdateState::DownloadFile {
-						package, get_file, new_folder
+						package,
+						get_file,
+						new_folder,
 					} => (package, get_file, new_folder),
-					_ => unreachable!()
+					_ => unreachable!(),
 				}
-			},
+			}
 			PackageUpdateState::DownloadFile {
-				package, get_file, new_folder
+				package,
+				get_file,
+				new_folder,
 			} => (package, get_file, new_folder),
 			// not_finished_packages only returns packages that are not yet
 			// finished, which does not include the following states
-			PackageUpdateState::NoUpdate |
-			PackageUpdateState::Updated(_) |
-			PackageUpdateState::NotFound => unreachable!()
+			PackageUpdateState::NoUpdate
+			| PackageUpdateState::Updated(_)
+			| PackageUpdateState::NotFound => unreachable!(),
 		};
 
 		// download the file
@@ -137,9 +140,9 @@ async fn update_from_source(
 			let r = client.get_file_with_builder(get_file).await;
 
 			match r {
-				Ok(_) => {},
+				Ok(_) => {}
 				Err(Error::FileNotFound) => continue 'package_loop,
-				Err(e) => return Err(io_other(e))
+				Err(e) => return Err(io_other(e)),
 			}
 		}
 
@@ -150,12 +153,7 @@ async fn update_from_source(
 	}
 
 	if !update.image.is_finished() {
-		update_image(
-			source,
-			update,
-			&client,
-			bootloader
-		).await?;
+		update_image(source, update, &client, bootloader).await?;
 	}
 
 	Ok(())
@@ -165,24 +163,23 @@ async fn update_from_source(
 async fn update_package(
 	new_folder: &str,
 	new: &Package,
-	file: &GetFileBuilder
+	file: &GetFileBuilder,
 ) -> io::Result<()> {
-
 	// extract
 	let package_dir = format!("{}/{}", PACKAGES_DIR, new.name);
 	let tar = format!("{}/{}.tar.gz", package_dir, new.name);
 
 	// create package directory if it doens't exist
 	match fs::create_dir(&package_dir).await {
-		Ok(_) => {},
+		Ok(_) => {}
 		// don't return an error if the path already exists
-		Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {},
-		Err(e) => return Err(e)
+		Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+		Err(e) => return Err(e),
 	}
 
 	// validate hash
 	if file.hash() != new.version {
-		return Err(io_other!("hash mismatch {:?}", new))
+		return Err(io_other!("hash mismatch {:?}", new));
 	}
 
 	// remove file if it exists
@@ -199,7 +196,6 @@ async fn update_package(
 	let _ = fs::remove_dir_all(&extracted_path).await;
 	extract(&tar, &package_dir).await?;
 
-
 	fs::rename(extracted_path, other_path).await?;
 
 	fs::remove_file(&tar).await?;
@@ -212,64 +208,64 @@ async fn update_image(
 	source: &Source,
 	update: &mut Update,
 	client: &Client,
-	bootloader: &Bootloader
+	bootloader: &Bootloader,
 ) -> io::Result<()> {
 	let state = &mut update.image;
 
 	let (package, file) = match state {
 		ImageUpdateState::GatherInfo { version } => {
 			// check for new version
-			let package = client.package_info(
-				update.channel,
-				update.arch,
-				update.device_id.clone(),
-				format!("image-{}", update.board)
-			).await.map_err(io_other)?;
+			let package = client
+				.package_info(
+					update.channel,
+					update.arch,
+					update.device_id.clone(),
+					format!("image-{}", update.board),
+				)
+				.await
+				.map_err(io_other)?;
 
 			// skip if the package was not found
 			let package = match package {
 				Some(p) => p,
-				None => return Ok(())
+				None => return Ok(()),
 			};
 
 			if version == &package.version {
 				*state = ImageUpdateState::NoUpdate;
-				return Ok(())
+				return Ok(());
 			}
 
 			// validate signature
-			if !source.sign_key.verify(
-				&package.version,
-				&package.signature
-			) {
+			if !source.sign_key.verify(&package.version, &package.signature) {
 				eprintln!("signature mismatch {:?}", package);
 				// might be flagged as not found
-				return Ok(())
+				return Ok(());
 			}
 
 			*state = ImageUpdateState::DownloadFile {
 				get_file: GetFileBuilder::new(
 					package.version.clone(),
-					FILE_PART_SIZE
+					FILE_PART_SIZE,
 				),
-				package
+				package,
 			};
 
 			match state {
 				ImageUpdateState::DownloadFile { package, get_file } => {
 					(package, get_file)
-				},
-				_ => unreachable!()
+				}
+				_ => unreachable!(),
 			}
-		},
+		}
 		ImageUpdateState::DownloadFile { package, get_file } => {
 			(package, get_file)
-		},
+		}
 		// theses states are marked as finished and since this function
 		// only get's called with unfinished states, unreachable
-		ImageUpdateState::NoUpdate |
-		ImageUpdateState::Updated(_) |
-		ImageUpdateState::NotFound => unreachable!()
+		ImageUpdateState::NoUpdate
+		| ImageUpdateState::Updated(_)
+		| ImageUpdateState::NotFound => unreachable!(),
 	};
 
 	// download the file
@@ -277,9 +273,9 @@ async fn update_image(
 		let r = client.get_file_with_builder(file).await;
 
 		match r {
-			Ok(_) => {},
+			Ok(_) => {}
 			Err(Error::FileNotFound) => return Ok(()),
-			Err(e) => return Err(io_other(e))
+			Err(e) => return Err(io_other(e)),
 		}
 	}
 
@@ -290,13 +286,12 @@ async fn update_image(
 
 	// validate hash
 	if file.hash() != package.version {
-		return Err(io_other!("hash mismatch {:?}", package))
+		return Err(io_other!("hash mismatch {:?}", package));
 	}
 
 	// remove file if it exists
 	let _ = fs::remove_file(&tar).await;
 	fs::write(&tar, file.file()).await?;
-
 
 	let img_path = format!("{}/{}", path, package.name);
 	let _ = fs::remove_dir_all(&img_path).await;
@@ -310,10 +305,9 @@ async fn update_image(
 		version_str: package.version_str.clone(),
 		version: package.version.clone(),
 		signature: package.signature.clone(),
-		path: img_path.clone()
+		path: img_path.clone(),
 	};
-	let version = bootloader.update(&req).await
-		.map_err(io_other)?;
+	let version = bootloader.update(&req).await.map_err(io_other)?;
 
 	// remove the folder
 	let _ = fs::remove_dir_all(&img_path).await;

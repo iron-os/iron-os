@@ -1,7 +1,6 @@
-
 use std::fmt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Error {
@@ -15,7 +14,7 @@ pub enum Error {
 	DeserializationError,
 	InternalError(String),
 	// update errors
-	AlreadyUpdated
+	AlreadyUpdated,
 }
 
 impl Error {

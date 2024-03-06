@@ -1,19 +1,19 @@
-use std::time::Duration;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 
-use dbus::{Error, Path};
-use dbus::blocking::{Connection as DbusConnection, Proxy};
 use dbus::arg::{RefArg, Variant};
+use dbus::blocking::{Connection as DbusConnection, Proxy};
+use dbus::{Error, Path};
 
-use nmdbus::NetworkManager as DbusNetworkManager;
+use nmdbus::accesspoint::AccessPoint as AccessPointTrait;
 use nmdbus::device::Device as DeviceTrait;
 use nmdbus::device_wireless::DeviceWireless;
-use nmdbus::accesspoint::AccessPoint as AccessPointTrait;
 use nmdbus::settings::Settings as SettingsTrait;
 use nmdbus::settings_connection::SettingsConnection as SettingsConnectionTrait;
+use nmdbus::NetworkManager as DbusNetworkManager;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const DBUS_NAME: &str = "org.freedesktop.NetworkManager";
 const DBUS_PATH: &str = "/org/freedesktop/NetworkManager";
@@ -22,17 +22,16 @@ const TIMEOUT: Duration = Duration::from_secs(2);
 
 /*
  let response = self.dbus
-    .call(NM_SETTINGS_PATH, NM_SETTINGS_INTERFACE, "ListConnections")?;
+	.call(NM_SETTINGS_PATH, NM_SETTINGS_INTERFACE, "ListConnections")?;
 
 let array: Array<Path, _> = self.dbus.extract(&response)?;
 
 Ok(array.map(|e| e.to_string()).collect())
 */
 
-
 #[derive(Clone)]
 struct Dbus {
-	conn: Arc<DbusConnection>
+	conn: Arc<DbusConnection>,
 }
 
 impl Dbus {
@@ -44,32 +43,29 @@ impl Dbus {
 
 	fn proxy<'a, 'b>(
 		&'b self,
-		path: impl Into<Path<'a>>
+		path: impl Into<Path<'a>>,
 	) -> Proxy<'a, &'b DbusConnection> {
 		self.conn.with_proxy(DBUS_NAME, path, TIMEOUT)
 	}
 }
 
-
 #[derive(Clone)]
 pub struct NetworkManager {
-	dbus: Dbus
+	dbus: Dbus,
 }
 
 impl NetworkManager {
 	pub fn connect() -> Result<Self, Error> {
-		Dbus::connect()
-			.map(|dbus| Self { dbus })
+		Dbus::connect().map(|dbus| Self { dbus })
 	}
 
 	pub fn devices(&self) -> Result<Vec<Device>, Error> {
 		let paths = self.dbus.proxy(DBUS_PATH).get_devices()?;
-		let devices = paths.into_iter()
-			.map(|path| {
-				Device {
-					dbus: self.dbus.clone(),
-					path
-				}
+		let devices = paths
+			.into_iter()
+			.map(|path| Device {
+				dbus: self.dbus.clone(),
+				path,
 			})
 			.collect();
 
@@ -78,12 +74,11 @@ impl NetworkManager {
 
 	pub fn connections(&self) -> Result<Vec<Connection>, Error> {
 		let paths = self.dbus.proxy(DBUS_PATH_SETTINGS).list_connections()?;
-		let connections = paths.into_iter()
-			.map(|path| {
-				Connection {
-					dbus: self.dbus.clone(),
-					path
-				}
+		let connections = paths
+			.into_iter()
+			.map(|path| Connection {
+				dbus: self.dbus.clone(),
+				path,
 			})
 			.collect();
 
@@ -92,29 +87,29 @@ impl NetworkManager {
 
 	pub fn add_connection(
 		&self,
-		connection: HashMap<&str, PropMap>
+		connection: HashMap<&str, PropMap>,
 	) -> Result<Connection, Error> {
-		let connection = connection.into_iter()
-			.map(|(k, v)| (k, v.inner))
-			.collect();
+		let connection =
+			connection.into_iter().map(|(k, v)| (k, v.inner)).collect();
 
-		self.dbus.proxy(DBUS_PATH_SETTINGS)
+		self.dbus
+			.proxy(DBUS_PATH_SETTINGS)
 			.add_connection(connection)
-			.map(|path| {
-				Connection {
-					dbus: self.dbus.clone(),
-					path
-				}
+			.map(|path| Connection {
+				dbus: self.dbus.clone(),
+				path,
 			})
 	}
 
 	pub fn remove_connection(&self, uuid: &str) -> Result<(), Error> {
-		let path = self.dbus.proxy(DBUS_PATH_SETTINGS)
+		let path = self
+			.dbus
+			.proxy(DBUS_PATH_SETTINGS)
 			.get_connection_by_uuid(uuid)?;
 
 		let con = Connection {
 			dbus: self.dbus.clone(),
-			path
+			path,
 		};
 
 		con.delete()
@@ -123,7 +118,7 @@ impl NetworkManager {
 
 pub struct Device {
 	dbus: Dbus,
-	path: Path<'static>
+	path: Path<'static>,
 }
 
 impl Device {
@@ -131,31 +126,31 @@ impl Device {
 		self.dbus.proxy(&self.path).interface()
 	}
 
-	// /// The path of the device as exposed by the udev property ID_PATH.  
+	// /// The path of the device as exposed by the udev property ID_PATH.
 	// /// Note that non-UTF-8 characters are backslash escaped.
-	// /// Use g_strcompress() to obtain the true (non-UTF-8) string. 
+	// /// Use g_strcompress() to obtain the true (non-UTF-8) string.
 	// pub fn path(&self) -> Result<String, Error> {
 	// 	self.dbus.proxy(&self.path).path()
 	// }
 
 	/// The general type of the network device; ie Ethernet, Wi-Fi, etc.
 	pub fn kind(&self) -> Result<DeviceKind, Error> {
-		self.dbus.proxy(&self.path).device_type()
-			.map(Into::into)
+		self.dbus.proxy(&self.path).device_type().map(Into::into)
 	}
 
 	/// make sure you call a device with Wifi
 	pub fn access_points(&self) -> Result<Vec<AccessPoint>, Error> {
 		self.dbus.proxy(&self.path).request_scan(HashMap::new())?;
 
-		self.dbus.proxy(&self.path).get_all_access_points()
+		self.dbus
+			.proxy(&self.path)
+			.get_all_access_points()
 			.map(|paths| {
-				paths.into_iter()
-					.map(|path| {
-						AccessPoint {
-							dbus: self.dbus.clone(),
-							path
-						}
+				paths
+					.into_iter()
+					.map(|path| AccessPoint {
+						dbus: self.dbus.clone(),
+						path,
 					})
 					.collect()
 			})
@@ -229,7 +224,7 @@ pub enum DeviceKind {
 	/// an 802.11 Wi-Fi P2P device. Since: 1.16.
 	WifiP2p = 30,
 	/// A VRF (Virtual Routing and Forwarding) interface. Since: 1.24.
-	Vrf = 31
+	Vrf = 31,
 }
 
 impl From<u32> for DeviceKind {
@@ -237,41 +232,35 @@ impl From<u32> for DeviceKind {
 		if num > 31 {
 			Self::Unknown
 		} else {
-			unsafe {
-				*(&num as *const u32 as *const Self)
-			}
+			unsafe { *(&num as *const u32 as *const Self) }
 		}
 	}
 }
 
 pub struct AccessPoint {
 	dbus: Dbus,
-	path: Path<'static>
+	path: Path<'static>,
 }
 
 impl AccessPoint {
 	pub fn wpa_flags(&self) -> Result<ApSecurityFlags, Error> {
-		self.dbus.proxy(&self.path).wpa_flags()
-			.map(Into::into)
+		self.dbus.proxy(&self.path).wpa_flags().map(Into::into)
 	}
 
 	pub fn rsn_flags(&self) -> Result<ApSecurityFlags, Error> {
-		self.dbus.proxy(&self.path).rsn_flags()
-			.map(Into::into)
+		self.dbus.proxy(&self.path).rsn_flags().map(Into::into)
 	}
 
 	pub fn ssid(&self) -> Result<String, Error> {
-		self.dbus.proxy(&self.path).ssid()
-			.and_then(|b| {
-				String::from_utf8(b)
-					.map_err(|_| Error::new_failed("ssid not valid utf8"))
-			})
+		self.dbus.proxy(&self.path).ssid().and_then(|b| {
+			String::from_utf8(b)
+				.map_err(|_| Error::new_failed("ssid not valid utf8"))
+		})
 	}
 
 	#[allow(dead_code)]
 	pub fn mode(&self) -> Result<ApMode, Error> {
-		AccessPointTrait::mode(&self.dbus.proxy(&self.path))
-			.map(Into::into)
+		AccessPointTrait::mode(&self.dbus.proxy(&self.path)).map(Into::into)
 	}
 
 	pub fn strength(&self) -> Result<u8, Error> {
@@ -299,7 +288,7 @@ impl From<u32> for ApSecurityFlags {
 pub enum ApSecurityFlag {
 	None = 0,
 	KeyMgmtPsk = 0x00000100,
-	KeyMgmt802_1x = 0x00000200
+	KeyMgmt802_1x = 0x00000200,
 }
 
 #[repr(u32)]
@@ -308,7 +297,7 @@ pub enum ApMode {
 	Unknown = 0,
 	Adhoc = 1,
 	Infra = 2,
-	Ap = 3
+	Ap = 3,
 }
 
 impl From<u32> for ApMode {
@@ -316,27 +305,23 @@ impl From<u32> for ApMode {
 		if num > 3 {
 			Self::Unknown
 		} else {
-			unsafe {
-				*(&num as *const u32 as *const Self)
-			}
+			unsafe { *(&num as *const u32 as *const Self) }
 		}
 	}
 }
 
-
 pub struct Connection {
 	dbus: Dbus,
-	path: Path<'static>
+	path: Path<'static>,
 }
 
 impl Connection {
 	pub fn get_settings(&self) -> Result<HashMap<String, PropMap>, Error> {
-		self.dbus.proxy(&self.path).get_settings()
-			.map(|map| {
-				map.into_iter()
-					.map(|(k, v)| (k, PropMap { inner: v }))
-					.collect()
-			})
+		self.dbus.proxy(&self.path).get_settings().map(|map| {
+			map.into_iter()
+				.map(|(k, v)| (k, PropMap { inner: v }))
+				.collect()
+		})
 	}
 
 	pub fn delete(&self) -> Result<(), Error> {
@@ -346,23 +331,25 @@ impl Connection {
 
 #[derive(Debug)]
 pub struct PropMap {
-	inner: HashMap<String, Variant<Box<dyn RefArg + 'static>>>
+	inner: HashMap<String, Variant<Box<dyn RefArg + 'static>>>,
 }
 
 impl PropMap {
 	pub fn new() -> Self {
 		Self {
-			inner: HashMap::new()
+			inner: HashMap::new(),
 		}
 	}
 
 	pub fn get_str(&self, s: &str) -> Option<&str> {
-		self.inner.get(s)?
-			.as_str()
+		self.inner.get(s)?.as_str()
 	}
 
 	pub fn get_string_from_bytes(&self, s: &str) -> Option<String> {
-		let bytes: Vec<u8> = self.inner.get(s)?.0
+		let bytes: Vec<u8> = self
+			.inner
+			.get(s)?
+			.0
 			.as_iter()?
 			// this should be done better
 			.map(|a| a.as_u64().and_then(|u| u.try_into().ok()))
@@ -371,14 +358,18 @@ impl PropMap {
 		String::from_utf8(bytes).ok()
 	}
 
-	pub fn insert_string(&mut self, k: impl Into<String>, v: impl Into<String>) {
+	pub fn insert_string(
+		&mut self,
+		k: impl Into<String>,
+		v: impl Into<String>,
+	) {
 		self.inner.insert(k.into(), Variant(Box::new(v.into())));
 	}
 
 	pub fn insert_string_as_bytes(
 		&mut self,
 		k: impl Into<String>,
-		v: impl Into<String>
+		v: impl Into<String>,
 	) {
 		let v = v.into().into_bytes();
 		self.inner.insert(k.into(), Variant(Box::new(v)));

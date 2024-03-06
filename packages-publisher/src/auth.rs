@@ -1,16 +1,16 @@
+use crate::config::Config;
 use crate::error::Result;
 use crate::util::get_priv_key;
-use crate::config::Config;
 
-use packages::packages::Channel;
 use packages::client::Client;
+use packages::packages::Channel;
 
 /// Requests an authentication reader key from a server.
-/// 
+///
 /// Automatically stores it in the configuration file.
 #[derive(clap::Parser)]
 pub struct AuthOpts {
-	channel: Channel
+	channel: Channel,
 }
 
 pub async fn authenticate(opts: AuthOpts) -> Result<()> {
@@ -23,13 +23,18 @@ pub async fn authenticate(opts: AuthOpts) -> Result<()> {
 	println!("connecting to {:?}", source.addr);
 
 	// build a connection
-	let client = Client::connect(&source.addr, source.public_key.clone()).await
+	let client = Client::connect(&source.addr, source.public_key.clone())
+		.await
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
-	client.authenticate_writer(&opts.channel, &priv_key).await
+	client
+		.authenticate_writer(&opts.channel, &priv_key)
+		.await
 		.map_err(|e| err!(e, "failed to authenticate as writer"))?;
 
-	let key = client.new_auth_key_reader().await
+	let key = client
+		.new_auth_key_reader()
+		.await
 		.map_err(|e| err!(e, "failed to get auth key reader"))?;
 
 	source.auth_key = Some(key);

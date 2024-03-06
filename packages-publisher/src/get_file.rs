@@ -1,12 +1,11 @@
-use crate::error::Result;
 use crate::config::Config;
+use crate::error::Result;
 
 use tokio::fs;
 
 use packages::client::Client;
+use packages::packages::{BoardArch, Channel};
 use packages::requests::DeviceId;
-use packages::packages::{Channel, BoardArch};
-
 
 #[derive(clap::Parser)]
 pub struct GetFile {
@@ -21,7 +20,7 @@ pub struct GetFile {
 	device_id: Option<DeviceId>,
 
 	/// Where should the file be downloaded to
-	dest: Option<String>
+	dest: Option<String>,
 }
 
 pub async fn get_file(cfg: GetFile) -> Result<()> {
@@ -32,20 +31,22 @@ pub async fn get_file(cfg: GetFile) -> Result<()> {
 	println!("connecting to {}", source.addr);
 
 	// build a connection
-	let client = Client::connect(&source.addr, source.public_key.clone()).await
+	let client = Client::connect(&source.addr, source.public_key.clone())
+		.await
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
-
-	let package = client.package_info(
-		cfg.channel,
-		cfg.arch,
-		cfg.device_id.clone(),
-		cfg.name.clone()
-	).await
+	let package = client
+		.package_info(
+			cfg.channel,
+			cfg.arch,
+			cfg.device_id.clone(),
+			cfg.name.clone(),
+		)
+		.await
 		.map_err(|e| err!(e, "failed to get package info"))?;
 
 	let Some(package) = package else {
-		return Err(err!("not found", "package {} not found", cfg.name))
+		return Err(err!("not found", "package {} not found", cfg.name));
 	};
 
 	println!();
@@ -59,10 +60,12 @@ pub async fn get_file(cfg: GetFile) -> Result<()> {
 	println!("arch: {}", package.arch);
 	println!("binary: {:?}", package.binary);
 
-	let file = client.get_file(package.version.clone()).await
+	let file = client
+		.get_file(package.version.clone())
+		.await
 		.map_err(|e| err!(e, "failed to download file"))?;
 	if file.is_empty() {
-		return Err(err!("not found", "file {} not found", package.name))
+		return Err(err!("not found", "file {} not found", package.name));
 	}
 
 	// todo how do we get a signature key?
@@ -77,9 +80,12 @@ pub async fn get_file(cfg: GetFile) -> Result<()> {
 	client.close().await;
 
 	// write file to disk
-	let dest = cfg.dest.unwrap_or_else(|| format!("./{}.tar.gz", package.name));
+	let dest = cfg
+		.dest
+		.unwrap_or_else(|| format!("./{}.tar.gz", package.name));
 
-	fs::write(&dest, file.file()).await
+	fs::write(&dest, file.file())
+		.await
 		.map_err(|e| err!(e, "could not write to {dest}"))?;
 
 	println!("file written to {dest}");

@@ -2,17 +2,24 @@ use crate::packages::Channel;
 
 use std::fmt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use stream_api::{IntoMessage, FromMessage};
-use stream_api::error::{ApiError, RequestError, MessageError};
+use stream_api::error::{ApiError, MessageError, RequestError};
+use stream_api::{FromMessage, IntoMessage};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-
 // todo i don't wan't to change the enum at the moment
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(IntoMessage, FromMessage)]
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	Serialize,
+	Deserialize,
+	IntoMessage,
+	FromMessage,
+)]
 #[message(json)]
 #[non_exhaustive]
 pub enum Error {
@@ -31,7 +38,7 @@ pub enum Error {
 	Request(String),
 	// deprecated
 	Response(String),
-	Other(String)
+	Other(String),
 }
 
 impl ApiError for Error {
@@ -40,7 +47,7 @@ impl ApiError for Error {
 			RequestError::ConnectionAlreadyClosed => Self::ConnectionClosed,
 			RequestError::NoResponse => Self::RequestDropped,
 			RequestError::ResponsePacket(p) => Self::Response(p.to_string()),
-			e => Self::Request(e.to_string())
+			e => Self::Request(e.to_string()),
 		}
 	}
 

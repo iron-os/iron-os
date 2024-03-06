@@ -1,4 +1,3 @@
-
 macro_rules! kind {
 	($($name:ident),*) => (
 		#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -25,7 +24,6 @@ macro_rules! kind {
 	)
 }
 
-
 /// Example
 /// ```ignore
 /// request_handler!{
@@ -38,7 +36,7 @@ macro_rules! kind {
 macro_rules! request_handler {
 	(
 		fn $name:ident($req:ident: $req_ty:ty) -> $ret_ty:ty $block:block
-	) => (
+	) => {
 		#[allow(non_camel_case_types)]
 		pub struct $name;
 
@@ -56,7 +54,7 @@ macro_rules! request_handler {
 				}
 
 				fn __handle(
-					line: $crate::Line
+					line: $crate::Line,
 				) -> std::result::Result<__Response, __Error> {
 					let req: $req_ty = $crate::deserialize(line.data())
 						.map_err(|_| __Error::DeserializationError)?;
@@ -69,9 +67,9 @@ macro_rules! request_handler {
 					Ok(s) => s,
 					Err(_) => $crate::serialize(&__Error::SerializationError)
 						// this should not be able to fail
-						.unwrap()
+						.unwrap(),
 				}
 			}
 		}
-	)
+	};
 }

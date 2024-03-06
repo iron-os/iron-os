@@ -1,9 +1,8 @@
-
-use std::{fmt, error};
+use std::{error, fmt};
 
 pub use stream_api::error::{ApiError, Error as ErrorTrait};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -14,7 +13,7 @@ pub enum Error {
 	Internal(String),
 	Request(String),
 	Response(String),
-	Other(String)
+	Other(String),
 }
 
 impl Error {

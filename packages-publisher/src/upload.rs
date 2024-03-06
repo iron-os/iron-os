@@ -1,12 +1,12 @@
-use crate::error::Result;
-use crate::util::{
-	read_toml, create_dir, compress, remove_dir, hash_file, get_priv_key
-};
-use crate::script::Script;
 use crate::config::Config;
+use crate::error::Result;
+use crate::script::Script;
+use crate::util::{
+	compress, create_dir, get_priv_key, hash_file, read_toml, remove_dir,
+};
 
-use std::io;
 use std::collections::HashSet;
+use std::io;
 use std::iter::FromIterator;
 
 use crypto::signature::Keypair;
@@ -14,10 +14,8 @@ use crypto::signature::Keypair;
 use tokio::fs::{self, File};
 
 use packages::client::Client;
-use packages::requests::{
-	SetFileReq, DeviceId
-};
-use packages::packages::{Channel, Package, TargetArch, BoardArch};
+use packages::packages::{BoardArch, Channel, Package, TargetArch};
+use packages::requests::{DeviceId, SetFileReq};
 
 use riji::paint_act;
 
@@ -33,14 +31,14 @@ pub struct PackageToml {
 	#[serde(rename = "tar-file")]
 	pub tar_file: Option<String>,
 	#[serde(rename = "single-arch")]
-	pub single_arch: Option<TargetArch>
+	pub single_arch: Option<TargetArch>,
 }
 
 impl PackageToml {
 	pub fn script(&self) -> &str {
 		match &self.script {
 			Some(s) => s,
-			None => "./package.rhai"
+			None => "./package.rhai",
 		}
 	}
 }
@@ -52,7 +50,7 @@ pub struct Upload {
 	/// To what channel should this be updated
 	channel: Channel,
 	/// if no architecture is selected `Amd64` and `Arm64` are used.
-	/// 
+	///
 	/// Expect for image.
 	#[clap(long)]
 	arch: Option<BoardArch>,
@@ -61,7 +59,7 @@ pub struct Upload {
 	#[clap(long, default_value = "0")]
 	auto_whitelist: u32,
 	#[clap(long, num_args(0..))]
-	whitelist: Vec<DeviceId>
+	whitelist: Vec<DeviceId>,
 }
 
 pub async fn upload(cfg: Upload) -> Result<()> {
@@ -79,32 +77,41 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	match (package.single_arch, cfg.arch) {
 		(None, None) => {
 			for arch in &[TargetArch::Amd64, TargetArch::Arm64] {
-				packages.push(build(
-					arch,
+				packages.push(
+					build(
+						arch,
+						&cfg.channel,
+						cfg.host_channel.as_ref(),
+						&package,
+						&priv_key,
+					)
+					.await?,
+				);
+			}
+		}
+		(Some(arch), _) => {
+			packages.push(
+				build(
+					&arch,
 					&cfg.channel,
 					cfg.host_channel.as_ref(),
 					&package,
-					&priv_key
-				).await?);
-			}
-		},
-		(Some(arch), _) => {
-			packages.push(build(
-				&arch,
-				&cfg.channel,
-				cfg.host_channel.as_ref(),
-				&package,
-				&priv_key
-			).await?);
-		},
+					&priv_key,
+				)
+				.await?,
+			);
+		}
 		(_, Some(arch)) => {
-			packages.push(build(
-				&arch.into(),
-				&cfg.channel,
-				cfg.host_channel.as_ref(),
-				&package,
-				&priv_key
-			).await?);
+			packages.push(
+				build(
+					&arch.into(),
+					&cfg.channel,
+					cfg.host_channel.as_ref(),
+					&package,
+					&priv_key,
+				)
+				.await?,
+			);
 		}
 	}
 
@@ -122,41 +129,50 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 	let mut confirm = String::new();
 	let stdin = io::stdin();
-	stdin.read_line(&mut confirm)
+	stdin
+		.read_line(&mut confirm)
 		.map_err(|e| err!(e, "could not read confirmation"))?;
 
 	if confirm.trim() != "YES" {
-		return Err(err!(confirm, "confirmation not received"))
+		return Err(err!(confirm, "confirmation not received"));
 	}
 
 	println!("connecting to {}", source.addr);
 
 	// build a connection
-	let client = Client::connect(&source.addr, source.public_key.clone()).await
+	let client = Client::connect(&source.addr, source.public_key.clone())
+		.await
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
 	// authenticate
-	client.authenticate_writer(&cfg.channel, &priv_key).await
+	client
+		.authenticate_writer(&cfg.channel, &priv_key)
+		.await
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
 	for (tar_path, package) in packages {
-		let tar = File::open(&tar_path).await
-			.expect("tar file deleted");
-		let file_req = SetFileReq::new(package.signature.clone(), tar).await
+		let tar = File::open(&tar_path).await.expect("tar file deleted");
+		let file_req = SetFileReq::new(package.signature.clone(), tar)
+			.await
 			.expect("reading tar failed");
 		assert_eq!(file_req.hash(), package.version);
 
-		client.set_file(file_req).await
+		client
+			.set_file(file_req)
+			.await
 			.map_err(|e| err!(e, "failed to upload file"))?;
 
-		client.set_package_info(
-			package,
-			HashSet::from_iter(cfg.whitelist.clone()),
-			cfg.auto_whitelist
-		).await
+		client
+			.set_package_info(
+				package,
+				HashSet::from_iter(cfg.whitelist.clone()),
+				cfg.auto_whitelist,
+			)
+			.await
 			.map_err(|e| err!(e, "failed to upload package"))?;
 
-		fs::remove_file(&tar_path).await
+		fs::remove_file(&tar_path)
+			.await
 			.expect("could not remove tar");
 	}
 
@@ -170,14 +186,12 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 	Ok(())
 }
 
-
 async fn build(
 	arch: &TargetArch,
 	channel: &Channel,
 	host_channel: Option<&Channel>,
 	package: &PackageToml,
-	priv_key: &Keypair
-	// tar file
+	priv_key: &Keypair, // tar file
 ) -> Result<(String, Package)> {
 	// now we need to call build
 	let mut script = Script::new(package.script())?;
@@ -187,7 +201,7 @@ async fn build(
 
 	let tar_name = match &package.tar_file {
 		Some(n) => n.clone(),
-		None => pack(arch, channel, &package, &mut script).await?
+		None => pack(arch, channel, &package, &mut script).await?,
 	};
 
 	let hash = hash_file(&tar_name).await?;
@@ -202,20 +216,18 @@ async fn build(
 		version: hash,
 		signature: sign,
 		arch: *arch,
-		binary: package.binary.clone()
+		binary: package.binary.clone(),
 	};
 
 	Ok((tar_name, package))
 }
 
-
 async fn pack(
 	arch: &TargetArch,
 	channel: &Channel,
 	package: &PackageToml,
-	script: &mut Script
+	script: &mut Script,
 ) -> Result<String> {
-
 	let dest_folder = format!("./package_tmp/{}", package.name);
 	create_dir(&dest_folder).await?;
 
@@ -234,7 +246,8 @@ async fn pack(
 }
 
 async fn print_package(tar_path: &str, pack: &Package) {
-	let size = fs::metadata(tar_path).await
+	let size = fs::metadata(tar_path)
+		.await
 		.expect("failed to read package archive metadata")
 		.len();
 	println!("name: {}", pack.name);

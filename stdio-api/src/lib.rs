@@ -1,7 +1,7 @@
 //! A mini protocol based on stdio  
 //! a request consists of the following: `:>:<key> <data>\n`  
 //! a response consists of the following: `:<:<key> <data>\n`  
-//! 
+//!
 
 use std::mem;
 
@@ -16,9 +16,9 @@ pub use r#async::*;
 #[cfg(feature = "serde")]
 mod serde;
 #[cfg(feature = "serde")]
-pub use serde::{serialize, deserialize};
-#[cfg(feature = "serde")]
 pub use serde::Error as SerdeError;
+#[cfg(feature = "serde")]
+pub use serde::{deserialize, serialize};
 
 // Represents an api line
 // <kind><key> <data>\n
@@ -27,16 +27,15 @@ pub struct Line {
 	kind: Kind,
 	/// contains the length of the key
 	key: usize,
-	inner: String
+	inner: String,
 }
 
 impl Line {
-
 	pub fn new(kind: Kind, key: &str, data: &str) -> Self {
 		Self {
 			key: key.len(),
 			inner: format!("{}{} {}\n", kind.as_str(), key, data),
-			kind
+			kind,
 		}
 	}
 
@@ -44,9 +43,7 @@ impl Line {
 	fn new_raw(kind: Kind, inner: &mut String) -> Self {
 		let inner = mem::take(inner);
 		debug_assert!(inner.len() > 3);
-		let key = inner.find(' ')
-			.unwrap_or(0)
-			.max(3) - 3;// skips the first 3 bytes
+		let key = inner.find(' ').unwrap_or(0).max(3) - 3; // skips the first 3 bytes
 
 		Self { kind, key, inner }
 	}
@@ -67,7 +64,6 @@ impl Line {
 	pub fn as_str(&self) -> &str {
 		&self.inner
 	}
-
 }
 
 // stdin represents the request
@@ -79,7 +75,7 @@ impl Line {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
 	Request,
-	Response
+	Response,
 }
 
 impl Kind {
@@ -91,27 +87,28 @@ impl Kind {
 		match start {
 			":>:" => Some(Self::Request),
 			":<:" => Some(Self::Response),
-			_ => None
+			_ => None,
 		}
 	}
 
 	pub fn as_str(&self) -> &'static str {
 		match self {
 			Self::Request => ":>:",
-			Self::Response => ":<:"
+			Self::Response => ":<:",
 		}
 	}
 }
 
-
 #[derive(Debug)]
 struct Buffer {
-	inner: String
+	inner: String,
 }
 
 impl Buffer {
 	pub fn new() -> Self {
-		Self { inner: String::new() }
+		Self {
+			inner: String::new(),
+		}
 	}
 
 	pub fn as_mut(&mut self) -> &mut String {
@@ -122,7 +119,7 @@ impl Buffer {
 	/// then the line is outputed again to stderr
 	pub fn parse_line(&mut self) -> Option<Line> {
 		if self.inner.is_empty() {
-			return None
+			return None;
 		}
 
 		let kind = Kind::from_str(&self.inner);
@@ -137,7 +134,6 @@ impl Buffer {
 	}
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -145,7 +141,6 @@ mod tests {
 
 	#[test]
 	fn from_str() {
-
 		let mut buffer = Buffer::new();
 		buffer.as_mut().push_str(":>:SomeKey data\n");
 		let line = buffer.parse_line().unwrap();
@@ -157,12 +152,9 @@ mod tests {
 
 	#[test]
 	fn new() {
-
 		let line = Line::new(Kind::Request, "SomeKey", "data");
 		assert_eq!(line.kind, Kind::Request);
 		assert_eq!(line.key(), "SomeKey");
 		assert_eq!(line.data(), "data");
-
 	}
-
 }

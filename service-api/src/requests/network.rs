@@ -1,10 +1,9 @@
-use crate::Action;
 use crate::error::Error;
+use crate::Action;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use stream_api::request::Request;
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +13,7 @@ pub struct AccessPointsReq;
 #[serde(rename_all = "camelCase")]
 pub struct AccessPoints {
 	pub device: String,
-	pub list: Vec<AccessPoint>
+	pub list: Vec<AccessPoint>,
 }
 
 /// only returns ssids which have wpa-psk
@@ -22,8 +21,8 @@ pub struct AccessPoints {
 #[serde(rename_all = "camelCase")]
 pub struct AccessPoint {
 	pub ssid: String,
-	/// 
-	pub strength: u8
+	///
+	pub strength: u8,
 }
 
 impl<B> Request<Action, B> for AccessPointsReq {
@@ -33,7 +32,6 @@ impl<B> Request<Action, B> for AccessPointsReq {
 	const ACTION: Action = Action::NetworkAccessPoints;
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionsReq;
@@ -41,7 +39,7 @@ pub struct ConnectionsReq;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connections {
-	pub list: Vec<Connection>
+	pub list: Vec<Connection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,13 +47,13 @@ pub struct Connections {
 pub struct Connection {
 	pub id: String,
 	pub uuid: String,
-	pub kind: ConnectionKind
+	pub kind: ConnectionKind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConnectionKind {
 	Wifi(ConnectionWifi),
-	Gsm(ConnectionGsm)
+	Gsm(ConnectionGsm),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,13 +61,13 @@ pub enum ConnectionKind {
 pub struct ConnectionWifi {
 	pub interface_name: String,
 	/// can only be ssids which are wpa-psk
-	pub ssid: String
+	pub ssid: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionGsm {
-	pub apn: String
+	pub apn: String,
 }
 
 impl<B> Request<Action, B> for ConnectionsReq {
@@ -79,18 +77,17 @@ impl<B> Request<Action, B> for ConnectionsReq {
 	const ACTION: Action = Action::NetworkConnections;
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddConnectionReq {
 	pub id: String,
-	pub kind: AddConnectionKind
+	pub kind: AddConnectionKind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AddConnectionKind {
 	Wifi(AddConnectionWifi),
-	Gsm(AddConnectionGsm)
+	Gsm(AddConnectionGsm),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,13 +96,13 @@ pub struct AddConnectionWifi {
 	pub interface_name: String,
 	/// can only be ssids which are wpa-psk
 	pub ssid: String,
-	pub password: String
+	pub password: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddConnectionGsm {
-	pub apn: String
+	pub apn: String,
 }
 
 impl<B> Request<Action, B> for AddConnectionReq {
@@ -115,11 +112,10 @@ impl<B> Request<Action, B> for AddConnectionReq {
 	const ACTION: Action = Action::NetworkAddConnection;
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoveConnectionReq {
-	pub uuid: String
+	pub uuid: String,
 }
 
 impl<B> Request<Action, B> for RemoveConnectionReq {

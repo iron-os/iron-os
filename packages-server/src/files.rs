@@ -1,5 +1,5 @@
-use crate::error::{Error, Result};
 use crate::config::Config;
+use crate::error::{Error, Result};
 
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ pub struct Files {
 	// used as a drop holder
 	#[allow(dead_code)]
 	holder: Box<dyn std::any::Any + Send + Sync>,
-	path: PathBuf
+	path: PathBuf,
 }
 
 impl Files {
@@ -22,7 +22,7 @@ impl Files {
 
 		Self {
 			path: tmp.as_ref().into(),
-			holder: Box::new(tmp)
+			holder: Box::new(tmp),
 		}
 	}
 
@@ -31,18 +31,20 @@ impl Files {
 			return Self::read(cfg).await;
 		}
 
-		fs::create_dir(&cfg.files_dir).await
+		fs::create_dir(&cfg.files_dir)
+			.await
 			.map_err(|e| Error::new("could not create files directory", e))?;
 
 		Self::read(cfg).await
 	}
 
 	pub async fn read(cfg: &Config) -> Result<Self> {
-		let path = fs::canonicalize(&cfg.files_dir).await
+		let path = fs::canonicalize(&cfg.files_dir)
+			.await
 			.map_err(|e| Error::new("files dir not found", e))?;
 		Ok(Self {
 			holder: Box::new(path.clone()),
-			path
+			path,
 		})
 	}
 
@@ -65,14 +67,13 @@ impl Files {
 		let file = OpenOptions::new()
 			.create_new(true)
 			.write(true)
-			.open(path).await;
+			.open(path)
+			.await;
 
 		let mut file = match file {
 			Ok(file) => file,
-			Err(e) if e.kind() == ErrorKind::AlreadyExists => {
-				return Ok(())
-			},
-			Err(e) => return Err(e)
+			Err(e) if e.kind() == ErrorKind::AlreadyExists => return Ok(()),
+			Err(e) => return Err(e),
 		};
 
 		file.write_all(&data).await?;

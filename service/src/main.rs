@@ -6,21 +6,18 @@
 
 #[macro_use]
 mod util;
-mod ui;
-mod context;
-mod bootloader;
-mod packages;
 mod api;
-mod subprocess;
+mod bootloader;
+mod context;
 mod display;
+mod packages;
+mod subprocess;
+mod ui;
 
 use bootloader::Bootloader;
 
-
-
 #[tokio::main]
 async fn main() {
-
 	unsafe {
 		context::init();
 	}
@@ -41,7 +38,8 @@ async fn main() {
 		ui_api_tx.open_page("http://127.0.0.1:8080".into());
 
 		// start the ui
-		let ui_bg_task = ui::start(bootloader, ui_api_rx).await
+		let ui_bg_task = ui::start(bootloader, ui_api_rx)
+			.await
 			.expect("ui start failed");
 
 		ui_bg_task.await.expect("ui task failed");
@@ -50,11 +48,13 @@ async fn main() {
 	}
 
 	// start the ui
-	let ui_bg_task = ui::start(bootloader.clone(), ui_api_rx).await
+	let ui_bg_task = ui::start(bootloader.clone(), ui_api_rx)
+		.await
 		.expect("ui start failed");
 
 	// start packages api
-	let (packages, packages_bg_task) = packages::start(bootloader.clone()).await
+	let (packages, packages_bg_task) = packages::start(bootloader.clone())
+		.await
 		.expect("packages failed");
 
 	// start display api
@@ -65,12 +65,15 @@ async fn main() {
 		bootloader.clone(),
 		ui_api_tx,
 		display,
-		packages.clone()
-	).await.expect("service api failed");
+		packages.clone(),
+	)
+	.await
+	.expect("service api failed");
 
 	// detect what package should be run
 	// and run it
-	subprocess::start(packages, bootloader).await
+	subprocess::start(packages, bootloader)
+		.await
 		.expect("failed to start subprocess");
 
 	// now wait until some task fails and restart
@@ -79,6 +82,6 @@ async fn main() {
 		packages_bg_task,
 		service_bg_task,
 		display_bg_task
-	).expect("some task failed");
-
+	)
+	.expect("some task failed");
 }

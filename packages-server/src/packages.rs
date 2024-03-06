@@ -1,31 +1,32 @@
-use crate::Config;
 use crate::error::{Error, Result};
+use crate::Config;
 
-use std::result::Result as StdResult;
-use std::collections::{HashMap, HashSet};
 use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
+use std::result::Result as StdResult;
 
 use tokio::fs;
 use tokio::sync::RwLock;
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Error as SerdeError, IntoDeserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use packages::packages::{Package, Channel, Hash, TargetArch, BoardArch};
+use packages::packages::{BoardArch, Channel, Hash, Package, TargetArch};
 use packages::requests::DeviceId;
 
 use file_db::FileDb;
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct IndexKey {
 	channel: Channel,
-	arch: TargetArch
+	arch: TargetArch,
 }
 
 impl Serialize for IndexKey {
 	fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
-	where S: Serializer {
+	where
+		S: Serializer,
+	{
 		let s = format!("{}-{}", self.channel, self.arch);
 		serializer.serialize_str(&s)
 	}
@@ -33,10 +34,13 @@ impl Serialize for IndexKey {
 
 impl<'de> Deserialize<'de> for IndexKey {
 	fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
-	where D: Deserializer<'de> {
+	where
+		D: Deserializer<'de>,
+	{
 		let s: Cow<'_, str> = Deserialize::deserialize(deserializer)?;
 		let s = s.as_ref();
-		let (channel, arch) = s.split_once('-')
+		let (channel, arch) = s
+			.split_once('-')
 			.ok_or_else(|| D::Error::custom("expected <channel>-<arch>"))?;
 		let channel = Channel::deserialize(channel.into_deserializer())?;
 		let arch = TargetArch::deserialize(arch.into_deserializer())?;
@@ -49,28 +53,30 @@ impl<'de> Deserialize<'de> for IndexKey {
 pub struct EntryIndex {
 	packages_index: IndexKey,
 	name: String,
-	idx: usize
+	idx: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesDbFile {
-	indexes: HashMap<IndexKey, PackagesIndex>
+	indexes: HashMap<IndexKey, PackagesIndex>,
 }
 
 impl PackagesDbFile {
 	fn new() -> Self {
 		Self {
-			indexes: HashMap::new()
+			indexes: HashMap::new(),
 		}
 	}
 
 	pub fn get(&self, idx: &EntryIndex) -> Option<&PackageEntry> {
-		self.indexes.get(&idx.packages_index)
+		self.indexes
+			.get(&idx.packages_index)
 			.and_then(|packages| packages.get(&idx.name, idx.idx))
 	}
 
 	pub fn get_mut(&mut self, idx: &EntryIndex) -> Option<&mut PackageEntry> {
-		self.indexes.get_mut(&idx.packages_index)
+		self.indexes
+			.get_mut(&idx.packages_index)
 			.and_then(|packages| packages.get_mut(&idx.name, idx.idx))
 	}
 
@@ -86,7 +92,7 @@ impl PackagesDbFile {
 		arch: &BoardArch,
 		channel: &Channel,
 		name: &str,
-		device_id: &Option<DeviceId>
+		device_id: &Option<DeviceId>,
 	) -> Option<EntryIndex> {
 		// first try with the provided arch
 		// else try with the any arch
@@ -94,7 +100,10 @@ impl PackagesDbFile {
 		self.get_latest_inner(&(*arch).into(), channel, name, device_id)
 			.or_else(|| {
 				self.get_latest_inner(
-					&TargetArch::Any, channel, name, device_id
+					&TargetArch::Any,
+					channel,
+					name,
+					device_id,
 				)
 			})
 	}
@@ -104,15 +113,15 @@ impl PackagesDbFile {
 		arch: &TargetArch,
 		channel: &Channel,
 		name: &str,
-		device_id: &Option<DeviceId>
+		device_id: &Option<DeviceId>,
 	) -> Option<EntryIndex> {
 		let mut idx = EntryIndex {
 			packages_index: IndexKey {
 				channel: *channel,
-				arch: *arch
+				arch: *arch,
 			},
 			name: name.into(),
-			idx: 0
+			idx: 0,
 		};
 
 		let packages = self.indexes.get(&idx.packages_index)?;
@@ -123,10 +132,13 @@ impl PackagesDbFile {
 
 	fn push(&mut self, channel: Channel, entry: PackageEntry) {
 		// entry: PackageEntry
-		let index = self.indexes.entry(IndexKey {
-			channel,
-			arch: entry.package.arch
-		}).or_insert_with(|| PackagesIndex::new());
+		let index = self
+			.indexes
+			.entry(IndexKey {
+				channel,
+				arch: entry.package.arch,
+			})
+			.or_insert_with(|| PackagesIndex::new());
 		index.push(entry);
 	}
 
@@ -138,12 +150,15 @@ impl PackagesDbFile {
 		version: &Hash,
 		whitelist: HashSet<DeviceId>,
 		mut add: bool,
-		auto_whitelist_limit: u32
+		auto_whitelist_limit: u32,
 	) -> bool {
-		let entry = self.indexes.get_mut(&IndexKey {
-			channel: *channel,
-			arch: *arch
-		}).and_then(|i| i.mut_with_version(name, version));
+		let entry = self
+			.indexes
+			.get_mut(&IndexKey {
+				channel: *channel,
+				arch: *arch,
+			})
+			.and_then(|i| i.mut_with_version(name, version));
 
 		// make sure we don't remove whitelist entries if it is probably not
 		// intended
@@ -177,7 +192,7 @@ impl PackagesDbFile {
 enum InWhitelist {
 	Yes,
 	CanBe,
-	No
+	No,
 }
 
 impl InWhitelist {
@@ -194,7 +209,7 @@ impl From<bool> for InWhitelist {
 	fn from(b: bool) -> Self {
 		match b {
 			true => Self::Yes,
-			false => Self::No
+			false => Self::No,
 		}
 	}
 }
@@ -208,7 +223,7 @@ pub struct PackageEntry {
 	// if this is > 0 every device which request info about the package will be
 	// added to the whitelist until the whitelist.len is >= than this value
 	#[serde(default)]
-	pub auto_whitelist_limit: u32
+	pub auto_whitelist_limit: u32,
 }
 
 impl PackageEntry {
@@ -218,7 +233,7 @@ impl PackageEntry {
 			Some(_) if self.whitelist.is_empty() => InWhitelist::Yes,
 			Some(device_id) if self.whitelist.contains(device_id) => {
 				InWhitelist::Yes
-			},
+			}
 			// might be added to the whitelist
 			Some(_) => {
 				if self.auto_whitelist_limit as usize > self.whitelist.len() {
@@ -243,13 +258,13 @@ impl PackageEntry {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackagesIndex {
 	// last package Entry is the current entry
-	list: HashMap<String, Vec<PackageEntry>>
+	list: HashMap<String, Vec<PackageEntry>>,
 }
 
 impl PackagesIndex {
 	fn new() -> Self {
 		Self {
-			list: HashMap::new()
+			list: HashMap::new(),
 		}
 	}
 
@@ -265,10 +280,13 @@ impl PackagesIndex {
 	fn get_latest(
 		&self,
 		name: &str,
-		device_id: &Option<DeviceId>
+		device_id: &Option<DeviceId>,
 	) -> Option<usize> {
-		self.list.get(name)?
-			.iter().enumerate().rev()
+		self.list
+			.get(name)?
+			.iter()
+			.enumerate()
+			.rev()
 			.find(|(_, e)| e.in_whitelist(device_id).is_or_can_be())
 			.map(|(idx, _)| idx)
 	}
@@ -276,22 +294,22 @@ impl PackagesIndex {
 	fn mut_with_version(
 		&mut self,
 		name: &str,
-		version: &Hash
+		version: &Hash,
 	) -> Option<&mut PackageEntry> {
-		self.list.get_mut(name)?
-			.iter_mut().rev()
-			.find(|e| {
-				&e.package.version == version
-			})
+		self.list
+			.get_mut(name)?
+			.iter_mut()
+			.rev()
+			.find(|e| &e.package.version == version)
 	}
 
 	// push or updates a existing Entry
 	fn push(&mut self, entry: PackageEntry) {
 		let name = entry.package.name.clone();
-		let list = self.list.entry(name)
-			.or_insert(vec![]);
+		let list = self.list.entry(name).or_insert(vec![]);
 
-		let maybe_entry = list.iter_mut()
+		let maybe_entry = list
+			.iter_mut()
 			.find(|e| e.package.version == entry.package.version);
 
 		match maybe_entry {
@@ -299,7 +317,7 @@ impl PackagesIndex {
 				// the version is the same
 				// so override the current package
 				*stored_entry = entry;
-			},
+			}
 			None => {
 				list.push(entry);
 			}
@@ -310,7 +328,7 @@ impl PackagesIndex {
 #[derive(Debug)]
 pub struct PackagesDb {
 	inner: RwLock<FileDb<PackagesDbFile>>,
-	write: bool
+	write: bool,
 }
 
 impl PackagesDb {
@@ -321,7 +339,7 @@ impl PackagesDb {
 
 		Self {
 			inner: RwLock::new(db),
-			write: false
+			write: false,
 		}
 	}
 
@@ -331,22 +349,24 @@ impl PackagesDb {
 		}
 
 		let db = FileDb::new(&cfg.packages_file, PackagesDbFile::new());
-		db.write().await
+		db.write()
+			.await
 			.map_err(|e| Error::new("could not write packages.fdb", e))?;
 
 		Ok(Self {
 			inner: RwLock::new(db),
-			write: true
+			write: true,
 		})
 	}
 
 	pub async fn read(cfg: &Config) -> Result<Self> {
-		let db = FileDb::open(&cfg.packages_file).await
+		let db = FileDb::open(&cfg.packages_file)
+			.await
 			.map_err(|e| Error::new("packages.fdb could not be opened", e))?;
 
 		Ok(Self {
 			inner: RwLock::new(db),
-			write: true
+			write: true,
 		})
 	}
 
@@ -355,7 +375,7 @@ impl PackagesDb {
 		arch: &BoardArch,
 		channel: &Channel,
 		name: &str,
-		device_id: &Option<DeviceId>
+		device_id: &Option<DeviceId>,
 	) -> Option<PackageEntry> {
 		{
 			let lock = self.inner.read().await;
@@ -366,7 +386,7 @@ impl PackagesDb {
 
 			// check if we need to add us to the whitelist
 			if !package.in_whitelist(device_id).can_be() {
-				return Some(package.clone())
+				return Some(package.clone());
 			}
 		};
 
@@ -387,8 +407,7 @@ impl PackagesDb {
 		db.push(channel, entry);
 
 		if self.write {
-			lock.write().await
-				.expect("writing failed unexpectetly")
+			lock.write().await.expect("writing failed unexpectetly")
 		}
 	}
 
@@ -401,7 +420,7 @@ impl PackagesDb {
 		version: &Hash,
 		whitelist: HashSet<DeviceId>,
 		add: bool,
-		auto_whitelist_limit: u32
+		auto_whitelist_limit: u32,
 	) -> bool {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
@@ -412,12 +431,11 @@ impl PackagesDb {
 			version,
 			whitelist,
 			add,
-			auto_whitelist_limit
+			auto_whitelist_limit,
 		);
 
 		if self.write {
-			lock.write().await
-				.expect("writing failed unexpectetly");
+			lock.write().await.expect("writing failed unexpectetly");
 		}
 
 		r

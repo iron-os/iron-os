@@ -1,20 +1,17 @@
-
 use crate::command::Command;
 use crate::io_other;
 
-use std::io;
-use std::path::{Path, PathBuf};
-use std::os::unix::io::AsRawFd;
 use std::fs::{self, File};
+use std::io;
+use std::os::unix::io::AsRawFd;
+use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
 
-use libc::{uid_t, gid_t};
+use libc::{gid_t, uid_t};
 
 pub fn chown(fd: &File, owner: uid_t, group: gid_t) -> io::Result<()> {
-	let r = unsafe {
-		libc::fchown(fd.as_raw_fd(), owner, group)
-	};
+	let r = unsafe { libc::fchown(fd.as_raw_fd(), owner, group) };
 
 	if r == -1 {
 		Err(io::Error::last_os_error())
@@ -28,10 +25,7 @@ pub fn mount(path: impl AsRef<Path>, dest: impl AsRef<Path>) -> io::Result<()> {
 	// first unmount
 	// but ignore the result since it returns an error of nothing is mounted
 	let _ = umount(dest);
-	Command::new("mount")
-		.arg(path.as_ref())
-		.arg(dest)
-		.exec()
+	Command::new("mount").arg(path.as_ref()).arg(dest).exec()
 }
 
 pub fn umount(path: impl AsRef<Path>) -> io::Result<()> {
@@ -41,9 +35,7 @@ pub fn umount(path: impl AsRef<Path>) -> io::Result<()> {
 	// we can do without -f since it works but checking the status code needs
 	// some user code?
 
-	Command::new("umount")
-		.arg(path.as_ref())
-		.exec()
+	Command::new("umount").arg(path.as_ref()).exec()
 }
 
 pub fn cp(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
@@ -61,7 +53,7 @@ pub fn list_files(dir: impl AsRef<Path>) -> io::Result<Vec<PathBuf>> {
 	for entry in fs::read_dir(dir)? {
 		let e = entry?;
 		if e.file_type()?.is_dir() {
-			continue
+			continue;
 		}
 
 		// so we have a file

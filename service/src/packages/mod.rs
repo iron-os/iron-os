@@ -5,7 +5,7 @@
 //!   - package.fdb // json_db containing information about the package
 //!   - left
 //!   - right
-//! 
+//!
 //! package.fdb
 //!  - name
 //!  - version_str
@@ -19,31 +19,31 @@ mod update;
 use update::update;
 
 // use crypto::signature::PublicKey;
-use crate::Bootloader;
 use crate::util::io_other;
+use crate::Bootloader;
 
+use std::collections::{hash_map::Entry, HashMap};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::collections::{HashMap, hash_map::Entry};
 use std::time::Instant;
 
 use tokio::fs;
-use tokio::task::JoinHandle;
-use tokio::time::{Duration, sleep};
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio::task::JoinHandle;
+use tokio::time::{sleep, Duration};
 
 use rand::{thread_rng, Rng};
 
-use bootloader_api::requests::{VersionInfo, DeviceId, Architecture};
+use api::requests::packages::Package;
+use bootloader_api::requests::{Architecture, DeviceId, VersionInfo};
+use file_db::FileDb;
 use packages::packages::{
-	PackagesCfg, PackageCfg, Package as PackPackage, BoardArch,
-	Channel, Hash, Source
+	BoardArch, Channel, Hash, Package as PackPackage, PackageCfg, PackagesCfg,
+	Source,
 };
 use packages::requests::GetFileBuilder;
-use api::requests::packages::Package;
-use file_db::FileDb;
 
 const PACKAGES_DIR: &str = "/data/packages";
 
@@ -57,25 +57,19 @@ fn path(s: &str) -> PathBuf {
 fn new_api() -> (PackagesApi, PackagesReceiver) {
 	let (tx, rx) = mpsc::channel(2);
 
-	(
-		PackagesApi { tx },
-		PackagesReceiver { rx }
-	)
+	(PackagesApi { tx }, PackagesReceiver { rx })
 }
 
 #[derive(Clone)]
 pub struct Packages {
 	api: PackagesApi,
-	inner: SyncPackages
+	inner: SyncPackages,
 }
 
 impl Packages {
 	/// Downloads a package and adds it to the list returns None if the package
 	/// was not found
-	pub async fn add_package(
-		&self,
-		name: String
-	) -> Option<Package> {
+	pub async fn add_package(&self, name: String) -> Option<Package> {
 		self.api.add_package(name).await
 	}
 
@@ -106,27 +100,26 @@ impl Packages {
 #[derive(Debug)]
 enum PackRequest {
 	RequestUpdate(oneshot::Sender<()>),
-	AddPackage(String, oneshot::Sender<Option<Package>>)
+	AddPackage(String, oneshot::Sender<Option<Package>>),
 }
 
-// impl Packages 
+// impl Packages
 
 /// Internal api to communicate with the packages background task.
 #[derive(Clone)]
 struct PackagesApi {
-	tx: mpsc::Sender<PackRequest>
+	tx: mpsc::Sender<PackRequest>,
 }
 
 impl PackagesApi {
 	/// this might take a while
-	pub async fn add_package(
-		&self,
-		name: String
-	) -> Option<Package> {
+	pub async fn add_package(&self, name: String) -> Option<Package> {
 		let (tx, rx) = oneshot::channel();
 
 		// should we check if the package already exists?
-		self.tx.send(PackRequest::AddPackage(name, tx)).await
+		self.tx
+			.send(PackRequest::AddPackage(name, tx))
+			.await
 			.expect("packages api failed");
 
 		rx.await.expect("packages api failed")
@@ -136,7 +129,9 @@ impl PackagesApi {
 	async fn update(&self) {
 		let (tx, rx) = oneshot::channel();
 
-		self.tx.send(PackRequest::RequestUpdate(tx)).await
+		self.tx
+			.send(PackRequest::RequestUpdate(tx))
+			.await
 			.expect("packages api failed");
 
 		rx.await.expect("packages api failed");
@@ -144,7 +139,7 @@ impl PackagesApi {
 }
 
 struct PackagesReceiver {
-	rx: mpsc::Receiver<PackRequest>
+	rx: mpsc::Receiver<PackRequest>,
 }
 
 impl PackagesReceiver {
@@ -157,7 +152,7 @@ impl PackagesReceiver {
 const UPDATE_STATE_ERROR_LIMIT: usize = 120;
 
 pub async fn start(
-	client: Bootloader
+	client: Bootloader,
 ) -> io::Result<(Packages, JoinHandle<()>)> {
 	let (tx, mut rx) = new_api();
 
@@ -165,12 +160,14 @@ pub async fn start(
 
 	let ret_pack = Packages {
 		api: tx,
-		inner: packages.clone()
+		inner: packages.clone(),
 	};
 
 	let task = tokio::spawn(async move {
 		// get version info so we know if we should update or not
-		let version_info = client.version_info().await
+		let version_info = client
+			.version_info()
+			.await
 			.expect("fetching version failed");
 
 		if !version_info.installed {
@@ -179,7 +176,7 @@ pub async fn start(
 			// for an installation to be finished
 			// a restart is required so we don't need to check in a loop
 			eprintln!("not installed, only updating when installed");
-			return
+			return;
 		}
 
 		let times = UpdateIntervalTimes::from_channel(packages.channel().await);
@@ -209,11 +206,9 @@ pub async fn start(
 				update_state_error = 0;
 			}
 
-
 			if update_state.is_none() {
-				update_state = Some(
-					packages.prepare_update(&version_info).await
-				);
+				update_state =
+					Some(packages.prepare_update(&version_info).await);
 			}
 			let mut update_data = update_state.as_mut().unwrap();
 
@@ -225,33 +220,33 @@ pub async fn start(
 							name.clone(),
 							PackageUpdateState::GatherInfo {
 								version: None,
-								new_folder: DEFAULT_FOLDER.to_string()
-							}
+								new_folder: DEFAULT_FOLDER.to_string(),
+							},
 						);
 					}
-				},
+				}
 				_ => {}
 			}
 
 			let update_start_time = Instant::now();
 
 			// update all packages and the image
-			let update_res = update(
-				&packages.sources().await,
-				&mut update_data,
-				&client
-			).await;
+			let update_res =
+				update(&packages.sources().await, &mut update_data, &client)
+					.await;
 			match update_res {
 				Ok(_) => failed = false,
 				Err(e) => {
 					eprintln!("update error {:?}", e);
 					failed = true;
 					update_state_error += 1;
-					continue
+					continue;
 				}
 			}
 
-			packages.apply_update(&update_data).await
+			packages
+				.apply_update(&update_data)
+				.await
 				.expect("apply_update failed");
 
 			let image_was_updated = update_data.image.was_updated();
@@ -271,23 +266,26 @@ pub async fn start(
 				Some(PackRequest::AddPackage(name, tx)) => {
 					// let's check if the package was added
 					let _ = tx.send(packages.get(&name).await);
-				},
+				}
 				Some(PackRequest::RequestUpdate(tx)) => {
 					let _ = tx.send(());
-				},
+				}
 				None => {}
 			}
 
 			// if image was updated
 			if image_was_updated {
-				client.restart().await
+				client
+					.restart()
+					.await
 					.expect("could not restart the system");
 			// if packages updated
 			} else if any_package_was_updated {
-				client.systemd_restart("service-bootloader").await
+				client
+					.systemd_restart("service-bootloader")
+					.await
 					.expect("could not restart service-bootloader");
 			}
-
 		}
 	});
 
@@ -296,27 +294,27 @@ pub async fn start(
 
 struct UpdateIntervalTimes {
 	failed: UpdateInterval,
-	normal: UpdateInterval
+	normal: UpdateInterval,
 }
 
 impl UpdateIntervalTimes {
 	const DEBUG: Self = Self {
 		failed: UpdateInterval::Fixed(30),
-		normal: UpdateInterval::Fixed(30)
+		normal: UpdateInterval::Fixed(30),
 	};
 	const ALPHA: Self = Self {
 		failed: UpdateInterval::Fixed(30),
-		normal: UpdateInterval::Fixed(60)
+		normal: UpdateInterval::Fixed(60),
 	};
 	const BETA: Self = Self {
 		failed: UpdateInterval::Range(30, 2 * 60),
-		normal: UpdateInterval::Range(2 * 60, 10 * 60)
+		normal: UpdateInterval::Range(2 * 60, 10 * 60),
 	};
 	const RELEASE: Self = Self {
 		// 1-5 minutes
 		failed: UpdateInterval::Range(60, 5 * 60),
 		// 5-15 minutes
-		normal: UpdateInterval::Range(5 * 60, 15 * 60)
+		normal: UpdateInterval::Range(5 * 60, 15 * 60),
 	};
 
 	const fn from_channel(channel: Channel) -> Self {
@@ -324,7 +322,7 @@ impl UpdateIntervalTimes {
 			Channel::Debug => Self::DEBUG,
 			Channel::Alpha => Self::ALPHA,
 			Channel::Beta => Self::BETA,
-			Channel::Release => Self::RELEASE
+			Channel::Release => Self::RELEASE,
 		}
 	}
 
@@ -342,25 +340,25 @@ enum UpdateInterval {
 	// in seconds
 	Fixed(u64),
 	// in seconds
-	Range(u64, u64)
+	Range(u64, u64),
 }
 
 impl UpdateInterval {
 	pub fn to_duration(&self) -> Duration {
 		match *self {
 			Self::Fixed(s) => Duration::from_secs(s),
-			Self::Range(min, max) => Duration::from_secs(
-				thread_rng().gen_range(min..max)
-			)
+			Self::Range(min, max) => {
+				Duration::from_secs(thread_rng().gen_range(min..max))
+			}
 		}
 	}
 }
 
-
 async fn extract(path: &str, to: &str) -> io::Result<()> {
 	let stat = Command::new("tar")
 		.args(&["-zxvf", path, "-C", to])
-		.status().await?;
+		.status()
+		.await?;
 	if stat.success() {
 		Ok(())
 	} else {
@@ -376,21 +374,22 @@ struct Update {
 	pub channel: Channel,
 	pub device_id: Option<DeviceId>,
 	pub packages: HashMap<String, PackageUpdateState>,
-	pub image: ImageUpdateState
+	pub image: ImageUpdateState,
 }
 
 impl Update {
 	pub fn is_finished(&self) -> bool {
 		// find a package that is not already updated
-		!self.packages.values().any(|v| !v.is_finished()) &&
-		self.image.is_finished()
+		!self.packages.values().any(|v| !v.is_finished())
+			&& self.image.is_finished()
 	}
 
 	/// Returns a list of package states which need to be updated
 	pub fn not_finished_packages(
-		&mut self
-	) -> impl Iterator<Item=(&str, &mut PackageUpdateState)> {
-		self.packages.iter_mut()
+		&mut self,
+	) -> impl Iterator<Item = (&str, &mut PackageUpdateState)> {
+		self.packages
+			.iter_mut()
 			.filter(|(_, pack)| !pack.is_finished())
 			.map(|(name, pack)| (name.as_str(), pack))
 	}
@@ -407,28 +406,25 @@ enum PackageUpdateState {
 		// name is stored in the table
 		/// version is used to check if the package needs to be updated
 		version: Option<Hash>,
-		new_folder: String
+		new_folder: String,
 	},
 	DownloadFile {
 		package: PackPackage,
 		get_file: GetFileBuilder,
-		new_folder: String
+		new_folder: String,
 	},
 	NoUpdate,
 	Updated(PackPackage),
 	/// This means the package was not found in any source
 	/// or that package was returned with the wrong signature
-	NotFound
+	NotFound,
 }
 
 impl PackageUpdateState {
 	pub fn is_finished(&self) -> bool {
 		match self {
-			Self::NoUpdate |
-			Self::Updated(_) |
-			Self::NotFound => true,
-			Self::GatherInfo { .. } |
-			Self::DownloadFile { .. } => false
+			Self::NoUpdate | Self::Updated(_) | Self::NotFound => true,
+			Self::GatherInfo { .. } | Self::DownloadFile { .. } => false,
 		}
 	}
 
@@ -439,24 +435,23 @@ impl PackageUpdateState {
 
 #[derive(Debug, Clone)]
 enum ImageUpdateState {
-	GatherInfo { version: Hash },
+	GatherInfo {
+		version: Hash,
+	},
 	DownloadFile {
 		package: PackPackage,
-		get_file: GetFileBuilder
+		get_file: GetFileBuilder,
 	},
 	NoUpdate,
 	Updated(VersionInfo),
-	NotFound
+	NotFound,
 }
 
 impl ImageUpdateState {
 	pub fn is_finished(&self) -> bool {
 		match self {
-			Self::NoUpdate |
-			Self::Updated(_) |
-			Self::NotFound => true,
-			Self::GatherInfo { .. } |
-			Self::DownloadFile { .. } => false
+			Self::NoUpdate | Self::Updated(_) | Self::NotFound => true,
+			Self::GatherInfo { .. } | Self::DownloadFile { .. } => false,
 		}
 	}
 
@@ -465,25 +460,23 @@ impl ImageUpdateState {
 	}
 }
 
-
 // writing to the packages location is only permitted by this struct / this
 // module and one task
 #[derive(Debug, Clone)]
 struct SyncPackages {
-	inner: Arc<RwLock<RawPackages>>
+	inner: Arc<RwLock<RawPackages>>,
 }
 
 impl SyncPackages {
 	pub async fn load() -> io::Result<Self> {
 		Ok(Self {
-			inner: Arc::new(RwLock::new(RawPackages::load().await?))
+			inner: Arc::new(RwLock::new(RawPackages::load().await?)),
 		})
 	}
 
 	// is this expensive?
 	pub async fn channel(&self) -> Channel {
-		self.inner.read().await
-			.cfg.channel
+		self.inner.read().await.cfg.channel
 	}
 
 	/// Creates an update struct from the current packages information
@@ -492,28 +485,28 @@ impl SyncPackages {
 	}
 
 	pub async fn sources(&self) -> Vec<Source> {
-		self.inner.read().await
-			.cfg.sources.clone()
+		self.inner.read().await.cfg.sources.clone()
 	}
 
 	pub async fn apply_update(&self, update: &Update) -> io::Result<()> {
-		self.inner.write().await
-			.apply_update(update).await
+		self.inner.write().await.apply_update(update).await
 	}
 
 	pub async fn get(&self, name: &str) -> Option<Package> {
-		self.inner.read().await.list.get(name)
+		self.inner
+			.read()
+			.await
+			.list
+			.get(name)
 			.map(|db| package_cfg_to_package(db))
 	}
 
 	pub async fn packages(&self) -> Vec<Package> {
-		self.inner.read().await
-			.packages()
+		self.inner.read().await.packages()
 	}
 
 	pub async fn config(&self) -> PackagesCfg {
-		self.inner.read().await
-			.cfg.clone()
+		self.inner.read().await.cfg.clone()
 	}
 
 	pub async fn on_run_binary(&self) -> Option<(String, String)> {
@@ -524,7 +517,7 @@ impl SyncPackages {
 #[derive(Debug)]
 struct RawPackages {
 	cfg: FileDb<PackagesCfg>,
-	list: HashMap<String, FileDb<PackageCfg>>
+	list: HashMap<String, FileDb<PackageCfg>>,
 }
 
 impl RawPackages {
@@ -538,7 +531,7 @@ impl RawPackages {
 		let mut dirs = fs::read_dir(PACKAGES_DIR).await?;
 		while let Some(entry) = dirs.next_entry().await? {
 			if !entry.file_type().await?.is_dir() {
-				continue
+				continue;
 			}
 
 			let mut path = entry.path();
@@ -559,13 +552,13 @@ impl RawPackages {
 			let state = PackageUpdateState::GatherInfo {
 				version: Some(pack.package().version.clone()),
 				// todo maybe store &'static str
-				new_folder: pack.other().to_string()
+				new_folder: pack.other().to_string(),
 			};
 			packs.insert(name.clone(), state);
 		}
 
 		let image = ImageUpdateState::GatherInfo {
-			version: version.version.clone()
+			version: version.version.clone(),
 		};
 
 		Update {
@@ -574,7 +567,7 @@ impl RawPackages {
 			channel: self.cfg.channel,
 			device_id: version.device_id.clone(),
 			packages: packs,
-			image
+			image,
 		}
 	}
 
@@ -585,19 +578,18 @@ impl RawPackages {
 	pub async fn apply_update(&mut self, update: &Update) -> io::Result<()> {
 		for (name, state) in &update.packages {
 			match state {
-				PackageUpdateState::NoUpdate => {},
+				PackageUpdateState::NoUpdate => {}
 				PackageUpdateState::Updated(package) => {
 					match self.list.entry(name.clone()) {
 						Entry::Occupied(mut o) => {
 							let db = o.get_mut();
 							db.switch(package.clone());
 							db.write().await?;
-						},
+						}
 						Entry::Vacant(v) => {
 							let path = format!(
 								"{}/{}/package.fdb",
-								PACKAGES_DIR,
-								name
+								PACKAGES_DIR, name
 							);
 							// this should stay in sync with DEFAULT_FOLDER
 							let cfg = PackageCfg::Left(package.clone());
@@ -606,9 +598,9 @@ impl RawPackages {
 							db.write().await?;
 						}
 					};
-				},
-				PackageUpdateState::GatherInfo {..} |
-				PackageUpdateState::DownloadFile {..} => unreachable!(),
+				}
+				PackageUpdateState::GatherInfo { .. }
+				| PackageUpdateState::DownloadFile { .. } => unreachable!(),
 				PackageUpdateState::NotFound => {}
 			}
 		}
@@ -625,12 +617,7 @@ impl RawPackages {
 		let package = self.list.get(on_run)?;
 		let binary = package.package().binary.as_ref()?;
 
-		let dir = format!(
-			"{}/{}/{}",
-			PACKAGES_DIR,
-			on_run,
-			package.current()
-		);
+		let dir = format!("{}/{}/{}", PACKAGES_DIR, on_run, package.current());
 
 		let bin = format!("{}/{}", dir, binary);
 
@@ -638,7 +625,8 @@ impl RawPackages {
 	}
 
 	pub fn packages(&self) -> Vec<Package> {
-		self.list.values()
+		self.list
+			.values()
 			.map(|v| package_cfg_to_package(v))
 			.collect()
 	}
@@ -647,7 +635,7 @@ impl RawPackages {
 fn boot_arch_to_board_arch(boot_arch: Architecture) -> BoardArch {
 	match boot_arch {
 		Architecture::Amd64 => BoardArch::Amd64,
-		Architecture::Arm64 => BoardArch::Arm64
+		Architecture::Arm64 => BoardArch::Arm64,
 	}
 }
 
@@ -660,6 +648,6 @@ fn package_cfg_to_package(cfg: &PackageCfg) -> Package {
 		version: pack.version.clone(),
 		signature: pack.signature.clone(),
 		binary: pack.binary.clone(),
-		path: format!("/data/packages/{}/{}", pack.name, cfg.current())
+		path: format!("/data/packages/{}/{}", pack.name, cfg.current()),
 	}
 }

@@ -1,19 +1,18 @@
 use std::str::FromStr;
 use std::{fmt, mem};
 
-pub use crypto::signature::{PublicKey, Signature};
 pub use crypto::hash::Hash;
+pub use crypto::signature::{PublicKey, Signature};
 
-use serde::{Serialize, Deserialize};
 use serde::de::{value, IntoDeserializer};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Channel {
 	Debug,
 	Alpha,
 	Beta,
-	Release
+	Release,
 }
 
 impl FromStr for Channel {
@@ -46,10 +45,8 @@ pub struct Source {
 	/// the connection signature key
 	pub public_key: PublicKey,
 	/// the package signature key
-	pub sign_key: PublicKey
-
-	// todo add whitelist that only specific packages can be fetched
-	// from this source
+	pub sign_key: PublicKey, // todo add whitelist that only specific packages can be fetched
+	                         // from this source
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,7 +63,7 @@ pub struct PackagesCfg {
 	/// the package that should be run normally
 	pub on_run: String,
 	/// this information get's overriden if the image is in Debug
-	pub channel: Channel
+	pub channel: Channel,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -75,14 +72,14 @@ pub enum TargetArch {
 	/// packages, or script only
 	Any,
 	Amd64,
-	Arm64
+	Arm64,
 }
 
 impl From<BoardArch> for TargetArch {
 	fn from(b: BoardArch) -> Self {
 		match b {
 			BoardArch::Amd64 => TargetArch::Amd64,
-			BoardArch::Arm64 => TargetArch::Arm64
+			BoardArch::Arm64 => TargetArch::Arm64,
 		}
 	}
 }
@@ -104,7 +101,7 @@ impl fmt::Display for TargetArch {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BoardArch {
 	Amd64,
-	Arm64
+	Arm64,
 }
 
 impl FromStr for BoardArch {
@@ -130,21 +127,21 @@ pub struct Package {
 	pub version: Hash,
 	pub signature: Signature,
 	pub arch: TargetArch,
-	pub binary: Option<String>
+	pub binary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PackageCfg {
 	// do i need to other package??
 	Left(Package),
-	Right(Package)
+	Right(Package),
 }
 
 impl PackageCfg {
 	pub fn package(&self) -> &Package {
 		match self {
 			Self::Left(p) => p,
-			Self::Right(p) => p
+			Self::Right(p) => p,
 		}
 	}
 
@@ -152,7 +149,7 @@ impl PackageCfg {
 	pub fn current(&self) -> &'static str {
 		match self {
 			Self::Left(_) => "left",
-			Self::Right(_) => "right"
+			Self::Right(_) => "right",
 		}
 	}
 
@@ -160,7 +157,7 @@ impl PackageCfg {
 	pub fn other(&self) -> &'static str {
 		match self {
 			Self::Left(_) => "right",
-			Self::Right(_) => "left"
+			Self::Right(_) => "left",
 		}
 	}
 
@@ -168,7 +165,7 @@ impl PackageCfg {
 	pub fn switch(&mut self, new: Package) {
 		let new = match self {
 			Self::Left(_) => PackageCfg::Right(new),
-			Self::Right(_) => PackageCfg::Left(new)
+			Self::Right(_) => PackageCfg::Left(new),
 		};
 		let _ = mem::replace(self, new);
 	}

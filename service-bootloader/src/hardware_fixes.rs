@@ -1,7 +1,6 @@
-
 use std::fs;
-use std::path::Path;
 use std::io::{self, Write};
+use std::path::Path;
 
 use linux_info::bios::Bios;
 
@@ -12,7 +11,7 @@ pub fn hardware_fixes() {
 		Some(s) => s,
 		None => {
 			eprintln!("[hardware_fixes] failed to get system info");
-			return
+			return;
 		}
 	};
 
@@ -26,7 +25,7 @@ pub fn hardware_fixes() {
 			if let Err(e) = change_sim7600e_mode() {
 				eprintln!("changing sim7600e mode failed with {:?}", e);
 			}
-		},
+		}
 		_ => {}
 	}
 }
@@ -56,15 +55,13 @@ fn change_sim7600e_mode() -> io::Result<()> {
 	let product = fs::read_to_string(Path::new(PATH).join("idProduct"))?;
 
 	if vendor.trim() != "1e0e" || product.trim() != "9011" {
-		return Ok(())
+		return Ok(());
 	}
 
 	eprintln!("applying fix: change sim7600e mode");
 
 	// change mode
-	let mut file = fs::OpenOptions::new()
-		.write(true)
-		.open("/dev/ttyUSB3")?;
+	let mut file = fs::OpenOptions::new().write(true).open("/dev/ttyUSB3")?;
 
 	file.write_all(b"AT+CUSBPIDSWITCH=9001,1,1\r\n")?;
 

@@ -1,5 +1,5 @@
-use crate::Config;
 use crate::error::{Error, Result};
+use crate::Config;
 
 use std::collections::HashMap;
 
@@ -8,11 +8,10 @@ use tokio::sync::RwLock;
 
 use file_db::FileDb;
 
-use packages::requests::AuthKey;
 use packages::packages::Channel;
+use packages::requests::AuthKey;
 
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 fn default_keys() -> HashMap<AuthKey, Channel> {
 	HashMap::new()
@@ -21,13 +20,13 @@ fn default_keys() -> HashMap<AuthKey, Channel> {
 #[derive(Debug, Serialize, Deserialize)]
 struct AuthDbFile {
 	#[serde(rename = "keys_v2", default = "default_keys")]
-	keys: HashMap<AuthKey, Channel>
+	keys: HashMap<AuthKey, Channel>,
 }
 
 impl AuthDbFile {
 	fn new() -> Self {
 		Self {
-			keys: HashMap::new()
+			keys: HashMap::new(),
 		}
 	}
 
@@ -42,7 +41,7 @@ impl AuthDbFile {
 
 pub struct AuthDb {
 	inner: RwLock<FileDb<AuthDbFile>>,
-	write: bool
+	write: bool,
 }
 
 impl AuthDb {
@@ -50,7 +49,7 @@ impl AuthDb {
 	pub fn new(cfg: &Config) -> Self {
 		Self {
 			inner: RwLock::new(FileDb::new(&cfg.auths_file, AuthDbFile::new())),
-			write: false
+			write: false,
 		}
 	}
 
@@ -60,22 +59,24 @@ impl AuthDb {
 		}
 
 		let db = FileDb::new(&cfg.auths_file, AuthDbFile::new());
-		db.write().await
+		db.write()
+			.await
 			.map_err(|e| Error::new("could not write auths.fdb", e))?;
 
 		Ok(Self {
 			inner: RwLock::new(db),
-			write: true
+			write: true,
 		})
 	}
 
 	pub async fn read(cfg: &Config) -> Result<Self> {
-		let db = FileDb::open(&cfg.auths_file).await
+		let db = FileDb::open(&cfg.auths_file)
+			.await
 			.map_err(|e| Error::new("auths.fdb could not be opened", e))?;
 
 		Ok(Self {
 			inner: RwLock::new(db),
-			write: true
+			write: true,
 		})
 	}
 
@@ -85,8 +86,7 @@ impl AuthDb {
 		db.insert(key, channel);
 
 		if self.write {
-			lock.write().await
-				.expect("writing failed");
+			lock.write().await.expect("writing failed");
 		}
 	}
 

@@ -1,37 +1,42 @@
-
-use crate::error::Result;
 use crate::config::Source;
+use crate::error::Result;
 
-use std::process::Command;
 use std::path::Path;
-use std::{fmt, io};
+use std::process::Command;
 use std::str::FromStr;
+use std::{fmt, io};
 
-use tokio::fs::{self, read_to_string};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use crypto::hash::{Hasher, Hash};
+use crypto::hash::{Hash, Hasher};
 use crypto::signature::Keypair;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use tokio::fs::{self, read_to_string};
 
 pub async fn read_toml<T>(path: impl AsRef<Path>) -> Result<T>
-where T: DeserializeOwned {
+where
+	T: DeserializeOwned,
+{
 	let path = path.as_ref();
-	let s = read_to_string(path).await
+	let s = read_to_string(path)
+		.await
 		.map_err(|e| err!(e, "file {:?} not found", path))?;
-	toml::from_str(&s)
-		.map_err(|e| err!(e, "toml error in {:?}", path))
+	toml::from_str(&s).map_err(|e| err!(e, "toml error in {:?}", path))
 }
 
 pub async fn write_toml<T>(path: impl AsRef<Path>, ctn: &T) -> Result<()>
-where T: Serialize + fmt::Debug {
+where
+	T: Serialize + fmt::Debug,
+{
 	let s = toml::to_string_pretty(ctn)
 		.map_err(|e| err!(e, "could not generate toml from {:?}", ctn))?;
 	// create the folder first
 	let path = path.as_ref();
 	let dir = path.with_file_name("");
-	fs::create_dir_all(&dir).await
+	fs::create_dir_all(&dir)
+		.await
 		.map_err(|e| err!(e, "could not create dir {:?}", dir))?;
-	fs::write(path, s).await
+	fs::write(path, s)
+		.await
 		.map_err(|e| err!(e, "could not write to {:?}", path))
 }
 
@@ -40,18 +45,21 @@ where T: Serialize + fmt::Debug {
 pub async fn create_dir(path: impl AsRef<Path>) -> Result<()> {
 	let path = path.as_ref();
 	let _ = fs::remove_dir_all(path).await;
-	fs::create_dir_all(path).await
+	fs::create_dir_all(path)
+		.await
 		.map_err(|e| err!(e, "could not create {:?}", path))
 }
 
 pub async fn remove_dir(path: impl AsRef<Path>) -> Result<()> {
 	let path = path.as_ref();
-	fs::remove_dir_all(path).await
+	fs::remove_dir_all(path)
+		.await
 		.map_err(|e| err!(e, "could not remove {:?}", path))
 }
 
 pub async fn copy(from: &str, to: &str) -> Result<()> {
-	fs::copy(from, to).await
+	fs::copy(from, to)
+		.await
 		.map(drop)
 		.map_err(|e| err!(e, "could not copy {:?} to {:?}", from, to))
 }
@@ -82,8 +90,8 @@ pub fn extract(path: &str, to: &str) -> Result<()> {
 }
 
 pub async fn hash_file(path: &str) -> Result<Hash> {
-
-	let v = fs::read(path).await
+	let v = fs::read(path)
+		.await
 		.map_err(|e| err!(e, "could not hash file {:?}", path))?;
 
 	Ok(Hasher::hash(&v))
@@ -99,7 +107,8 @@ pub async fn get_priv_key(source: &Source) -> Result<Keypair> {
 
 		let mut priv_key_b64 = String::new();
 		let stdin = io::stdin();
-		stdin.read_line(&mut priv_key_b64)
+		stdin
+			.read_line(&mut priv_key_b64)
 			.map_err(|e| err!(e, "could not read private key"))?;
 		Keypair::from_str(priv_key_b64.trim())
 			.map_err(|e| err!(format!("{:?}", e), "invalid private key"))

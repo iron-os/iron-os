@@ -1,41 +1,31 @@
-
 use std::sync::Arc;
 
-use bootloader_api::{AsyncClient, error::Result};
-use bootloader_api::requests::{Disk, VersionInfo, UpdateReq};
+use bootloader_api::requests::{Disk, UpdateReq, VersionInfo};
+use bootloader_api::{error::Result, AsyncClient};
 
 use tokio::sync::Mutex;
 
-
 #[derive(Clone)]
 pub struct Bootloader {
-	inner: Arc<Mutex<AsyncClient>>
+	inner: Arc<Mutex<AsyncClient>>,
 }
 
 impl Bootloader {
-
 	pub fn new() -> Self {
 		Self {
-			inner: Arc::new(Mutex::new(AsyncClient::new()))
+			inner: Arc::new(Mutex::new(AsyncClient::new())),
 		}
 	}
 
-	pub async fn systemd_restart(
-		&self,
-		name: impl Into<String>
-	) -> Result<()> {
-		self.inner.lock().await
-			.systemd_restart(name).await
+	pub async fn systemd_restart(&self, name: impl Into<String>) -> Result<()> {
+		self.inner.lock().await.systemd_restart(name).await
 	}
 
 	pub async fn disks(&self) -> Result<Vec<Disk>> {
 		self.inner.lock().await.disks().await
 	}
 
-	pub async fn install_on(
-		&self,
-		disk: impl Into<String>
-	) -> Result<()> {
+	pub async fn install_on(&self, disk: impl Into<String>) -> Result<()> {
 		self.inner.lock().await.install_on(disk).await
 	}
 
@@ -43,10 +33,7 @@ impl Bootloader {
 		self.inner.lock().await.version_info().await
 	}
 
-	pub async fn make_root(
-		&self,
-		path: impl Into<String>
-	) -> Result<()> {
+	pub async fn make_root(&self, path: impl Into<String>) -> Result<()> {
 		self.inner.lock().await.make_root(path).await
 	}
 
@@ -61,5 +48,4 @@ impl Bootloader {
 	pub async fn shutdown(&self) -> Result<()> {
 		self.inner.lock().await.shutdown().await
 	}
-
 }

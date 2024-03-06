@@ -1,32 +1,25 @@
-
-use crate::Action;
-use crate::error::{Result, Error};
-use crate::requests::system::{SystemInfoReq, SystemInfo, InstallOnReq};
-use crate::requests::ui::OpenPageReq;
-use crate::requests::packages::{
-	ListPackagesReq, ListPackages,
-	AddPackageReq, Package,
-	RemovePackageReq,
-	UpdateReq
-};
+use crate::error::{Error, Result};
 use crate::requests::device::{
-	DeviceInfoReq, DeviceInfo,
-	SetPowerStateReq, PowerState,
-	DisksReq, Disk,
-	SetDisplayStateReq, SetDisplayBrightnessReq
+	DeviceInfo, DeviceInfoReq, Disk, DisksReq, PowerState,
+	SetDisplayBrightnessReq, SetDisplayStateReq, SetPowerStateReq,
 };
 use crate::requests::network::{
-	AccessPointsReq, AccessPoints,
-	ConnectionsReq, Connection,
-	AddConnectionReq, AddConnectionKind,
-	RemoveConnectionReq
+	AccessPoints, AccessPointsReq, AddConnectionKind, AddConnectionReq,
+	Connection, ConnectionsReq, RemoveConnectionReq,
 };
+use crate::requests::packages::{
+	AddPackageReq, ListPackages, ListPackagesReq, Package, RemovePackageReq,
+	UpdateReq,
+};
+use crate::requests::system::{InstallOnReq, SystemInfo, SystemInfoReq};
+use crate::requests::ui::OpenPageReq;
+use crate::Action;
 
-use std::time::Duration;
 use std::path::Path;
+use std::time::Duration;
 
-use stream::packet::PlainBytes;
 use stream::client::Config;
+use stream::packet::PlainBytes;
 use stream_api::client;
 
 use tokio::net::UnixStream;
@@ -35,19 +28,24 @@ use tokio::net::UnixStream;
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct Client {
-	inner: client::Client<Action, PlainBytes>
+	inner: client::Client<Action, PlainBytes>,
 }
 
 impl Client {
 	pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
-		let stream = UnixStream::connect(path).await
+		let stream = UnixStream::connect(path)
+			.await
 			.map_err(|e| Error::Internal(e.to_string()))?;
 
 		Ok(Self {
-			inner: client::Client::<_, PlainBytes>::new(stream, Config {
-				timeout: TIMEOUT,
-				body_limit: 0
-			}, None)
+			inner: client::Client::<_, PlainBytes>::new(
+				stream,
+				Config {
+					timeout: TIMEOUT,
+					body_limit: 0,
+				},
+				None,
+			),
 		})
 	}
 
@@ -68,7 +66,9 @@ impl Client {
 	}
 
 	pub async fn add_package(&self, name: String) -> Result<Option<Package>> {
-		self.inner.request(AddPackageReq { name }).await
+		self.inner
+			.request(AddPackageReq { name })
+			.await
 			.map(|a| a.package)
 	}
 
@@ -89,8 +89,7 @@ impl Client {
 	}
 
 	pub async fn disks(&self) -> Result<Vec<Disk>> {
-		self.inner.request(DisksReq).await
-			.map(|d| d.0)
+		self.inner.request(DisksReq).await.map(|d| d.0)
 	}
 
 	pub async fn set_display_state(&self, on: bool) -> Result<()> {
@@ -98,7 +97,9 @@ impl Client {
 	}
 
 	pub async fn set_display_brightness(&self, brightness: u8) -> Result<()> {
-		self.inner.request(SetDisplayBrightnessReq { brightness }).await
+		self.inner
+			.request(SetDisplayBrightnessReq { brightness })
+			.await
 	}
 
 	pub async fn network_access_points(&self) -> Result<AccessPoints> {
@@ -106,22 +107,18 @@ impl Client {
 	}
 
 	pub async fn network_connections(&self) -> Result<Vec<Connection>> {
-		self.inner.request(ConnectionsReq).await
-			.map(|c| c.list)
+		self.inner.request(ConnectionsReq).await.map(|c| c.list)
 	}
 
 	pub async fn network_add_connection(
 		&self,
 		id: String,
-		kind: AddConnectionKind
+		kind: AddConnectionKind,
 	) -> Result<Connection> {
 		self.inner.request(AddConnectionReq { id, kind }).await
 	}
 
-	pub async fn network_remove_connection(
-		&self,
-		uuid: String
-	) -> Result<()> {
+	pub async fn network_remove_connection(&self, uuid: String) -> Result<()> {
 		self.inner.request(RemoveConnectionReq { uuid }).await
 	}
 }

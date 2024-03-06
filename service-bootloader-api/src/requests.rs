@@ -1,13 +1,12 @@
-
 use crate::Request;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crypto::hash::Hash;
 use crypto::signature::Signature;
 use crypto::token::Token;
 
-kind!{
+kind! {
 	SystemdRestart,
 	Restart,
 	Shutdown,
@@ -18,25 +17,27 @@ kind!{
 	Update
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemdRestart {
-	pub name: String
+	pub name: String,
 }
 
 impl Request for SystemdRestart {
 	type Response = ();
-	fn kind() -> Kind { Kind::SystemdRestart }
+	fn kind() -> Kind {
+		Kind::SystemdRestart
+	}
 }
-
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Disks;
 
 impl Request for Disks {
 	type Response = Vec<Disk>;
-	fn kind() -> Kind { Kind::Disks }
+	fn kind() -> Kind {
+		Kind::Disks
+	}
 }
 
 // data for disks info
@@ -49,34 +50,36 @@ pub struct Disk {
 	// if the this disk has a gpt partition table
 	pub initialized: bool,
 	// how many bytes this disk has
-	pub size: u64
+	pub size: u64,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallOn {
-	pub disk: String
+	pub disk: String,
 }
 
 impl Request for InstallOn {
 	type Response = ();
-	fn kind() -> Kind { Kind::InstallOn }
+	fn kind() -> Kind {
+		Kind::InstallOn
+	}
 }
-
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct VersionInfoReq;
 
 impl Request for VersionInfoReq {
 	type Response = VersionInfo;
-	fn kind() -> Kind { Kind::VersionInfo }
+	fn kind() -> Kind {
+		Kind::VersionInfo
+	}
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Architecture {
 	Amd64,
-	Arm64
+	Arm64,
 }
 
 // Should be equivalent to the DeviceId in packages-api
@@ -93,20 +96,21 @@ pub struct VersionInfo {
 	pub signature: Option<Signature>,
 	/// device id should exist if the device is installed
 	pub device_id: Option<DeviceId>,
-	pub installed: bool
+	pub installed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MakeRoot {
-	pub path: String
+	pub path: String,
 }
 
 impl Request for MakeRoot {
 	type Response = ();
-	fn kind() -> Kind { Kind::MakeRoot }
+	fn kind() -> Kind {
+		Kind::MakeRoot
+	}
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,21 +121,24 @@ pub struct UpdateReq {
 	// path to folder where the following files are located:
 	// - bzImage
 	// - rootfs.ext2
-	pub path: String
+	pub path: String,
 }
 
 impl Request for UpdateReq {
 	type Response = VersionInfo;
-	fn kind() -> Kind { Kind::Update }
+	fn kind() -> Kind {
+		Kind::Update
+	}
 }
-
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RestartReq;
 
 impl Request for RestartReq {
 	type Response = ();
-	fn kind() -> Kind { Kind::Restart }
+	fn kind() -> Kind {
+		Kind::Restart
+	}
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -139,5 +146,7 @@ pub struct ShutdownReq;
 
 impl Request for ShutdownReq {
 	type Response = ();
-	fn kind() -> Kind { Kind::Shutdown }
+	fn kind() -> Kind {
+		Kind::Shutdown
+	}
 }

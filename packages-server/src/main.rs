@@ -1,17 +1,17 @@
+mod auth;
 mod config;
 mod error;
+mod files;
 mod packages;
 mod server;
-mod files;
-mod auth;
 #[cfg(test)]
 mod testing_requests;
 
-use config::Config;
-use files::Files;
-use error::Result;
-use auth::AuthDb;
 use crate::packages::PackagesDb;
+use auth::AuthDb;
+use config::Config;
+use error::Result;
+use files::Files;
 
 use clap::Parser;
 use crypto::signature::Keypair;
@@ -23,7 +23,7 @@ struct Args {
 	#[clap(long, default_value = "packages_server=info,error")]
 	tracing: String,
 	#[clap(long, default_value = "./config.toml")]
-	config: String
+	config: String,
 }
 
 #[derive(Parser)]
@@ -31,7 +31,7 @@ pub enum SubCommand {
 	/// create a configuration file
 	Create,
 	/// Print out the keys
-	Keys
+	Keys,
 }
 
 #[tokio::main]
@@ -50,8 +50,8 @@ async fn main() -> Result<()> {
 
 			let _auths = AuthDb::create(&cfg).await?;
 
-			return Ok(())
-		},
+			return Ok(());
+		}
 		Some(SubCommand::Keys) => {
 			// get connection public key
 			let cfg = Config::read(&args.config).await?;
@@ -66,11 +66,10 @@ async fn main() -> Result<()> {
 			println!("New signature private key: {}", sign);
 			println!("New signature public key: {}", sign.public());
 
-			return Ok(())
-		},
+			return Ok(());
+		}
 		None => {}
 	}
 
 	server::serve(&args.tracing, &args.config).await
 }
-

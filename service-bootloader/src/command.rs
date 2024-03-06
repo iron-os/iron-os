@@ -1,12 +1,11 @@
 use crate::io_other;
 
-use std::process::{Child as StdChild, Command as StdCommand, Stdio};
 use std::ffi::OsStr;
 use std::io;
-use std::path::Path;
-use std::os::unix::process::CommandExt;
 use std::ops::{Deref, DerefMut};
-
+use std::os::unix::process::CommandExt;
+use std::path::Path;
+use std::process::{Child as StdChild, Command as StdCommand, Stdio};
 
 pub struct Command(StdCommand);
 
@@ -24,7 +23,7 @@ impl Command {
 	pub fn args<I, S>(&mut self, args: I) -> &mut Self
 	where
 		I: IntoIterator<Item = S>,
-		S: AsRef<OsStr>
+		S: AsRef<OsStr>,
 	{
 		self.0.args(args);
 		self
@@ -33,7 +32,7 @@ impl Command {
 	pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Self
 	where
 		K: AsRef<OsStr>,
-		V: AsRef<OsStr>
+		V: AsRef<OsStr>,
 	{
 		self.0.env(key, val);
 		self
@@ -52,12 +51,11 @@ impl Command {
 	}
 
 	pub fn exec(&mut self) -> io::Result<()> {
-		self.0.status()
-			.and_then(|s| {
-				s.success()
-					.then(|| ())
-					.ok_or_else(|| io_other("command exited with non success status"))
+		self.0.status().and_then(|s| {
+			s.success().then(|| ()).ok_or_else(|| {
+				io_other("command exited with non success status")
 			})
+		})
 	}
 
 	pub fn stdin_piped(&mut self) -> &mut Self {
@@ -77,16 +75,16 @@ impl Command {
 	}
 
 	pub fn spawn(&mut self) -> io::Result<Child> {
-		self.0.spawn()
-			.map(|inner| Child {
-				inner, should_kill: false
-			})
+		self.0.spawn().map(|inner| Child {
+			inner,
+			should_kill: false,
+		})
 	}
 }
 
 pub struct Child {
 	inner: StdChild,
-	should_kill: bool
+	should_kill: bool,
 }
 
 impl Child {

@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::util::{create_dir, remove_dir, read_toml, write_toml, extract};
+use crate::util::{create_dir, extract, read_toml, remove_dir, write_toml};
 
 use tokio::fs;
 
@@ -9,14 +9,13 @@ use riji::paint_act;
 
 use crypto::signature::PublicKey;
 
-use packages::packages::{
-	Channel, Source, Package, PackageCfg, PackagesCfg, BoardArch
-};
 use packages::client::Client;
+use packages::packages::{
+	BoardArch, Channel, Package, PackageCfg, PackagesCfg, Source,
+};
 use packages::requests::DeviceId;
 
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourceToml {
@@ -42,19 +41,19 @@ pub struct PackagesToml {
 	#[serde(rename = "on-run")]
 	on_run: String,
 	#[serde(rename = "source")]
-	sources: Vec<SourceToml>
+	sources: Vec<SourceToml>,
 }
 
 /// The toml in which the buildsystem stores information about the image
 #[derive(Debug, Clone, Deserialize)]
 pub struct ImageToml {
-	arch: BoardArch
+	arch: BoardArch,
 }
 
 /// The toml file which get's used between the download and pack-image command
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductToml {
-	product: String
+	product: String,
 }
 
 /// Downloads and fills a full packages folder `./packages`
@@ -67,7 +66,7 @@ pub struct Download {
 
 	/// If you want to specificy as which device we make the request
 	#[clap(long)]
-	device_id: Option<DeviceId>
+	device_id: Option<DeviceId>,
 }
 
 pub async fn download(opts: Download) -> Result<()> {
@@ -75,7 +74,7 @@ pub async fn download(opts: Download) -> Result<()> {
 	let cfg: PackagesToml = read_toml(opts.config).await?;
 
 	let product_toml = ProductToml {
-		product: cfg.product.clone()
+		product: cfg.product.clone(),
 	};
 
 	// store the product name
@@ -90,14 +89,11 @@ pub async fn download(opts: Download) -> Result<()> {
 	let _ = remove_dir(&local_packages).await;
 	create_dir(&local_packages).await?;
 
-
 	if cfg.sources.is_empty() {
-		return Err(err!("no sources", "misssing cfg sources"))
+		return Err(err!("no sources", "misssing cfg sources"));
 	}
 
-	let mut list: Vec<_> = cfg.list.into_iter()
-		.map(Some)
-		.collect();
+	let mut list: Vec<_> = cfg.list.into_iter().map(Some).collect();
 
 	let mut packs = vec![];
 
@@ -109,8 +105,9 @@ pub async fn download(opts: Download) -> Result<()> {
 			opts.device_id.as_ref(),
 			&cfg.channel,
 			&source,
-			&local_packages
-		).await?;
+			&local_packages,
+		)
+		.await?;
 	}
 
 	let mut unfinished = false;
@@ -122,15 +119,17 @@ pub async fn download(opts: Download) -> Result<()> {
 	}
 
 	if unfinished {
-		return Err(err!("unfinished", "not all packages could be downloaded"))
+		return Err(err!("unfinished", "not all packages could be downloaded"));
 	}
 
-	let sources: Vec<_> = cfg.sources.into_iter()
+	let sources: Vec<_> = cfg
+		.sources
+		.into_iter()
 		.map(|source| Source {
 			addr: source.address,
 			public: true,
 			public_key: source.pub_key,
-			sign_key: source.sign_key
+			sign_key: source.sign_key,
 		})
 		.collect();
 
@@ -151,13 +150,15 @@ pub async fn download(opts: Download) -> Result<()> {
 
 		// rename extracted folder
 		let left = format!("{}/left", path);
-		fs::rename(&format!("{}/{}", path, pack.name), &left).await
+		fs::rename(&format!("{}/{}", path, pack.name), &left)
+			.await
 			.map_err(|e| err!(e, "could not rename folder"))?;
 
 		// build package and store it
 		let fdb = format!("{}/package.fdb", path);
 		let db = FileDb::new(fdb, PackageCfg::Left(pack));
-		db.write().await
+		db.write()
+			.await
 			.map_err(|e| err!(e, "could not store file db"))?;
 	}
 
@@ -165,11 +166,12 @@ pub async fn download(opts: Download) -> Result<()> {
 		sources,
 		fetch_realtime: false,
 		on_run: cfg.on_run.clone(),
-		channel: cfg.channel
+		channel: cfg.channel,
 	};
 
 	let db = FileDb::new(format!("{}/packages.fdb", local_packages), packs_cfg);
-	db.write().await
+	db.write()
+		.await
 		.map_err(|e| err!(e, "could not store packages.fdb"))?;
 
 	Ok(())
@@ -182,32 +184,30 @@ async fn download_from_source(
 	device_id: Option<&DeviceId>,
 	channel: &Channel,
 	source: &SourceToml,
-	packages_dir: &str
+	packages_dir: &str,
 ) -> Result<()> {
 	paint_act!("connecting to {}", source.address);
 
 	// should we delete the packages folder
-	let client = Client::connect(&source.address, source.pub_key.clone()).await
+	let client = Client::connect(&source.address, source.pub_key.clone())
+		.await
 		.map_err(|e| err!(e, "connect to {} failed", source.address))?;
 
 	for list_name in list.iter_mut() {
 		let name = match list_name.as_ref() {
 			Some(n) => n,
-			None => continue
+			None => continue,
 		};
 
 		paint_act!("checking {}", name);
 
-		let pack = client.package_info(
-			*channel,
-			*arch,
-			device_id.cloned(),
-			name.clone()
-		).await
+		let pack = client
+			.package_info(*channel, *arch, device_id.cloned(), name.clone())
+			.await
 			.map_err(|e| err!(e, "could not get package info"))?;
 		let pack = match pack {
 			Some(p) => p,
-			None => continue
+			None => continue,
 		};
 
 		list_name.take();
@@ -215,21 +215,24 @@ async fn download_from_source(
 		paint_act!("downloading {}", pack.name);
 
 		// now get the file
-		let res = client.get_file(pack.version.clone()).await
+		let res = client
+			.get_file(pack.version.clone())
+			.await
 			.map_err(|e| err!(e, "could not get file"))?;
 		if res.is_empty() {
 			return Err(err!("not found", "file {} not found", pack.name));
 		}
 
-		if res.hash() != pack.version ||
-			!source.sign_key.verify(&pack.version, &pack.signature)
+		if res.hash() != pack.version
+			|| !source.sign_key.verify(&pack.version, &pack.signature)
 		{
 			return Err(err!("hash / sig", "file {} not correct", pack.name));
 		}
 
 		// write to
 		let path = format!("{}/{}.tar.gz", packages_dir, pack.name);
-		fs::write(&path, res.file()).await
+		fs::write(&path, res.file())
+			.await
 			.map_err(|e| err!(e, "could not write to {}", path))?;
 
 		packs.push(pack);

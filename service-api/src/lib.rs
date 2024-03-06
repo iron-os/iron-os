@@ -1,16 +1,16 @@
 #![doc = include_str!("../README.md")]
 
-pub mod requests;
 #[cfg(target_family = "unix")]
 pub mod client;
+pub mod error;
+pub mod requests;
 #[cfg(target_family = "unix")]
 pub mod server;
-pub mod error;
 
 pub use stream;
 
-pub use stream_api::request_handler;
 use stream_api::action;
+pub use stream_api::request_handler;
 
 action! {
 	#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -1,78 +1,73 @@
-use crate::config::Config;
-use crate::packages::{PackagesDb, PackageEntry};
 use crate::auth::AuthDb;
+use crate::config::Config;
+use crate::error::{Error, Result};
 use crate::files::Files;
-use crate::error::{Result, Error};
+use crate::packages::{PackageEntry, PackagesDb};
 
 use sentry::ClientInitGuard;
 
-use stream_api::api;
-use packages::requests::{
-	PackageInfoReq, PackageInfo,
-	SetPackageInfoReq,
-	GetFileReq, GetFile,
-	GetFilePartReq, GetFilePart,
-	SetFileReq,
-	AuthenticateReaderReq, AuthKey,
-	AuthenticateWriter1Req, AuthenticateWriter1, Challenge,
-	AuthenticateWriter2Req,
-	NewAuthKeyReaderReq, NewAuthKeyReader,
-	ChangeWhitelistReq,
-	EmptyJson
-};
+use packages::error::{Error as ApiError, Result as ApiResult};
 use packages::packages::Channel;
-use packages::error::{Result as ApiResult, Error as ApiError};
-use packages::server::{
-	Server, Session, Configurator, Config as ServerConfig
+use packages::requests::{
+	AuthKey, AuthenticateReaderReq, AuthenticateWriter1,
+	AuthenticateWriter1Req, AuthenticateWriter2Req, Challenge,
+	ChangeWhitelistReq, EmptyJson, GetFile, GetFilePart, GetFilePartReq,
+	GetFileReq, NewAuthKeyReader, NewAuthKeyReaderReq, PackageInfo,
+	PackageInfoReq, SetFileReq, SetPackageInfoReq,
 };
+use packages::server::{Config as ServerConfig, Configurator, Server, Session};
+use stream_api::api;
 
+use tracing::error;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
-use tracing::error;
 
 pub async fn serve(tracing: &str, path: &str) -> Result<()> {
 	let cfg = match Config::read(path).await {
 		Ok(cfg) => cfg,
 		Err(e) => {
-			eprintln!("reading configuration failed\nto create a configuration \
-				use the command `create`");
-			return Err(e)
+			eprintln!(
+				"reading configuration failed\nto create a configuration \
+				use the command `create`"
+			);
+			return Err(e);
 		}
 	};
 
 	if !cfg.has_sign_key() {
 		eprintln!("please define the signature public key `sign-key`");
-		return Ok(())
+		return Ok(());
 	}
 
 	let _sentry_guard = enable_tracing(tracing, cfg.sentry_url.as_deref());
 
-	let pack_db = match PackagesDb::read(&cfg).await {
-		Ok(p) => p,
-		Err(e) => {
-			error!("reading packages db failed\nto create the packages db file \
+	let pack_db =
+		match PackagesDb::read(&cfg).await {
+			Ok(p) => p,
+			Err(e) => {
+				error!("reading packages db failed\nto create the packages db file \
 				use the command `create`");
-			return Err(e)
-		}
-	};
+				return Err(e);
+			}
+		};
 
 	let files = Files::read(&cfg).await?;
 
-	let auth_db = match AuthDb::read(&cfg).await {
-		Ok(a) => a,
-		Err(e) => {
-			error!("reading auth db failed\nto create the auth db file use the \
+	let auth_db =
+		match AuthDb::read(&cfg).await {
+			Ok(a) => a,
+			Err(e) => {
+				error!("reading auth db failed\nto create the auth db file use the \
 				command `create`");
-			return Err(e)
-		}
-	};
+				return Err(e);
+			}
+		};
 
 	// now spawn the server
-	
-	let mut server = Server::new(
-		("0.0.0.0", cfg.port),
-		cfg.con_key.clone()
-	).await.map_err(|e| Error::other("server failed", e))?;
+
+	let mut server = Server::new(("0.0.0.0", cfg.port), cfg.con_key.clone())
+		.await
+		.map_err(|e| Error::other("server failed", e))?;
 
 	println!("start server on 0.0.0.0:{:?}", cfg.port);
 
@@ -81,14 +76,19 @@ pub async fn serve(tracing: &str, path: &str) -> Result<()> {
 	server.register_data(cfg);
 	server.register_data(auth_db);
 	// server.register_request(all_packages);
-	
+
 	register_requests(&mut server);
 
-	server.run().await
+	server
+		.run()
+		.await
 		.map_err(|e| Error::other("server failed", e))
 }
 
-fn enable_tracing(tracing: &str, sentry_url: Option<&str>) -> Option<ClientInitGuard> {
+fn enable_tracing(
+	tracing: &str,
+	sentry_url: Option<&str>,
+) -> Option<ClientInitGuard> {
 	// setup tracing
 	let tracing_reg = tracing_subscriber::registry()
 		.with(EnvFilter::from(tracing))
@@ -139,7 +139,7 @@ struct AuthReader(Channel);
 fn valid_reader_auth(sess: &Session) -> ApiResult<Channel> {
 	match sess.get::<AuthReader>() {
 		Some(c) => Ok(c.0),
-		None => Err(ApiError::NotAuthenticated)
+		None => Err(ApiError::NotAuthenticated),
 	}
 }
 
@@ -152,22 +152,20 @@ struct AuthWriter(Channel);
 fn valid_writer_auth(sess: &Session) -> ApiResult<Channel> {
 	match sess.get::<AuthWriter>() {
 		Some(a) => Ok(a.0),
-		None => Err(ApiError::NotAuthenticated)
+		None => Err(ApiError::NotAuthenticated),
 	}
 }
 
 #[api(PackageInfoReq)]
 async fn package_info(
 	req: PackageInfoReq,
-	packages: &PackagesDb
+	packages: &PackagesDb,
 ) -> ApiResult<PackageInfo> {
 	Ok(PackageInfo {
-		package: packages.get_package(
-			&req.arch,
-			&req.channel,
-			&req.name,
-			&req.device_id
-		).await.map(|e| e.package)
+		package: packages
+			.get_package(&req.arch, &req.channel, &req.name, &req.device_id)
+			.await
+			.map(|e| e.package),
 	})
 }
 
@@ -178,53 +176,55 @@ async fn set_package_info(
 	files: &Files,
 	session: &Session,
 	cfg: &Config,
-	packages: &PackagesDb
+	packages: &PackagesDb,
 ) -> ApiResult<EmptyJson> {
 	let channel = valid_writer_auth(session)?;
 
 	// check that we have a file with that version
 	let hash = &req.package.version;
 	if !files.exists(hash).await {
-		return Err(ApiError::Request(format!("version does not exists")))
+		return Err(ApiError::Request(format!("version does not exists")));
 	}
 
 	// validate that the signature is correct
-	let sign_pub_key = cfg.sign_pub_key_by_channel(channel)
+	let sign_pub_key = cfg
+		.sign_pub_key_by_channel(channel)
 		.ok_or_else(|| ApiError::NoSignKeyForChannel(channel))?;
 
 	if !sign_pub_key.verify(hash, &req.package.signature) {
-		return Err(ApiError::SignatureIncorrect)
+		return Err(ApiError::SignatureIncorrect);
 	}
 
 	// now set it
-	packages.push_package(channel, PackageEntry {
-		package: req.package,
-		whitelist: req.whitelist,
-		auto_whitelist_limit: req.auto_whitelist_limit
-	}).await;
+	packages
+		.push_package(
+			channel,
+			PackageEntry {
+				package: req.package,
+				whitelist: req.whitelist,
+				auto_whitelist_limit: req.auto_whitelist_limit,
+			},
+		)
+		.await;
 
 	Ok(EmptyJson)
 }
 
 #[api(GetFileReq<B>)]
-async fn get_file(
-	req: GetFileReq<B>,
-	files: &Files
-) -> ApiResult<GetFile<B>> {
+async fn get_file(req: GetFileReq<B>, files: &Files) -> ApiResult<GetFile<B>> {
 	let file = files.get(&req.hash).await;
 	match file {
 		Some(file) => GetFile::from_file(file).await,
-		None => Ok(GetFile::empty())
+		None => Ok(GetFile::empty()),
 	}
 }
 
 #[api(GetFilePartReq<B>)]
 async fn get_file_part(
 	req: GetFilePartReq<B>,
-	files: &Files
+	files: &Files,
 ) -> ApiResult<GetFilePart<B>> {
-	let file = files.get(&req.hash).await
-		.ok_or(ApiError::FileNotFound)?;
+	let file = files.get(&req.hash).await.ok_or(ApiError::FileNotFound)?;
 
 	GetFilePart::from_file(file, req.start, req.len).await
 }
@@ -235,26 +235,26 @@ async fn set_file(
 	req: SetFileReq<B>,
 	files: &Files,
 	session: &Session,
-	cfg: &Config
+	cfg: &Config,
 ) -> ApiResult<EmptyJson> {
 	let channel = valid_writer_auth(session)?;
 
 	// generate hash of file
 	let hash = req.hash();
 	// validate signature
-	let sign_pub_key = cfg.sign_pub_key_by_channel(channel)
+	let sign_pub_key = cfg
+		.sign_pub_key_by_channel(channel)
 		.ok_or_else(|| ApiError::NoSignKeyForChannel(channel))?;
 	if !sign_pub_key.verify(&hash, req.signature()) {
-		return Err(ApiError::SignatureIncorrect)
+		return Err(ApiError::SignatureIncorrect);
 	}
 
 	// now write to disk
 	let file = req.file();
 
-	files.set(&hash, file).await
-		.map_err(|e| ApiError::Internal(
-			format!("could not write file {}", e)
-		))?;
+	files.set(&hash, file).await.map_err(|e| {
+		ApiError::Internal(format!("could not write file {}", e))
+	})?;
 
 	Ok(EmptyJson)
 }
@@ -265,11 +265,11 @@ async fn set_file(
 async fn authenticate_reader(
 	req: AuthenticateReaderReq,
 	session: &Session,
-	auth_db: &AuthDb
+	auth_db: &AuthDb,
 ) -> ApiResult<EmptyJson> {
 	let channel = match auth_db.get(&req.key).await {
 		Some(c) => c,
-		None => return Err(ApiError::AuthKeyUnknown)
+		None => return Err(ApiError::AuthKeyUnknown),
 	};
 
 	session.set(AuthReader(channel));
@@ -280,7 +280,7 @@ async fn authenticate_reader(
 #[api(AuthenticateWriter1Req)]
 async fn authenticate_writer1(
 	req: AuthenticateWriter1Req,
-	session: &Session
+	session: &Session,
 ) -> ApiResult<AuthenticateWriter1> {
 	let challenge = Challenge::new();
 	session.set(AuthWriterChallenge(req.channel, challenge.clone()));
@@ -292,18 +292,18 @@ async fn authenticate_writer1(
 async fn authenticate_writer2(
 	req: AuthenticateWriter2Req,
 	session: &Session,
-	cfg: &Config
+	cfg: &Config,
 ) -> ApiResult<EmptyJson> {
-	let AuthWriterChallenge(channel, challenge) =
-		session.take::<AuthWriterChallenge>().ok_or_else(|| {
-			ApiError::NotAuthenticated
-		})?;
+	let AuthWriterChallenge(channel, challenge) = session
+		.take::<AuthWriterChallenge>()
+		.ok_or_else(|| ApiError::NotAuthenticated)?;
 
-	let sign_pub_key = cfg.sign_pub_key_by_channel(channel)
+	let sign_pub_key = cfg
+		.sign_pub_key_by_channel(channel)
 		.ok_or_else(|| ApiError::NoSignKeyForChannel(channel))?;
 
 	if !sign_pub_key.verify(challenge, &req.signature) {
-		return Err(ApiError::SignatureIncorrect)
+		return Err(ApiError::SignatureIncorrect);
 	}
 
 	session.set(AuthWriter(channel));
@@ -325,7 +325,7 @@ async fn authenticate_writer2(
 #[api(NewAuthKeyReaderReq)]
 async fn new_auth_key_reader(
 	session: &Session,
-	auth_db: &AuthDb
+	auth_db: &AuthDb,
 ) -> ApiResult<NewAuthKeyReader> {
 	let channel = valid_writer_auth(session)?;
 
@@ -342,19 +342,21 @@ async fn new_auth_key_reader(
 async fn change_whitelist(
 	req: ChangeWhitelistReq,
 	session: &Session,
-	packages: &PackagesDb
+	packages: &PackagesDb,
 ) -> ApiResult<EmptyJson> {
 	let channel = valid_writer_auth(session)?;
 
-	let changed = packages.change_whitelist(
-		&channel,
-		&req.arch,
-		&req.name,
-		&req.version,
-		req.whitelist,
-		req.add,
-		req.auto_whitelist_limit
-	).await;
+	let changed = packages
+		.change_whitelist(
+			&channel,
+			&req.arch,
+			&req.name,
+			&req.version,
+			req.whitelist,
+			req.add,
+			req.auto_whitelist_limit,
+		)
+		.await;
 
 	if changed {
 		Ok(EmptyJson)

@@ -1,4 +1,3 @@
-
 mod chromium;
 mod ws;
 
@@ -6,11 +5,11 @@ use crate::context;
 use crate::Bootloader;
 
 use std::io;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
-use tokio::task::JoinHandle;
 use tokio::sync::watch;
+use tokio::task::JoinHandle;
 use tokio::time::{self, Duration};
 
 use fire::{data_struct, static_file, static_files};
@@ -19,9 +18,8 @@ use fire::{data_struct, static_file, static_files};
 // but then return a task which contains the server
 pub async fn start(
 	client: Bootloader,
-	mut receiver: ApiReceiver
+	mut receiver: ApiReceiver,
 ) -> io::Result<JoinHandle<()>> {
-
 	if context::is_headless() {
 		// if we are in headless mode don't start the ui
 		// just spawn a mockup task
@@ -30,19 +28,15 @@ pub async fn start(
 			// wait until the ui sender closes
 			// then close also the ui task
 			while !receiver.on_maybe_closed().await {}
-		}))
+		}));
 	}
 
 	let web_watchdog = WebWatchDog::new();
 
 	// let's first start the server and then chromium
 	// so when chromes loads the page already exists
-	let server_task = start_server(
-		8888,
-		client.clone(),
-		receiver,
-		web_watchdog.clone()
-	);
+	let server_task =
+		start_server(8888, client.clone(), receiver, web_watchdog.clone());
 
 	// only start chromium if we have a context
 	if context::is_release() {
@@ -59,7 +53,9 @@ pub async fn start(
 				eprintln!("chromium watchdog failed");
 
 				if context::is_release() {
-					client.systemd_restart("chromium").await
+					client
+						.systemd_restart("chromium")
+						.await
 						.expect("could not restart chromium");
 				}
 			}
@@ -77,7 +73,7 @@ static_file!(Index, "/" => "./www/index.html");
 static_files!(Js, "/js" => "./www/js");
 static_files!(Css, "/css" => "./www/css");
 
-data_struct!{
+data_struct! {
 	pub struct Data {
 		bootloader: Bootloader,
 		api: ApiReceiver,
@@ -90,17 +86,15 @@ pub fn api_new() -> (ApiSender, ApiReceiver) {
 
 	(
 		ApiSender {
-			page: Arc::new(p_tx)
+			page: Arc::new(p_tx),
 		},
-		ApiReceiver {
-			page: p_rx
-		}
+		ApiReceiver { page: p_rx },
 	)
 }
 
 #[derive(Debug, Clone)]
 pub struct ApiSender {
-	page: Arc<watch::Sender<String>>
+	page: Arc<watch::Sender<String>>,
 }
 
 impl ApiSender {
@@ -111,7 +105,7 @@ impl ApiSender {
 
 #[derive(Debug, Clone)]
 pub struct ApiReceiver {
-	page: watch::Receiver<String>
+	page: watch::Receiver<String>,
 }
 
 impl ApiReceiver {
@@ -137,13 +131,13 @@ pub struct WebWatchDog {
 	// after timeout exceeds this should be checked
 	// if false (something is wrong)
 	// if true (everything is fine and you should set it to false)
-	inner: Arc<AtomicBool>
+	inner: Arc<AtomicBool>,
 }
 
 impl WebWatchDog {
 	pub fn new() -> Self {
 		Self {
-			inner: Arc::new(AtomicBool::new(true))
+			inner: Arc::new(AtomicBool::new(true)),
 		}
 	}
 
@@ -155,12 +149,9 @@ impl WebWatchDog {
 	// returns true if everything is fine
 	pub fn reset(&self) -> bool {
 		// orderings can probably be relaxed
-		self.inner.compare_exchange(
-			true,
-			false,
-			Ordering::SeqCst,
-			Ordering::SeqCst
-		).is_ok()
+		self.inner
+			.compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+			.is_ok()
 	}
 }
 
@@ -168,18 +159,16 @@ pub fn start_server(
 	port: u16,
 	bootloader: Bootloader,
 	receiver: ApiReceiver,
-	web_watchdog: WebWatchDog
+	web_watchdog: WebWatchDog,
 ) -> JoinHandle<()> {
-
 	let data = Data {
 		bootloader,
 		api: receiver,
-		web_watchdog
+		web_watchdog,
 	};
 
-
-	let mut server = fire::build(("127.0.0.1", port), data)
-		.expect("address not parseable");
+	let mut server =
+		fire::build(("127.0.0.1", port), data).expect("address not parseable");
 
 	server.add_route(Index::new());
 	server.add_route(Js::new());
@@ -187,7 +176,6 @@ pub fn start_server(
 	server.add_raw_route(ws::MainWs);
 
 	tokio::spawn(async move {
-		server.light().await
-			.expect("lighting server failed")
+		server.light().await.expect("lighting server failed")
 	})
 }

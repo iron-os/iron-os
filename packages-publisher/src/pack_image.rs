@@ -1,32 +1,33 @@
-use crate::error::{Result};
-use crate::util::{create_dir, hash_file, read_toml, remove_dir, compress, copy};
+use crate::error::Result;
+use crate::util::{
+	compress, copy, create_dir, hash_file, read_toml, remove_dir,
+};
 
 use tokio::fs;
 
 use file_db::FileDb;
 
-use bootloader_api::requests::{VersionInfo, Architecture};
+use bootloader_api::requests::{Architecture, VersionInfo};
 
-use serde::{Deserialize};
-
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ImageToml {
 	pub version: String,
 	pub board: String,
 	pub arch: Architecture,
-	pub name: String
+	pub name: String,
 }
 
 /// The toml file which get's used between the download and pack-image command
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProductToml {
-	product: String
+	product: String,
 }
 
 /// creates a tar.gz of the kernel and the rootfs
 /// this can then be uploaded to the packages server.
-/// 
+///
 /// There is also an option to only create the version.fdb file
 /// to add to the boot partition.
 #[derive(clap::Parser)]
@@ -36,11 +37,10 @@ pub struct PackImage {
 	#[clap(long)]
 	use_existing_image: bool,
 	#[clap(long)]
-	create_version_file: bool
+	create_version_file: bool,
 }
 
 pub async fn pack_image(opts: PackImage) -> Result<()> {
-
 	let cfg: ImageToml = read_toml("./image.toml").await?;
 
 	if !opts.use_existing_image {
@@ -49,7 +49,7 @@ pub async fn pack_image(opts: PackImage) -> Result<()> {
 
 	if !opts.create_version_file {
 		// nothing more to done
-		return Ok(())
+		return Ok(());
 	}
 
 	let hash = hash_file("./image.tar.gz").await?;
@@ -64,11 +64,12 @@ pub async fn pack_image(opts: PackImage) -> Result<()> {
 		version: hash,
 		signature: None,
 		device_id: None,
-		installed: false
+		installed: false,
 	};
 
 	let db = FileDb::new("./version.fdb", version);
-	db.write().await
+	db.write()
+		.await
 		.map_err(|e| err!(e, "could not store version.fdb"))?;
 
 	Ok(())
@@ -90,36 +91,37 @@ async fn create_tar_gz(cfg: &ImageToml) -> Result<()> {
 			// copy bootloader
 			copy(
 				"./efi-part/EFI/BOOT/bootx64.efi",
-				&format!("{tmp_path}/bootx64.efi")
-			).await?;
+				&format!("{tmp_path}/bootx64.efi"),
+			)
+			.await?;
 			// copy grub cfg
 			copy(
 				"./efi-part/EFI/BOOT/grub.templ",
-				&format!("{tmp_path}/grub.templ")
-			).await?;
+				&format!("{tmp_path}/grub.templ"),
+			)
+			.await?;
 
 			img_path
-		},
+		}
 		Architecture::Arm64 => {
 			let img_path = format!("{tmp_path}/Image.gz");
 			// copy kernel
 			copy("./Image.gz", &img_path).await?;
 			// copy bootloader
-			copy(
-				"./u-boot.bin",
-				&format!("{tmp_path}/u-boot.bin")
-			).await?;
+			copy("./u-boot.bin", &format!("{tmp_path}/u-boot.bin")).await?;
 			// copy uboot config
 			copy(
 				"./extlinux/extlinux.templ",
-				&format!("{tmp_path}/extlinux.templ")
-			).await?;
+				&format!("{tmp_path}/extlinux.templ"),
+			)
+			.await?;
 
 			img_path
 		}
 	};
 
-	let kernel_image_size = fs::metadata(kernel_img).await
+	let kernel_image_size = fs::metadata(kernel_img)
+		.await
 		.map_err(|e| {
 			err!(format!("{e:?}"), "could not read kernel image metadata")
 		})?

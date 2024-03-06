@@ -1,4 +1,4 @@
-use crate::error::{Result};
+use crate::error::Result;
 use crate::util::{read_toml, write_toml};
 
 use std::env;
@@ -6,10 +6,10 @@ use std::path::PathBuf;
 
 use crypto::signature::{Keypair, PublicKey};
 
-use packages::requests::AuthKey;
 use packages::packages::Channel;
+use packages::requests::AuthKey;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const PATH: &str = ".config/publisher/config.toml";
 
@@ -22,7 +22,7 @@ fn path() -> Result<PathBuf> {
 }
 
 pub struct Config {
-	inner: ConfigToml
+	inner: ConfigToml,
 }
 
 impl Config {
@@ -36,15 +36,15 @@ impl Config {
 					debug: None,
 					alpha: None,
 					beta: None,
-					release: None
-				}
-			}
+					release: None,
+				},
+			},
 		}
 	}
 
 	pub async fn open() -> Result<Self> {
 		Ok(Self {
-			inner: read_toml(&path()?).await?
+			inner: read_toml(&path()?).await?,
 		})
 	}
 
@@ -53,12 +53,12 @@ impl Config {
 			Channel::Debug => self.inner.debug.as_ref(),
 			Channel::Alpha => self.inner.alpha.as_ref(),
 			Channel::Beta => self.inner.beta.as_ref(),
-			Channel::Release => self.inner.release.as_ref()
+			Channel::Release => self.inner.release.as_ref(),
 		};
 
 		match opt {
 			Some(src) => Ok(src),
-			None => Err(err!("None", "no configuration for {:?}", channel))
+			None => Err(err!("None", "no configuration for {:?}", channel)),
 		}
 	}
 
@@ -67,12 +67,12 @@ impl Config {
 			Channel::Debug => self.inner.debug.as_mut(),
 			Channel::Alpha => self.inner.alpha.as_mut(),
 			Channel::Beta => self.inner.beta.as_mut(),
-			Channel::Release => self.inner.release.as_mut()
+			Channel::Release => self.inner.release.as_mut(),
 		};
 
 		match opt {
 			Some(src) => Ok(src),
-			None => Err(err!("None", "no configuration for {:?}", channel))
+			None => Err(err!("None", "no configuration for {:?}", channel)),
 		}
 	}
 
@@ -86,7 +86,7 @@ struct ConfigToml {
 	debug: Option<Source>,
 	alpha: Option<Source>,
 	beta: Option<Source>,
-	release: Option<Source>
+	release: Option<Source>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,7 +98,7 @@ pub struct Source {
 	pub priv_key: Option<Keypair>,
 	/// reader auth key
 	#[serde(rename = "auth-key")]
-	pub auth_key: Option<AuthKey>
+	pub auth_key: Option<AuthKey>,
 }
 
 /// Configures an address and a public key to use for uploading for a
@@ -108,7 +108,7 @@ pub struct Source {
 pub struct ConfigOpts {
 	channel: Channel,
 	address: String,
-	public_key: PublicKey
+	public_key: PublicKey,
 }
 
 pub async fn configure(opts: ConfigOpts) -> Result<()> {
@@ -118,14 +118,14 @@ pub async fn configure(opts: ConfigOpts) -> Result<()> {
 		Channel::Debug => &mut cfg.inner.debug,
 		Channel::Alpha => &mut cfg.inner.alpha,
 		Channel::Beta => &mut cfg.inner.beta,
-		Channel::Release => &mut cfg.inner.release
+		Channel::Release => &mut cfg.inner.release,
 	};
 
 	*src = Some(Source {
 		addr: opts.address,
 		public_key: opts.public_key,
 		priv_key: None,
-		auth_key: None
+		auth_key: None,
 	});
 
 	cfg.write().await?;
