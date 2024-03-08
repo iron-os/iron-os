@@ -21,12 +21,13 @@ fire = { package = "fire-http", version = "0.2", features = [
     "json",
     "ws",
 ] }
+stream-api = { package = "fire-stream-api", version = "0.3" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 file-db = { package = "iron-os-file-db", version = "0.2", features = ["async"] }
-packages = { package = "iron-os-packages-api", version = "0.1" }
+packages = { package = "iron-os-packages-api", version = "0.1", path = "./../packages-api" }
 rand = "0.8"
-api = { package = "iron-os-service-api", version = "0.2", path = "../service-api" }
+api = { package = "iron-os-service-api", version = "0.3", path = "../service-api" }
 # display
 wayland-client = "0.29"
 wayland-commons = "0.29"

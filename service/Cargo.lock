@@ -319,18 +319,6 @@ dependencies = [
 
 [[package]]
 name = "fire-stream"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6443818b62635ac120f303559f0ed43e4f907a548b43ae2b27cc5330bf3a16bb"
-dependencies = [
- "serde",
- "serde_json",
- "simple-bytes",
- "tokio",
-]
-
-[[package]]
-name = "fire-stream"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40571378d678c8c31ae370417a1275978642d5b9806448c775dc6f5bda0510b2"
@@ -345,25 +333,12 @@ dependencies = [
 
 [[package]]
 name = "fire-stream-api"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cd17359f0ba5d449876b019cd4749917b5d306d8d13ab6508fe12f4b9671271"
-dependencies = [
- "fire-stream 0.2.8",
- "serde",
- "serde_json",
- "simple-bytes",
- "tokio",
-]
-
-[[package]]
-name = "fire-stream-api"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ae4cdfed9fa545cfabefbebb31c3e3b28855a38e6eb7d8b33decd50c4000042"
 dependencies = [
  "fire-crypto",
- "fire-stream 0.4.3",
+ "fire-stream",
  "fire-stream-api-codegen",
  "serde",
  "serde_json",
@@ -582,24 +557,8 @@ version = "0.1.0"
 dependencies = [
  "base64 0.21.7",
  "fire-crypto",
- "fire-stream 0.4.3",
- "fire-stream-api 0.3.4",
- "rand",
- "serde",
- "simple-bytes",
- "tokio",
-]
-
-[[package]]
-name = "iron-os-packages-api"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5544cd339f273256ccbc1b5e972f3f08b7cf35707a961cbe3cdcb0046fb797b0"
-dependencies = [
- "base64 0.21.7",
- "fire-crypto",
- "fire-stream 0.4.3",
- "fire-stream-api 0.3.4",
+ "fire-stream",
+ "fire-stream-api",
  "rand",
  "serde",
  "simple-bytes",
@@ -608,11 +567,11 @@ dependencies = [
 
 [[package]]
 name = "iron-os-service-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
- "fire-stream 0.2.8",
- "fire-stream-api 0.1.2",
- "iron-os-packages-api 0.1.0",
+ "fire-stream",
+ "fire-stream-api",
+ "iron-os-packages-api",
  "serde",
  "simple-bytes",
  "tokio",
@@ -924,8 +883,9 @@ version = "1.0.1"
 dependencies = [
  "dbus",
  "fire-http",
+ "fire-stream-api",
  "iron-os-file-db",
- "iron-os-packages-api 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "iron-os-packages-api",
  "iron-os-service-api",
  "linux-info",
  "nmdbus",

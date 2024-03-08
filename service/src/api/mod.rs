@@ -1,7 +1,9 @@
 mod device_info;
 mod network_manager;
 
+use api::requests::EmptyJson;
 use network_manager::{ApSecurityFlag, DeviceKind, NetworkManager, PropMap};
+use stream_api::api;
 
 use crate::display::{Display, State};
 use crate::packages::Packages;
@@ -31,7 +33,6 @@ use api::requests::{
 	ui::OpenPageReq,
 };
 use api::server::Server;
-use api::{request_handler, Action};
 
 use tokio::fs;
 use tokio::task::{spawn_blocking, JoinHandle};
@@ -76,52 +77,47 @@ pub async fn start(
 	}))
 }
 
-request_handler!(
-	async fn open_page<Action>(
-		req: OpenPageReq,
-		ui_api: ApiSender,
-	) -> ApiResult<()> {
-		eprintln!("opening page {}", req.url);
-		ui_api.open_page(req.url);
-		Ok(())
-	}
-);
+#[api(OpenPageReq)]
+fn open_page(req: OpenPageReq, ui_api: &ApiSender) -> ApiResult<EmptyJson> {
+	eprintln!("opening page {}", req.url);
+	ui_api.open_page(req.url);
+	Ok(EmptyJson)
+}
 
-request_handler!(
-	async fn system_info<Action>(
-		_req: SystemInfoReq,
-		bootloader: Bootloader,
-		packages: Packages,
-	) -> ApiResult<SystemInfo> {
-		let version_info = bootloader
-			.version_info()
-			.await
-			.map_err(ApiError::internal)?;
+#[api(SystemInfoReq)]
+async fn system_info(
+	_req: SystemInfoReq,
+	bootloader: &Bootloader,
+	packages: &Packages,
+) -> ApiResult<SystemInfo> {
+	let version_info = bootloader
+		.version_info()
+		.await
+		.map_err(ApiError::internal_display)?;
 
-		let cfg = packages.config().await;
+	let cfg = packages.config().await;
 
-		let packages_list: Vec<_> = packages
-			.packages()
-			.await
-			.into_iter()
-			.map(|pack| ShortPackage {
-				name: pack.name,
-				version: pack.version_str,
-				path: pack.path,
-			})
-			.collect();
-
-		Ok(SystemInfo {
-			version: version_info.version_str,
-			board: version_info.board,
-			product: version_info.product,
-			installed: version_info.installed,
-			channel: cfg.channel,
-			device_id: version_info.device_id.clone(),
-			packages: packages_list,
+	let packages_list: Vec<_> = packages
+		.packages()
+		.await
+		.into_iter()
+		.map(|pack| ShortPackage {
+			name: pack.name,
+			version: pack.version_str,
+			path: pack.path,
 		})
-	}
-);
+		.collect();
+
+	Ok(SystemInfo {
+		version: version_info.version_str,
+		board: version_info.board,
+		product: version_info.product,
+		installed: version_info.installed,
+		channel: cfg.channel,
+		device_id: version_info.device_id.clone(),
+		packages: packages_list,
+	})
+}
 
 /*
 #[derive(Debug, Serialize, Deserialize)]
@@ -129,91 +125,88 @@ pub struct SetDisplayStateReq {
 	pub on: bool
 }
 */
-request_handler!(
-	async fn set_display_state<Action>(
-		req: SetDisplayStateReq,
-		display: Display,
-	) -> ApiResult<()> {
-		let SetDisplayStateReq { on } = req;
-		display
-			.set_state(match on {
-				true => State::On,
-				false => State::Off,
+#[api(SetDisplayStateReq)]
+async fn set_display_state(
+	req: SetDisplayStateReq,
+	display: &Display,
+) -> ApiResult<EmptyJson> {
+	let SetDisplayStateReq { on } = req;
+	display
+		.set_state(match on {
+			true => State::On,
+			false => State::Off,
+		})
+		.await
+		.ok_or_else(|| {
+			ApiError::internal_display("could not set display state")
+		})
+		.map(|_| EmptyJson)
+}
+
+#[api(SetDisplayBrightnessReq)]
+async fn set_display_brightness(
+	req: SetDisplayBrightnessReq,
+	display: &Display,
+) -> ApiResult<EmptyJson> {
+	display
+		.set_brightness(req.brightness)
+		.await
+		.ok_or_else(|| {
+			ApiError::internal_display("could not set display state")
+		})
+		.map(|_| EmptyJson)
+}
+
+#[api(DisksReq)]
+async fn disks(bootloader: &Bootloader) -> ApiResult<ApiDisks> {
+	let disks_list = bootloader
+		.disks()
+		.await
+		.map_err(ApiError::internal_display)?;
+
+	Ok(ApiDisks(
+		disks_list
+			.into_iter()
+			.filter(|disk| !disk.active)
+			.map(|disk| ApiDisk {
+				name: disk.name,
+				initialized: disk.initialized,
+				size: disk.size,
 			})
-			.await
-			.ok_or_else(|| ApiError::internal("could not set display state"))
-	}
-);
+			.collect(),
+	))
+}
 
-request_handler!(
-	async fn set_display_brightness<Action>(
-		req: SetDisplayBrightnessReq,
-		display: Display,
-	) -> ApiResult<()> {
-		display
-			.set_brightness(req.brightness)
-			.await
-			.ok_or_else(|| ApiError::internal("could not set display state"))
-	}
-);
+#[api(DeviceInfoReq)]
+async fn device_info_req(bootloader: &Bootloader) -> ApiResult<DeviceInfo> {
+	device_info::read(bootloader)
+		.await
+		.map_err(ApiError::internal_display)
+}
 
-request_handler!(
-	async fn disks<Action>(
-		_req: DisksReq,
-		bootloader: Bootloader,
-	) -> ApiResult<ApiDisks> {
-		let disks_list =
-			bootloader.disks().await.map_err(ApiError::internal)?;
+#[api(InstallOnReq)]
+async fn install_on(
+	req: InstallOnReq,
+	bootloader: &Bootloader,
+) -> ApiResult<EmptyJson> {
+	bootloader
+		.install_on(req.disk)
+		.await
+		.map_err(ApiError::internal_display)
+		.map(|_| EmptyJson)
+}
 
-		Ok(ApiDisks(
-			disks_list
-				.into_iter()
-				.filter(|disk| !disk.active)
-				.map(|disk| ApiDisk {
-					name: disk.name,
-					initialized: disk.initialized,
-					size: disk.size,
-				})
-				.collect(),
-		))
-	}
-);
-
-request_handler!(
-	async fn device_info_req<Action>(
-		_req: DeviceInfoReq,
-		bootloader: Bootloader,
-	) -> ApiResult<DeviceInfo> {
-		device_info::read(bootloader)
-			.await
-			.map_err(ApiError::internal_display)
-	}
-);
-
-request_handler!(
-	async fn install_on<Action>(
-		req: InstallOnReq,
-		bootloader: Bootloader,
-	) -> ApiResult<()> {
-		bootloader
-			.install_on(req.disk)
-			.await
-			.map_err(ApiError::internal)
-	}
-);
-
-request_handler!(
-	async fn set_power_state<Action>(
-		req: SetPowerStateReq,
-		bootloader: Bootloader,
-	) -> ApiResult<()> {
-		let r = match req.state {
-			PowerState::Shutdown => bootloader.shutdown().await,
-			PowerState::Restart => bootloader.restart().await,
-		};
-		r.map_err(ApiError::internal)
-	}
-);
+#[api(SetPowerStateReq)]
+async fn set_power_state(
+	req: SetPowerStateReq,
+	bootloader: &Bootloader,
+) -> ApiResult<EmptyJson> {
+	let r = match req.state {
+		PowerState::Shutdown => bootloader.shutdown().await,
+		PowerState::Restart => bootloader.restart().await,
+	};
+	r.map_err(ApiError::internal_display).map(|_| EmptyJson)
+}
 
 // setPowerState
 
@@ -221,42 +214,34 @@ request_handler!(
 // addpackage
 // removePackage
 
-request_handler!(
-	async fn list_packages<Action>(
-		_req: ListPackagesReq,
-		packages: Packages,
-	) -> ApiResult<ListPackages> {
-		let cfg = packages.config().await;
-		let list = packages.packages().await;
+#[api(ListPackagesReq)]
+async fn list_packages(packages: &Packages) -> ApiResult<ListPackages> {
+	let cfg = packages.config().await;
+	let list = packages.packages().await;
 
-		Ok(ListPackages {
-			packages: list,
-			sources: cfg.sources,
-			channel: cfg.channel,
-			on_run: cfg.on_run,
-		})
-	}
-);
+	Ok(ListPackages {
+		packages: list,
+		sources: cfg.sources,
+		channel: cfg.channel,
+		on_run: cfg.on_run,
+	})
+}
 
-request_handler!(
-	async fn add_package<Action>(
-		req: AddPackageReq,
-		packages: Packages,
-	) -> ApiResult<AddPackage> {
-		let package = packages.add_package(req.name).await;
+#[api(AddPackageReq)]
+async fn add_package(
+	req: AddPackageReq,
+	packages: &Packages,
+) -> ApiResult<AddPackage> {
+	let package = packages.add_package(req.name).await;
 
-		Ok(AddPackage { package })
-	}
-);
+	Ok(AddPackage { package })
+}
 
-request_handler!(
-	async fn update_req<Action>(
-		_req: UpdateReq,
-		packages: Packages,
-	) -> ApiResult<()> {
-		Ok(packages.update().await)
-	}
-);
+#[api(UpdateReq)]
+async fn update_req(packages: &Packages) -> ApiResult<EmptyJson> {
+	packages.update().await;
+	Ok(EmptyJson)
+}
 
 /*
 Get JournalLogs
@@ -332,13 +317,10 @@ fn access_points_sync() -> ApiResult<AccessPoints> {
 	})
 }
 
-request_handler!(
-	async fn access_points_req<Action>(
-		_req: AccessPointsReq,
-	) -> ApiResult<AccessPoints> {
-		spawn_blocking(access_points_sync).await.unwrap()
-	}
-);
+#[api(AccessPointsReq)]
+async fn access_points_req() -> ApiResult<AccessPoints> {
+	spawn_blocking(access_points_sync).await.unwrap()
+}
 
 fn connections_sync() -> ApiResult<Connections> {
 	let nm = NetworkManager::connect().map_err(api_error_dbus)?;
@@ -402,13 +384,10 @@ fn convert_connection(con: network_manager::Connection) -> Option<Connection> {
 	Some(Connection { id, uuid, kind })
 }
 
-request_handler!(
-	async fn connections<Action>(
-		_req: ConnectionsReq,
-	) -> ApiResult<Connections> {
-		spawn_blocking(connections_sync).await.unwrap()
-	}
-);
+#[api(ConnectionsReq)]
+async fn connections() -> ApiResult<Connections> {
+	spawn_blocking(connections_sync).await.unwrap()
+}
 
 fn add_connection_sync(req: AddConnectionReq) -> ApiResult<Connection> {
 	let nm = NetworkManager::connect().map_err(api_error_dbus)?;
@@ -462,15 +441,12 @@ fn add_connection_sync(req: AddConnectionReq) -> ApiResult<Connection> {
 	})
 }
 
-request_handler!(
-	async fn add_connection<Action>(
-		req: AddConnectionReq,
-	) -> ApiResult<Connection> {
-		spawn_blocking(move || add_connection_sync(req))
-			.await
-			.unwrap()
-	}
-);
+#[api(AddConnectionReq)]
+async fn add_connection(req: AddConnectionReq) -> ApiResult<Connection> {
+	spawn_blocking(move || add_connection_sync(req))
+		.await
+		.unwrap()
+}
 
 fn remove_connection_sync(uuid: String) -> ApiResult<()> {
 	let nm = NetworkManager::connect().map_err(api_error_dbus)?;
@@ -478,12 +454,10 @@ fn remove_connection_sync(uuid: String) -> ApiResult<()> {
 	nm.remove_connection(&uuid).map_err(api_error_dbus)
 }
 
-request_handler!(
-	async fn remove_connection<Action>(
-		req: RemoveConnectionReq,
-	) -> ApiResult<()> {
-		spawn_blocking(move || remove_connection_sync(req.uuid))
-			.await
-			.unwrap()
-	}
-);
+#[api(RemoveConnectionReq)]
+async fn remove_connection(req: RemoveConnectionReq) -> ApiResult<EmptyJson> {
+	spawn_blocking(move || remove_connection_sync(req.uuid))
+		.await
+		.unwrap()
+		.map(|_| EmptyJson)
+}
