@@ -54,11 +54,11 @@ impl Client {
 	}
 
 	pub async fn install_on(&self, disk: String) -> Result<()> {
-		self.inner.request(InstallOnReq { disk }).await
+		self.inner.request(InstallOnReq { disk }).await.map(|_| ())
 	}
 
 	pub async fn open_page(&self, url: String) -> Result<()> {
-		self.inner.request(OpenPageReq { url }).await
+		self.inner.request(OpenPageReq { url }).await.map(|_| ())
 	}
 
 	pub async fn list_packages(&self) -> Result<ListPackages> {
@@ -73,11 +73,14 @@ impl Client {
 	}
 
 	pub async fn remove_package(&self, name: String) -> Result<()> {
-		self.inner.request(RemovePackageReq { name }).await
+		self.inner
+			.request(RemovePackageReq { name })
+			.await
+			.map(|_| ())
 	}
 
 	pub async fn request_update(&self) -> Result<()> {
-		self.inner.request(UpdateReq).await
+		self.inner.request(UpdateReq).await.map(|_| ())
 	}
 
 	pub async fn device_info(&self) -> Result<DeviceInfo> {
@@ -85,7 +88,10 @@ impl Client {
 	}
 
 	pub async fn set_power_state(&self, state: PowerState) -> Result<()> {
-		self.inner.request(SetPowerStateReq { state }).await
+		self.inner
+			.request(SetPowerStateReq { state })
+			.await
+			.map(|_| ())
 	}
 
 	pub async fn disks(&self) -> Result<Vec<Disk>> {
@@ -93,13 +99,17 @@ impl Client {
 	}
 
 	pub async fn set_display_state(&self, on: bool) -> Result<()> {
-		self.inner.request(SetDisplayStateReq { on }).await
+		self.inner
+			.request(SetDisplayStateReq { on })
+			.await
+			.map(|_| ())
 	}
 
 	pub async fn set_display_brightness(&self, brightness: u8) -> Result<()> {
 		self.inner
 			.request(SetDisplayBrightnessReq { brightness })
 			.await
+			.map(|_| ())
 	}
 
 	pub async fn network_access_points(&self) -> Result<AccessPoints> {
@@ -119,6 +129,9 @@ impl Client {
 	}
 
 	pub async fn network_remove_connection(&self, uuid: String) -> Result<()> {
-		self.inner.request(RemoveConnectionReq { uuid }).await
+		self.inner
+			.request(RemoveConnectionReq { uuid })
+			.await
+			.map(|_| ())
 	}
 }

@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use stream::packet::PlainBytes;
 use stream::server::Config;
-use stream_api::server::{self, RequestHandler};
+use stream_api::request::RequestHandler;
+use stream_api::server::{self};
 
 use tokio::net::UnixListener;
 
@@ -38,7 +39,7 @@ impl Server {
 
 	pub fn register_request<H>(&mut self, handler: H)
 	where
-		H: RequestHandler<Action, PlainBytes> + Send + Sync + 'static,
+		H: RequestHandler<PlainBytes, Action = Action> + Send + Sync + 'static,
 	{
 		self.inner.register_request(handler);
 	}

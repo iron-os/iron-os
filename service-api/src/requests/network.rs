@@ -3,14 +3,18 @@ use crate::Action;
 
 use serde::{Deserialize, Serialize};
 
-use stream_api::request::Request;
+use stream_api::{request::Request, FromMessage, IntoMessage};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use super::EmptyJson;
+
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct AccessPointsReq;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct AccessPoints {
 	pub device: String,
 	pub list: Vec<AccessPoint>,
@@ -25,25 +29,29 @@ pub struct AccessPoint {
 	pub strength: u8,
 }
 
-impl<B> Request<Action, B> for AccessPointsReq {
+impl Request for AccessPointsReq {
+	type Action = Action;
 	type Response = AccessPoints;
 	type Error = Error;
 
 	const ACTION: Action = Action::NetworkAccessPoints;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct ConnectionsReq;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct Connections {
 	pub list: Vec<Connection>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct Connection {
 	pub id: String,
 	pub uuid: String,
@@ -70,15 +78,17 @@ pub struct ConnectionGsm {
 	pub apn: String,
 }
 
-impl<B> Request<Action, B> for ConnectionsReq {
+impl Request for ConnectionsReq {
+	type Action = Action;
 	type Response = Connections;
 	type Error = Error;
 
 	const ACTION: Action = Action::NetworkConnections;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct AddConnectionReq {
 	pub id: String,
 	pub kind: AddConnectionKind,
@@ -105,21 +115,24 @@ pub struct AddConnectionGsm {
 	pub apn: String,
 }
 
-impl<B> Request<Action, B> for AddConnectionReq {
+impl Request for AddConnectionReq {
+	type Action = Action;
 	type Response = Connection;
 	type Error = Error;
 
 	const ACTION: Action = Action::NetworkAddConnection;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct RemoveConnectionReq {
 	pub uuid: String,
 }
 
-impl<B> Request<Action, B> for RemoveConnectionReq {
-	type Response = ();
+impl Request for RemoveConnectionReq {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
 
 	const ACTION: Action = Action::NetworkRemoveConnection;

@@ -9,16 +9,20 @@ use crate::Action;
 
 use serde::{Deserialize, Serialize};
 
-use stream_api::request::Request;
+use stream_api::{request::Request, FromMessage, IntoMessage};
+
+use super::EmptyJson;
 
 /// ## Important!!
 ///
 /// Device info not implemented
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct DeviceInfoReq;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct DeviceInfo {
 	pub cpu: CpuLoad,
 	pub memory: MemoryUsage,
@@ -71,7 +75,8 @@ pub struct DataDisk {
 	pub used: u64,
 }
 
-impl<B> Request<Action, B> for DeviceInfoReq {
+impl Request for DeviceInfoReq {
+	type Action = Action;
 	type Response = DeviceInfo;
 	type Error = Error;
 
@@ -79,8 +84,9 @@ impl<B> Request<Action, B> for DeviceInfoReq {
 }
 
 /// not implemented
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct SetPowerStateReq {
 	pub state: PowerState,
 }
@@ -91,20 +97,23 @@ pub enum PowerState {
 	Restart,
 }
 
-impl<B> Request<Action, B> for SetPowerStateReq {
-	type Response = ();
+impl Request for SetPowerStateReq {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
 
 	const ACTION: Action = Action::SetPowerState;
 }
 
 /// This request should only be used if `SystemInfo.installed == false`
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub struct DisksReq;
 
 /// The active disk will not be returned
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct Disks(pub Vec<Disk>);
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -117,35 +126,40 @@ pub struct Disk {
 	pub size: u64,
 }
 
-impl<B> Request<Action, B> for DisksReq {
+impl Request for DisksReq {
+	type Action = Action;
 	type Response = Disks;
 	type Error = Error;
 
 	const ACTION: Action = Action::Disks;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct SetDisplayStateReq {
 	pub on: bool,
 }
 
-impl<B> Request<Action, B> for SetDisplayStateReq {
-	type Response = ();
+impl Request for SetDisplayStateReq {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
 
 	const ACTION: Action = Action::SetDisplayState;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
+#[message(json)]
 pub struct SetDisplayBrightnessReq {
 	// 0-255
 	pub brightness: u8,
 }
 
-impl<B> Request<Action, B> for SetDisplayBrightnessReq {
-	type Response = ();
+impl Request for SetDisplayBrightnessReq {
+	type Action = Action;
+	type Response = EmptyJson;
 	type Error = Error;
 
 	const ACTION: Action = Action::SetDisplayBrightness;

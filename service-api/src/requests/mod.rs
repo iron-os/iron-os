@@ -12,7 +12,13 @@ use crate::Action;
 
 use serde::{Deserialize, Serialize};
 
-use stream_api::request::Request;
+use stream_api::{request::Request, FromMessage, IntoMessage};
+
+#[derive(
+	Debug, Clone, Default, Serialize, Deserialize, IntoMessage, FromMessage,
+)]
+#[message(json)]
+pub struct EmptyJson;
 
 // todo maybe rename os? or system
 pub mod system {
@@ -27,11 +33,17 @@ pub mod system {
 	pub use packages_api::packages::Channel;
 	pub use packages_api::requests::DeviceId;
 
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
+	#[message(json)]
 	pub struct SystemInfoReq;
 
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct SystemInfo {
 		// equivalent of version_str
 		pub version: String,
@@ -51,7 +63,8 @@ pub mod system {
 		pub path: String,
 	}
 
-	impl<B> Request<Action, B> for SystemInfoReq {
+	impl Request for SystemInfoReq {
+		type Action = Action;
 		type Response = SystemInfo;
 		type Error = Error;
 
@@ -59,15 +72,17 @@ pub mod system {
 	}
 
 	/// This request should only be used if `SystemInfo.installed == false`
-	#[derive(Debug, Serialize, Deserialize)]
+	#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct InstallOnReq {
 		/// The name of a disk that is returned from DisksReq
 		pub disk: String,
 	}
 
-	impl<B> Request<Action, B> for InstallOnReq {
-		type Response = ();
+	impl Request for InstallOnReq {
+		type Action = Action;
+		type Response = EmptyJson;
 		type Error = Error;
 
 		const ACTION: Action = Action::InstallOn;
@@ -82,14 +97,16 @@ pub mod ui {
 
 	use super::*;
 
-	#[derive(Debug, Serialize, Deserialize)]
+	#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct OpenPageReq {
 		pub url: String,
 	}
 
-	impl<B> Request<Action, B> for OpenPageReq {
-		type Response = ();
+	impl Request for OpenPageReq {
+		type Action = Action;
+		type Response = EmptyJson;
 		type Error = Error;
 
 		const ACTION: Action = Action::OpenPage;
@@ -108,12 +125,18 @@ pub mod packages {
 
 	pub use packages_api::packages::{Channel, Hash, Signature, Source};
 
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
+	#[message(json)]
 	pub struct ListPackagesReq;
 
 	/// if you need a detailed list of packages
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct ListPackages {
 		pub packages: Vec<Package>,
 		pub sources: Vec<Source>,
@@ -140,27 +163,35 @@ pub mod packages {
 		pub path: String,
 	}
 
-	impl<B> Request<Action, B> for ListPackagesReq {
+	impl Request for ListPackagesReq {
+		type Action = Action;
 		type Response = ListPackages;
 		type Error = Error;
 
 		const ACTION: Action = Action::ListPackages;
 	}
 
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct AddPackageReq {
 		pub name: String,
 	}
 
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct AddPackage {
 		/// Returns None if the package was not found
 		pub package: Option<Package>,
 	}
 
-	impl<B> Request<Action, B> for AddPackageReq {
+	impl Request for AddPackageReq {
+		type Action = Action;
 		type Response = AddPackage;
 		type Error = Error;
 
@@ -168,26 +199,34 @@ pub mod packages {
 	}
 
 	/// Not implemented
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct RemovePackageReq {
 		pub name: String,
 	}
 
-	impl<B> Request<Action, B> for RemovePackageReq {
-		type Response = ();
+	impl Request for RemovePackageReq {
+		type Action = Action;
+		type Response = EmptyJson;
 		type Error = Error;
 
 		const ACTION: Action = Action::RemovePackage;
 	}
 
 	/// Not implemented
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(
+		Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage,
+	)]
 	#[serde(rename_all = "camelCase")]
+	#[message(json)]
 	pub struct UpdateReq;
 
-	impl<B> Request<Action, B> for UpdateReq {
-		type Response = ();
+	impl Request for UpdateReq {
+		type Action = Action;
+		type Response = EmptyJson;
 		type Error = Error;
 
 		const ACTION: Action = Action::Update;

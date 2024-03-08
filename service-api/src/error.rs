@@ -1,17 +1,23 @@
 use std::{error, fmt};
 
+use stream::error::RequestError;
 pub use stream_api::error::{ApiError, Error as ErrorTrait};
+use stream_api::{error::MessageError, FromMessage, IntoMessage};
 
 use serde::{Deserialize, Serialize};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
 pub enum Error {
+	#[deprecated]
 	ConnectionClosed,
+	#[deprecated]
 	RequestDropped,
 	Internal(String),
 	Request(String),
+	#[deprecated]
 	Response(String),
 	Other(String),
 }
@@ -23,28 +29,12 @@ impl Error {
 }
 
 impl ApiError for Error {
-	fn connection_closed() -> Self {
-		Self::ConnectionClosed
-	}
-
-	fn request_dropped() -> Self {
-		Self::RequestDropped
-	}
-
-	fn internal<E: ErrorTrait>(e: E) -> Self {
-		Self::Internal(e.to_string())
-	}
-
-	fn request<E: ErrorTrait>(e: E) -> Self {
+	fn from_message_error(e: MessageError) -> Self {
 		Self::Request(e.to_string())
 	}
 
-	fn response<E: ErrorTrait>(e: E) -> Self {
-		Self::Response(e.to_string())
-	}
-
-	fn other<E: ErrorTrait>(e: E) -> Self {
-		Self::Other(e.to_string())
+	fn from_request_error(e: RequestError) -> Self {
+		Self::Request(e.to_string())
 	}
 }
 
