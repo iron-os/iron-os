@@ -16,6 +16,7 @@ serde = { version = "1.0", features = ["derive"] }
 linux-info = "0.1.8"
 gpt = { version = "3.0", git = "https://github.com/soerenmeier/gpt", branch = "tmp_master" }
 uuid = "0.8"
+stdio-api = { version = "0.1", path = "./../stdio-api", features = ["serde"] }
 bootloader-api = { package = "service-bootloader-api", version = "0.2", path = "./../service-bootloader-api" }
 libc = "0.2"
 rand = "0.8"

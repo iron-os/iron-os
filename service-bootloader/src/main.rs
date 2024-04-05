@@ -4,6 +4,7 @@ mod hardware_fixes;
 mod service;
 mod util;
 mod version_info;
+mod fix_10;
 
 #[cfg(not(feature = "headless"))]
 use command::Command;
@@ -22,6 +23,13 @@ fn main() {
 		if args[1] == "version" {
 			eprintln!("service-bootloader {}", env!("CARGO_PKG_VERSION"));
 			return;
+		}
+	}
+
+	if args.len() >= 3 {
+		if args[1] == "update_image_fix_10" {
+			fix_10::update_image_fix_10(&args[2]);
+			return
 		}
 	}
 

@@ -893,6 +893,7 @@ dependencies = [
  "serde",
  "serde_json",
  "service-bootloader-api",
+ "stdio-api",
  "tokio",
  "toml",
  "uuid 1.7.0",
