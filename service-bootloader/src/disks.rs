@@ -13,9 +13,9 @@ use std::thread;
 use std::time::Duration;
 
 use gpt::disk::LogicalBlockSize;
-use gpt::mbr::ProtectiveMBR;
+use gpt::mbr::{MBRError, ProtectiveMBR};
 use gpt::partition::Partition as GptPartition;
-use gpt::{GptConfig, GptDisk};
+use gpt::{GptConfig, GptDisk, GptError};
 use linux_info::storage::sector_size;
 
 use uuid::Uuid;
@@ -72,7 +72,7 @@ enum NewDisk {
 	Active,
 }
 
-pub fn install_on(name: String) -> io::Result<()> {
+pub fn install_on(name: String) -> Result<(), InstallError> {
 	let mut active = None;
 	let mut new = None;
 
@@ -170,7 +170,7 @@ impl Disks {
 #[derive(Debug)]
 struct Disk {
 	path: PathBuf,
-	gpt_disk: Option<GptDisk<'static>>,
+	gpt_disk: Option<GptDisk<File>>,
 	is_root: bool,
 }
 
@@ -192,8 +192,8 @@ impl Disk {
 		me
 	}
 
-	fn open_gpt(&mut self) -> io::Result<()> {
-		let disk = GptConfig::new().writable(false).open(&self.path)?;
+	fn open_gpt(&mut self) -> Result<(), GptError> {
+		let disk = GptConfig::new().open(&self.path)?;
 
 		self.gpt_disk = Some(disk);
 		Ok(())
@@ -232,7 +232,7 @@ impl Disk {
 			.map(|d| (*d.logical_block_size()).into())
 	}
 
-	pub fn read_mbr(&self) -> io::Result<ProtectiveMBR> {
+	pub fn read_mbr(&self) -> Result<ProtectiveMBR, MBRError> {
 		let mut file = File::open(&self.path)?;
 		ProtectiveMBR::from_disk(&mut file, LogicalBlockSize::Lb512)
 	}
@@ -281,11 +281,26 @@ impl Disk {
 	}
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum InstallError {
+	#[error("partition not found {0}")]
+	PartitionNotFound(&'static str),
+
+	#[error("io error {0}")]
+	Io(#[from] io::Error),
+
+	#[error("reading or writing the mbr failed {0}")]
+	Mbr(#[from] MBRError),
+
+	#[error("writing or reading the gpt failed {0}")]
+	Gpt(#[from] GptError),
+}
+
 /// writes a new partition
 fn install_to_new_disk(
 	install_disk: &mut Disk,
 	new_disk: &mut Disk,
-) -> io::Result<()> {
+) -> Result<(), InstallError> {
 	// do we need to write the entire drive
 	// or is it enough to
 	write_gpt_to_new_disk(install_disk, new_disk)?;
@@ -306,10 +321,13 @@ fn install_to_new_disk(
 	Ok(())
 }
 
+/// Creates a gpt table on the new disk
+///
+/// Using the install disk as a template
 fn write_gpt_to_new_disk(
 	install_disk: &mut Disk,
 	new_disk: &mut Disk,
-) -> io::Result<()> {
+) -> Result<(), InstallError> {
 	// delete previous gpt if it exists
 	new_disk.gpt_disk = None;
 
@@ -336,19 +354,19 @@ fn write_gpt_to_new_disk(
 	// let's create a partion from scratch
 	let mut disk = GptConfig::new()
 		.writable(true)
-		.initialized(false)
+		.change_partition_count(true)
 		.logical_block_size(lbs)
-		.open(&new_disk.path)?;
+		.create(&new_disk.path)?;
 
 	// remove any previous partitions
 	// and set headers
 	disk.update_partitions(BTreeMap::new())?;
 	let header = disk.primary_header().unwrap();
 
-	// now add boot partition
+	// now add the boot partition
 	let mut boot = install_disk
 		.clone_part("boot")
-		.ok_or_else(|| io_other("could not get boot partition"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("boot"))?;
 	boot.part_guid = Uuid::new_v4();
 	let boot_sectors = BOOT_SIZE / sector_size;
 	boot.first_lba = header.first_usable;
@@ -359,7 +377,7 @@ fn write_gpt_to_new_disk(
 	// now create first root fs partition
 	let mut root_a = install_disk
 		.clone_part("root")
-		.ok_or_else(|| io_other("could not get root partition"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("root"))?;
 	root_a.part_guid = Uuid::new_v4();
 	root_a.first_lba = boot.last_lba + 1;
 	root_a.last_lba = root_a.first_lba + rootfs_sectors - 1;
@@ -376,7 +394,7 @@ fn write_gpt_to_new_disk(
 	let data_lba = (header.last_usable - root_b.last_lba) / 2;
 	let mut data = install_disk
 		.clone_part("data")
-		.ok_or_else(|| io_other("could not get data partition"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("data"))?;
 	data.part_guid = Uuid::new_v4();
 	data.first_lba = root_b.last_lba + 1;
 	data.last_lba = data.first_lba + data_lba - 1;
@@ -403,10 +421,12 @@ fn write_gpt_to_new_disk(
 fn copy_to_new_disk(
 	install_disk: &mut Disk,
 	new_disk: &mut Disk,
-) -> io::Result<()> {
+) -> Result<(), InstallError> {
+	// this should never fail if install_disk contains a gpt Disk
 	let old_sector_size = install_disk
 		.sector_size()
 		.ok_or_else(|| io_other("could not get sector_size"))?;
+	// this should never fail if new_disk contains a gpt Disk
 	let new_sector_size = new_disk
 		.sector_size()
 		.ok_or_else(|| io_other("could not get sector_size"))?;
@@ -414,10 +434,10 @@ fn copy_to_new_disk(
 	// copy boot to new boot
 	let old_boot = install_disk
 		.get_part("boot")
-		.ok_or_else(|| io_other("could not get old boot partition"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("old boot"))?;
 	let new_boot = new_disk
 		.get_part("boot")
-		.ok_or_else(|| io_other("could not get new boot partition"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("new boot"))?;
 
 	let old_first_byte = old_boot.first_lba * old_sector_size;
 	let new_first_byte = new_boot.first_lba * new_sector_size;
@@ -433,10 +453,10 @@ fn copy_to_new_disk(
 	// copy rootfs to new rootfs
 	let old_root = install_disk
 		.get_part("root")
-		.ok_or_else(|| io_other("could not get old root partition"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("old root"))?;
 	let new_root = new_disk
 		.get_part("root a")
-		.ok_or_else(|| io_other("could not get new root a partition"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("new root a"))?;
 
 	let old_first_byte = old_root.first_lba * old_sector_size;
 	let new_first_byte = new_root.first_lba * new_sector_size;
@@ -456,9 +476,10 @@ fn copy_to_new_disk(
 	//
 	let data_path = new_disk
 		.part_path("data")
-		.ok_or_else(|| io_other("could not get data partition path"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("data"))?;
 
 	// wait max 10s until the path exists
+	// todo this can probably be removed
 	for _ in 0..10 {
 		thread::sleep(Duration::from_secs(1));
 		if data_path.exists() {
@@ -529,9 +550,13 @@ fn copy_len_to_new(
 		new.write_all(&buf[..read_b])?;
 	}
 
+	new.flush()?;
+
 	Ok(())
 }
 
+/// Creates a ramdom machine id which can be stored in
+/// /etc/machine-id
 fn random_machine_id() -> String {
 	let mut bytes = [0u8; 16];
 	rand::thread_rng().fill_bytes(&mut bytes);
@@ -544,22 +569,22 @@ fn random_machine_id() -> String {
 	s
 }
 
-// configure the newly installed disk
-fn configure_disk(disk: &mut Disk) -> io::Result<()> {
+/// configure the newly installed disk
+fn configure_disk(disk: &mut Disk) -> Result<(), InstallError> {
 	// update fstab to with the new uuid
 	let root_path = disk
 		.part_path("root a")
-		.ok_or_else(|| io_other("could not get root path"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("root a"))?;
 
 	let boot_uuid = disk
 		.get_part("boot")
-		.ok_or_else(|| io_other("could not get boot partition"))?
+		.ok_or_else(|| InstallError::PartitionNotFound("boot"))?
 		.part_guid
 		.to_string();
 
 	let data_uuid = disk
 		.get_part("data")
-		.ok_or_else(|| io_other("could not get data partition"))?
+		.ok_or_else(|| InstallError::PartitionNotFound("data"))?
 		.part_guid
 		.to_string();
 
@@ -580,11 +605,11 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 
 	let boot_path = disk
 		.part_path("boot")
-		.ok_or_else(|| io_other("could not get boot path"))?;
+		.ok_or_else(|| InstallError::PartitionNotFound("boot"))?;
 
 	let root_uuid = disk
 		.get_part("root a")
-		.ok_or_else(|| io_other("could not get root partition"))?
+		.ok_or_else(|| InstallError::PartitionNotFound("root a"))?
 		.part_guid
 		.to_string();
 
@@ -608,14 +633,31 @@ fn configure_disk(disk: &mut Disk) -> io::Result<()> {
 			"/mnt/extlinux/extlinux.conf",
 		)?;
 	} else {
-		return Err(io::Error::new(
-			io::ErrorKind::NotFound,
-			"bootloader not identified",
-		));
+		return Err(io_other("bootloader not identified").into());
 	}
 
 	// update version info
 	update_version_info()?;
+
+	Ok(())
+}
+
+fn write_zeroes(file: &mut File, len: usize) -> io::Result<()> {
+	const CHUNK_SIZE: usize = 4096;
+
+	let full_chunks = len / CHUNK_SIZE;
+	let rem = len % CHUNK_SIZE;
+
+	let buf = [0u8; CHUNK_SIZE];
+	for _ in 0..full_chunks {
+		file.write_all(&buf)?;
+	}
+
+	if rem > 0 {
+		file.write_all(&buf[..rem])?;
+	}
+
+	file.flush()?;
 
 	Ok(())
 }
@@ -649,10 +691,10 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 		.part_guid
 		.to_string();
 
-	let (other_uuid, other) = if part_a.part_guid == part_uuid {
-		(part_b.part_guid, "root b")
+	let (other_part, other_uuid, other) = if part_a.part_guid == part_uuid {
+		(part_b, part_b.part_guid, "root b")
 	} else if part_b.part_guid == part_uuid {
-		(part_a.part_guid, "root a")
+		(part_a, part_a.part_guid, "root a")
 	} else {
 		return Err(io_other("root partition not found"));
 	};
@@ -664,8 +706,17 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	let rootfs_path = format!("{path}/rootfs.ext2");
 	let mut rootfs_file = File::open(&rootfs_path)?;
 
+	// clear partition first
+	let part_len = other_part.bytes_len(LogicalBlockSize::Lb512)?;
+	eprintln!("writing zeroes {part_len}");
+	write_zeroes(&mut part_file, part_len as usize)?;
+
+	part_file.seek(SeekFrom::Start(0))?;
+
 	// copy the rootfs to the partition
 	io::copy(&mut rootfs_file, &mut part_file)?;
+
+	part_file.flush()?;
 
 	// update fstab file to mount the correct partitions
 	mount(&part_path, "/mnt")?;
