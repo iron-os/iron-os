@@ -395,6 +395,16 @@ fn rust_version(board, channel) {
 	cmd([cargo_bin, "--version"]).execute();
 }
 
+fn rust_cargo_home(arch, channel) {
+	rust_cargo_home(arch, channel, "Release");
+}
+
+fn rust_cargo_home(arch, channel, hostChannel) {
+	let board = board_by_arch(arch);
+	let host = full_host_path(board, hostChannel);
+	print(host + "/share/cargo");
+}
+
 fn rust_build(arch, channel, path, binary) {
 	rust_build(arch, channel, path, binary, "Release");
 }
