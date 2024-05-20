@@ -28,10 +28,9 @@ pub struct ChangeWhitelistOpts {
 	version: Hash,
 	#[clap(long)]
 	arch: Option<BoardArch>,
-	#[clap(long, num_args(0..))]
-	whitelist: Vec<DeviceId>,
 	#[clap(long)]
-	add: bool
+	add: bool,
+	whitelist: Vec<DeviceId>
 }
 
 pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
