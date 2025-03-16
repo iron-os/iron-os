@@ -60,6 +60,8 @@ pub struct Upload {
 	auto_whitelist: u32,
 	#[clap(long, num_args(0..))]
 	whitelist: Vec<DeviceId>,
+	#[clap(long)]
+	whitelist_file: Option<String>,
 }
 
 pub async fn upload(cfg: Upload) -> Result<()> {
@@ -115,6 +117,17 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 		}
 	}
 
+	let mut whitelist = HashSet::from_iter(cfg.whitelist);
+
+	if let Some(file) = cfg.whitelist_file {
+		let ctn = fs::read_to_string(file)
+			.await
+			.expect("could not open whitelist_file");
+		for line in ctn.lines().filter(|l| !l.is_empty()) {
+			whitelist.insert(line.parse().unwrap());
+		}
+	}
+
 	println!();
 	println!("do you really wan't to upload package:");
 	println!("channel: {}", cfg.channel);
@@ -123,7 +136,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 		print_package(tar_path, pack).await;
 	}
 	println!("auto-whitelist: {:?}", cfg.auto_whitelist);
-	println!("whitelist: {:?}", cfg.whitelist);
+	println!("whitelist: {:?}", whitelist);
 	println!();
 	println!("Enter YES to confirm");
 
@@ -163,11 +176,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			.map_err(|e| err!(e, "failed to upload file"))?;
 
 		client
-			.set_package_info(
-				package,
-				HashSet::from_iter(cfg.whitelist.clone()),
-				cfg.auto_whitelist,
-			)
+			.set_package_info(package, whitelist.clone(), cfg.auto_whitelist)
 			.await
 			.map_err(|e| err!(e, "failed to upload package"))?;
 
