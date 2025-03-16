@@ -1,0 +1,5 @@
+arm_64bit=1
+
+dtparam=uart0_console=on
+
+kernel=KERNEL_NAME

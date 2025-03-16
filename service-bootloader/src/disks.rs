@@ -632,6 +632,17 @@ fn configure_disk(disk: &mut Disk) -> Result<(), InstallError> {
 			"/mnt/extlinux/extlinux.tmp",
 			"/mnt/extlinux/extlinux.conf",
 		)?;
+	} else if Path::new("/mnt/config.templ").is_file() {
+		// is rpi
+		let cmdline = read_to_string("/mnt/cmdline.templ")?;
+		let cmdline = cmdline.replace("ROOTFS_UUID", &root_uuid);
+		fs::write("/mnt/cmdline.tmp", cmdline)?;
+		fs::rename("/mnt/cmdline.tmp", "/mnt/cmdline.txt")?;
+
+		let config = read_to_string("/mnt/config.templ")?;
+		let config = config.replace("KERNEL_NAME", IMAGE_NAME);
+		fs::write("/mnt/config.tmp", config)?;
+		fs::rename("/mnt/config.tmp", "/mnt/config.txt")?;
 	} else {
 		return Err(io_other("bootloader not identified").into());
 	}
@@ -794,45 +805,83 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
 		}
 		Architecture::Arm64 => {
-			let exists = Path::new("/boot/extlinux/extlinux.templ").is_file();
-			if !exists {
+			let extlinux_exists =
+				Path::new("/boot/extlinux/extlinux.templ").is_file();
+
+			if extlinux_exists {
+				// update bootloader
+				let new_bootloader = Path::new(path).join("u-boot.bin");
+				if new_bootloader.is_file() {
+					fs::copy(new_bootloader, "/boot/u-boot.bin.tmp")?;
+					fs::rename("/boot/u-boot.bin.tmp", "/boot/u-boot.bin")?;
+				}
+
+				// update uboot cfg template
+				let new_extlinux_templ = Path::new(path).join("extlinux.templ");
+				if new_extlinux_templ.is_file() {
+					// first copy the file to the same mount point and the rename
+					// atomic
+					fs::copy(
+						new_extlinux_templ,
+						"/boot/extlinux/extlinux.templ.tmp",
+					)?;
+					fs::rename(
+						"/boot/extlinux/extlinux.templ.tmp",
+						"/boot/extlinux/extlinux.templ",
+					)?;
+				}
+
+				// is uboot
+				let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
+				let uboot =
+					uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
+				let uboot = uboot.replace("KERNEL_NAME", other_kernel);
+				fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
+				fs::rename(
+					"/boot/extlinux/extlinux.tmp",
+					"/boot/extlinux/extlinux.conf",
+				)?;
+			} else if Path::new("/boot/config.templ").is_file() {
+				// is rpi
+
+				// update cmdline template
+				let new_cmdline_templ = Path::new(path).join("cmdline.templ");
+				if new_cmdline_templ.is_file() {
+					// first copy the file to the same mount point and the rename
+					// atomic
+					fs::copy(new_cmdline_templ, "/boot/cmdline.templ.tmp")?;
+					fs::rename(
+						"/boot/cmdline.templ.tmp",
+						"/boot/cmdline.templ",
+					)?;
+				}
+
+				// update config template
+				let new_config_templ = Path::new(path).join("config.templ");
+				if new_config_templ.is_file() {
+					// first copy the file to the same mount point and the rename
+					// atomic
+					fs::copy(new_config_templ, "/boot/config.templ.tmp")?;
+					fs::rename("/boot/config.templ.tmp", "/boot/config.templ")?;
+				}
+
+				// is rpi
+				let cmdline = read_to_string("/boot/cmdline.templ")?;
+				let cmdline =
+					cmdline.replace("ROOTFS_UUID", &&other_uuid.to_string());
+				fs::write("/boot/cmdline.tmp", cmdline)?;
+				fs::rename("/boot/cmdline.tmp", "/boot/cmdline.conf")?;
+
+				let config = read_to_string("/boot/config.templ")?;
+				let config = config.replace("KERNEL_NAME", other_kernel);
+				fs::write("/boot/config.tmp", config)?;
+				fs::rename("/boot/config.tmp", "/boot/config.conf")?;
+			} else {
 				return Err(io::Error::new(
 					io::ErrorKind::NotFound,
-					"/boot/extlinux/extlinux.templ not found",
+					"/boot/extlinux/extlinux.templ or /boot/config.templ not found",
 				));
 			}
-
-			// update bootloader
-			let new_bootloader = Path::new(path).join("u-boot.bin");
-			if new_bootloader.is_file() {
-				fs::copy(new_bootloader, "/boot/u-boot.bin.tmp")?;
-				fs::rename("/boot/u-boot.bin.tmp", "/boot/u-boot.bin")?;
-			}
-
-			// update uboot cfg template
-			let new_extlinux_templ = Path::new(path).join("extlinux.templ");
-			if new_extlinux_templ.is_file() {
-				// first copy the file to the same mount point and the rename
-				// atomic
-				fs::copy(
-					new_extlinux_templ,
-					"/boot/extlinux/extlinux.templ.tmp",
-				)?;
-				fs::rename(
-					"/boot/extlinux/extlinux.templ.tmp",
-					"/boot/extlinux/extlinux.templ",
-				)?;
-			}
-
-			// is uboot
-			let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
-			let uboot = uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
-			let uboot = uboot.replace("KERNEL_NAME", other_kernel);
-			fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
-			fs::rename(
-				"/boot/extlinux/extlinux.tmp",
-				"/boot/extlinux/extlinux.conf",
-			)?;
 		}
 	}
 

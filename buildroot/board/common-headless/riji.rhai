@@ -179,6 +179,14 @@ fn post_image(buildroot_dir, host_dir, binaries_dir) {
 			data_uuid,
 			binaries_dir
 		);
+	} else if fs::is_file(binaries_dir + "/using_rpi") {
+		post_image_using_rpi(
+			image_file,
+			boot_uuid,
+			rootfs_uuid,
+			data_uuid,
+			binaries_dir
+		);
 	} else {
 		panic("unkown bootloader");
 	}
@@ -276,6 +284,40 @@ fn post_image_using_uboot(
 	data_uuid_reg.replace_file(binaries_dir + "/genimage-uboot.cfg", data_uuid);
 }
 
+fn post_image_using_rpi(
+	image_file,
+	boot_uuid,
+	rootfs_uuid,
+	data_uuid,
+	binaries_dir
+) {
+	let cmdline_cfg = binaries_dir + "/cmdline.txt";
+	fs::copy("./cmdline-rpi.cfg", cmdline_cfg);
+	fs::copy("./cmdline-rpi.cfg", binaries_dir + "/cmdline.templ");
+	let uuid_tmp_reg = regex("ROOTFS_UUID");
+	uuid_tmp_reg.replace_file(cmdline_cfg, rootfs_uuid);
+
+	let config_cfg = binaries_dir + "/config.txt";
+	fs::copy(config_cfg, binaries_dir + "/config.templ");
+	let kernel_reg = regex("KERNEL_NAME");
+	kernel_reg.replace_file(config_cfg, image_file);
+
+	uuid_tmp_reg.replace_file(binaries_dir + "/genimage-boot.cfg", rootfs_uuid);
+
+	// kernel name
+	kernel_reg.replace_file(binaries_dir + "/genimage-boot.cfg", image_file);
+	// todo fix this
+	kernel_reg.replace_file(binaries_dir + "/genimage-boot.cfg", image_file);
+
+	// boot uuid
+	let boot_uuid_reg = regex("EFI_UUID");
+	boot_uuid_reg.replace_file(binaries_dir + "/genimage-boot.cfg", boot_uuid);
+
+	// data uuid
+	let data_uuid_reg = regex("DATA_UUID");
+	data_uuid_reg.replace_file(binaries_dir + "/genimage-boot.cfg", data_uuid);
+}
+
 fn create_image_fakeroot(host_dir, binaries_dir, buildroot_dir) {
 	if !fs::is_dir(binaries_dir + "/packages") {
 		panic("you need to download the packages first");
@@ -338,6 +380,8 @@ fn create_image(binaries_dir, buildroot_dir) {
 		genimage_cfg = binaries_dir + "/genimage-efi.cfg";
 	} else if fs::is_file(binaries_dir + "/genimage-uboot.cfg") {
 		genimage_cfg = binaries_dir + "/genimage-uboot.cfg";
+	} else if fs::is_file(binaries_dir + "/genimage-boot.cfg") {
+		genimage_cfg = binaries_dir + "/genimage-boot.cfg";
 	} else {
 		panic("no genimage config found");
 	}
@@ -418,4 +462,7 @@ fn apply_patch(channel, buildroot) {
 	print("patch weston");
 	let weston_diff = diff_from_file("./pre-patches/weston-kiosk-sleep.patch");
 	buildroot_repo.apply_diff(weston_diff);
+	print("patch pi5");
+	let pi5_diff = diff_from_file("./pre-patches/pi5-support.patch");
+	buildroot_repo.apply_diff(pi5_diff);
 }

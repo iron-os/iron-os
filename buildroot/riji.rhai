@@ -390,6 +390,10 @@ fn board_by_arch(arch) {
 			return "pi4";
 		} else if fs::is_dir(br + "pi4-headless") {
 			return "pi4-headless";
+		} else if fs::is_dir(br + "pi5") {
+			return "pi5";
+		} else if fs::is_dir(br + "pi5-headless") {
+			return "pi5-headless";
 		}
 	}
 

@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::error::Result;
 use crate::util::{
 	compress, copy, create_dir, hash_file, read_toml, remove_dir,
@@ -107,14 +109,26 @@ async fn create_tar_gz(cfg: &ImageToml) -> Result<()> {
 			let img_path = format!("{tmp_path}/Image.gz");
 			// copy kernel
 			copy("./Image.gz", &img_path).await?;
-			// copy bootloader
-			copy("./u-boot.bin", &format!("{tmp_path}/u-boot.bin")).await?;
-			// copy uboot config
-			copy(
-				"./extlinux/extlinux.templ",
-				&format!("{tmp_path}/extlinux.templ"),
-			)
-			.await?;
+
+			if Path::new("./using_uboot").exists() {
+				// copy bootloader
+				copy("./u-boot.bin", &format!("{tmp_path}/u-boot.bin")).await?;
+				// copy uboot config
+				copy(
+					"./extlinux/extlinux.templ",
+					&format!("{tmp_path}/extlinux.templ"),
+				)
+				.await?;
+			} else if Path::new("./using_rpi").exists() {
+				// copy config
+				copy("./config.templ", &format!("{tmp_path}/config.templ"))
+					.await?;
+				// copy cmdline
+				copy("./cmdline.templ", &format!("{tmp_path}/cmdline.templ"))
+					.await?;
+			} else {
+				panic!("unknown boot method");
+			}
 
 			img_path
 		}
