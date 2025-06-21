@@ -17,8 +17,8 @@ fn help() {
 
 fn download() {
 	// download buildroot
-	let buildroot = git_clone("git://git.buildroot.net/buildroot", "./buildroot");
-	buildroot.checkout_tag("2024.02.2");
+	let buildroot = git_clone("https://gitlab.com/buildroot.org/buildroot.git", "./buildroot");
+	buildroot.checkout_tag("2025.02.3");
 }
 
 fn validate_channel(channel) {
@@ -184,7 +184,7 @@ fn _upload(board, channel, pub_channel, whitelist) {
 }
 
 fn create_image() {
-	print("create_image <product> <board> <channel> <?device-id>");	
+	print("create_image <product> <board> <channel> <?device-id>");
 }
 
 /// before you can call this you need to upload
