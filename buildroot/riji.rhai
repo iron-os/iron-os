@@ -457,9 +457,19 @@ fn rust_build(arch, channel, path, binary, hostChannel) {
 	cargo.execute();
 
 	// where is the executable??
+	let target_path = path + "/target/";
+	print("target path: " + target_path);
+	if !fs::is_dir(target_path) {
+		let tmp_target_path = path + "/../target/";
+		print("trying: " + tmp_target_path);
+		if fs::is_dir(tmp_target_path) {
+			target_path = tmp_target_path;
+		}
+	}
+
 	// maybe store it in target/rust_build/.
-	let bin = path + "/target/" + target + "/release/" + binary;
-	let rust_out = path + "/target/rust_build";
+	let bin = target_path + target + "/release/" + binary;
+	let rust_out = target_path + "rust_build";
 	fs::delete(rust_out);
 	fs::create_dir(rust_out);
 	fs::copy(bin, rust_out);
