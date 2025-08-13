@@ -4,7 +4,6 @@ fn docker_build() {
 
 fn docker_build(name) {
 	fs::create_dir("./deps");
-	_copy_dep("file-db");
 	_copy_dep("packages-api");
 
 	let docker = cmd(["docker", "build", "-t", name, "."]);

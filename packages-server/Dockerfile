@@ -2,7 +2,6 @@
 FROM soerenmeier/fire-build
 
 COPY --chown=build . ./packages-server
-COPY --chown=build ./deps/file-db ./file-db
 COPY --chown=build ./deps/packages-api ./packages-api
 
 # now build the server
@@ -12,7 +11,7 @@ RUN cargo b --release
 
 WORKDIR ..
 
-## release
+## release 1000
 FROM soerenmeier/fire-release
 
 COPY --chown=release --from=0 /home/build/packages-server/target/release/packages-server .
