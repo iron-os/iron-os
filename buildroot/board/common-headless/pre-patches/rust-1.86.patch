@@ -189,7 +189,7 @@ index 29c03594d2..7f6f2ebc17 100644
  RUST_SOURCE = rustc-$(RUST_VERSION)-src.tar.xz
  RUST_SITE = https://static.rust-lang.org/dist
  RUST_LICENSE = Apache-2.0 or MIT
-@@ -48,6 +48,7 @@ define HOST_RUST_CONFIGURE_CMDS
+@@ -49,6 +49,7 @@ define HOST_RUST_CONFIGURE_CMDS
  		echo '[target.$(RUSTC_TARGET_NAME)]'; \
  		echo 'cc = "$(TARGET_CROSS)gcc"'; \
  		echo '[llvm]'; \

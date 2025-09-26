@@ -2,7 +2,7 @@ diff --git a/package/gcc/gcc-final/gcc-final.mk b/package/gcc/gcc-final/gcc-fina
 index 99d7047b5f..dde2406c34 100644
 --- a/package/gcc/gcc-final/gcc-final.mk
 +++ b/package/gcc/gcc-final/gcc-final.mk
-@@ -181,6 +181,10 @@ define GCC_FINAL_INSTALL_STAGING_CMDS
+@@ -165,6 +165,10 @@ define GCC_FINAL_INSTALL_STAGING_CMDS
  		cp -dpf $(HOST_GCC_FINAL_GCC_LIB_DIR)/$(lib)* \
  			$(STAGING_DIR)/lib/
  	)
