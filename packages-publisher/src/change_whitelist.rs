@@ -7,7 +7,7 @@ use std::io;
 
 use packages::client::Client;
 use packages::error::Error as ApiError;
-use packages::packages::{BoardArch, Channel, Hash, TargetArch};
+use packages::packages::{BoardArch, Hash, TargetArch};
 use packages::requests::DeviceId;
 
 use riji::{paint_err, paint_ok};
@@ -23,7 +23,7 @@ struct PackageToml {
 
 #[derive(clap::Parser)]
 pub struct ChangeWhitelistOpts {
-	channel: Channel,
+	server_name: String,
 	version: Hash,
 	#[clap(long)]
 	arch: Option<BoardArch>,
@@ -38,7 +38,7 @@ pub struct ChangeWhitelistOpts {
 pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 	// check config
 	let config = Config::open().await?;
-	let source = config.get(&opts.channel)?;
+	let source = config.get(&opts.server_name)?;
 
 	// read package toml
 	let package: PackageToml = read_toml("./package.toml").await?;
@@ -60,7 +60,7 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 
 	// authenticate
 	client
-		.authenticate_writer(&opts.channel, &key)
+		.authenticate_writer(&source.channel, &key)
 		.await
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
@@ -68,7 +68,7 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 
 	println!();
 	println!("do you really wan't to change the whitelist for package:");
-	println!("channel: {}", opts.channel);
+	println!("channel: {}", source.channel);
 	println!("version: {:?}", opts.version);
 	println!("archs: {:?}", target_archs);
 	println!("add: {:?}", if opts.add { "yes" } else { "no" });

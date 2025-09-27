@@ -4,12 +4,12 @@ use crate::error::Result;
 use tokio::fs;
 
 use packages::client::Client;
-use packages::packages::{BoardArch, Channel};
+use packages::packages::BoardArch;
 use packages::requests::DeviceId;
 
 #[derive(clap::Parser)]
 pub struct GetFile {
-	channel: Channel,
+	server_name: String,
 	name: String,
 
 	/// Either `Amd64` or `Arm64`.
@@ -26,7 +26,7 @@ pub struct GetFile {
 pub async fn get_file(cfg: GetFile) -> Result<()> {
 	// check config
 	let config = Config::open().await?;
-	let source = config.get(&cfg.channel)?;
+	let source = config.get(&cfg.server_name)?;
 
 	println!("connecting to {}", source.addr);
 
@@ -37,7 +37,7 @@ pub async fn get_file(cfg: GetFile) -> Result<()> {
 
 	let package = client
 		.package_info(
-			cfg.channel,
+			source.channel,
 			cfg.arch,
 			cfg.device_id.clone(),
 			cfg.name.clone(),
@@ -50,7 +50,7 @@ pub async fn get_file(cfg: GetFile) -> Result<()> {
 	};
 
 	println!();
-	println!("channel: {}", cfg.channel);
+	println!("channel: {}", source.channel);
 	println!("addr: {}", source.addr);
 
 	println!("name: {}", package.name);

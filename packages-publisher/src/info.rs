@@ -2,12 +2,12 @@ use crate::config::Config;
 use crate::error::Result;
 
 use packages::client::Client;
-use packages::packages::{BoardArch, Channel};
+use packages::packages::BoardArch;
 use packages::requests::DeviceId;
 
 #[derive(clap::Parser)]
 pub struct Info {
-	channel: Channel,
+	server_name: String,
 	name: String,
 
 	/// if no architecture is selected `Amd64` and `Arm64` are used.
@@ -22,7 +22,7 @@ pub struct Info {
 pub async fn info(cfg: Info) -> Result<()> {
 	// check config
 	let config = Config::open().await?;
-	let source = config.get(&cfg.channel)?;
+	let source = config.get(&cfg.server_name)?;
 
 	let archs: &[BoardArch] = cfg
 		.arch
@@ -42,7 +42,7 @@ pub async fn info(cfg: Info) -> Result<()> {
 	for arch in archs {
 		let package = client
 			.package_info(
-				cfg.channel,
+				source.channel,
 				*arch,
 				cfg.device_id.clone(),
 				cfg.name.clone(),
@@ -56,7 +56,7 @@ pub async fn info(cfg: Info) -> Result<()> {
 	}
 
 	println!();
-	println!("channel: {}", cfg.channel);
+	println!("channel: {}", source.channel);
 	println!("addr: {}", source.addr);
 	for pack in packages {
 		println!();

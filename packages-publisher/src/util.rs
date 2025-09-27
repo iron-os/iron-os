@@ -98,7 +98,7 @@ pub async fn hash_file(path: &str) -> Result<Hash> {
 }
 
 pub async fn get_priv_key(source: &Source) -> Result<Keypair> {
-	if let Some(k) = &source.priv_key {
+	if let Some(k) = &source.private_key {
 		println!("using existing private signature key");
 		Ok(k.clone())
 	} else {

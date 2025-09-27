@@ -47,8 +47,8 @@ impl PackageToml {
 /// `package.rhai` is used to build and prepare the package.
 #[derive(clap::Parser)]
 pub struct Upload {
-	/// To what channel should this be updated
-	channel: Channel,
+	/// To what server should this be updated
+	server_name: String,
 	/// if no architecture is selected `Amd64` and `Arm64` are used.
 	///
 	/// Expect for image.
@@ -65,7 +65,7 @@ pub struct Upload {
 pub async fn upload(cfg: Upload) -> Result<()> {
 	// check config
 	let config = Config::open().await?;
-	let source = config.get(&cfg.channel)?;
+	let source = config.get(&cfg.server_name)?;
 
 	let priv_key = get_priv_key(&source).await?;
 
@@ -80,7 +80,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 				packages.push(
 					build(
 						arch,
-						&cfg.channel,
+						&source.channel,
 						cfg.host_channel.as_ref(),
 						&package,
 						&priv_key,
@@ -93,7 +93,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			packages.push(
 				build(
 					&arch,
-					&cfg.channel,
+					&source.channel,
 					cfg.host_channel.as_ref(),
 					&package,
 					&priv_key,
@@ -105,7 +105,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			packages.push(
 				build(
 					&arch.into(),
-					&cfg.channel,
+					&source.channel,
 					cfg.host_channel.as_ref(),
 					&package,
 					&priv_key,
@@ -117,7 +117,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 	println!();
 	println!("do you really wan't to upload package:");
-	println!("channel: {}", cfg.channel);
+	println!("channel: {}", source.channel);
 	println!("addr: {}", source.addr);
 	for (tar_path, pack) in packages.iter() {
 		print_package(tar_path, pack).await;
@@ -146,7 +146,7 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 	// authenticate
 	client
-		.authenticate_writer(&cfg.channel, &priv_key)
+		.authenticate_writer(&source.channel, &priv_key)
 		.await
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
