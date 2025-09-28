@@ -27,6 +27,7 @@ use wayland_client::{
 };
 
 #[derive(Debug)]
+#[allow(dead_code)]
 enum WaylandError {
 	Connect(ConnectError),
 	Io(io::Error),

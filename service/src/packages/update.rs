@@ -4,8 +4,9 @@ use super::{
 use crate::util::io_other;
 use crate::Bootloader;
 
-use std::{io, mem};
+use std::collections::HashMap;
 use std::path::Path;
+use std::{io, mem};
 
 use tokio::fs;
 use tokio::process::Command;
@@ -13,7 +14,7 @@ use tokio::process::Command;
 use packages::client::Client;
 use packages::error::Error;
 use packages::packages::{Package, Source};
-use packages::requests::GetFileBuilder;
+use packages::requests::{GetFileBuilder, PackageInfoReq};
 
 use bootloader_api::requests::{UpdateReq, VersionInfo};
 
@@ -61,6 +62,8 @@ async fn update_from_source(
 	let arch = update.arch;
 	let channel = update.channel;
 	let device_id = update.device_id.clone();
+	let image_version = update.image_version.clone();
+	let package_versions = update.package_versions.clone();
 
 	'package_loop: for (name, state) in update.not_finished_packages() {
 		let (package, get_file, new_folder) = match state {
@@ -72,12 +75,15 @@ async fn update_from_source(
 
 				// check package info
 				let package = client
-					.package_info(
+					.package_info(PackageInfoReq {
 						channel,
+						name: name.to_string(),
 						arch,
-						device_id.clone(),
-						name.to_string(),
-					)
+						device_id: device_id.clone(),
+						image_version: Some(image_version.clone()),
+						package_versions: Some(package_versions.clone()),
+						ignore_requirements: false,
+					})
 					.await
 					.map_err(io_other)?;
 
@@ -155,7 +161,15 @@ async fn update_from_source(
 	}
 
 	if !update.image.is_finished() {
-		update_image(source, update, &client, bootloader).await?;
+		update_image(
+			source,
+			update,
+			&client,
+			bootloader,
+			image_version,
+			package_versions,
+		)
+		.await?;
 	}
 
 	Ok(())
@@ -212,6 +226,8 @@ async fn update_image(
 	update: &mut Update,
 	client: &Client,
 	bootloader: &Bootloader,
+	image_version: String,
+	package_versions: HashMap<String, String>,
 ) -> io::Result<()> {
 	let state = &mut update.image;
 
@@ -219,12 +235,15 @@ async fn update_image(
 		ImageUpdateState::GatherInfo { version } => {
 			// check for new version
 			let package = client
-				.package_info(
-					update.channel,
-					update.arch,
-					update.device_id.clone(),
-					format!("image-{}", update.board),
-				)
+				.package_info(PackageInfoReq {
+					channel: update.channel,
+					name: format!("image-{}", update.board),
+					arch: update.arch,
+					device_id: update.device_id.clone(),
+					image_version: Some(image_version),
+					package_versions: Some(package_versions),
+					ignore_requirements: false,
+				})
 				.await
 				.map_err(io_other)?;
 
@@ -329,7 +348,7 @@ async fn update_image(
 // see #10
 async fn fix_10_update_image(
 	bootloader: &Bootloader,
-	req: &UpdateReq
+	req: &UpdateReq,
 ) -> io::Result<VersionInfo> {
 	// make sure we have the new service-bootloader in the correct folder
 	let path = "/data/tmp-service-bootloader";
@@ -341,16 +360,22 @@ async fn fix_10_update_image(
 	fs::copy("./service_bootloader", &service_bootloader_file).await?;
 
 	// make sure it can be executed as root
-	bootloader.make_root(service_bootloader_file.to_str().unwrap()).await
+	bootloader
+		.make_root(service_bootloader_file.to_str().unwrap())
+		.await
 		.map_err(io_other)?;
 
-	eprintln!("executing command update_image_fix_10 {}", stdio_api::serialize(req).unwrap());
+	eprintln!(
+		"executing command update_image_fix_10 {}",
+		stdio_api::serialize(req).unwrap()
+	);
 
 	// now call the bootloader
 	let output = Command::new(service_bootloader_file)
 		.arg("update_image_fix_10")
 		.arg(stdio_api::serialize(req).unwrap())
-		.output().await?;
+		.output()
+		.await?;
 
 	if !output.status.success() {
 		eprintln!(
@@ -358,12 +383,11 @@ async fn fix_10_update_image(
 			String::from_utf8_lossy(&output.stderr)
 		);
 
-		return Err(io_other("failed to update image"))
+		return Err(io_other("failed to update image"));
 	}
 
 	// now parse the version info
 	let output = String::from_utf8(output.stdout).map_err(io_other)?;
 
-	stdio_api::deserialize(&output)
-		.map_err(io_other)
+	stdio_api::deserialize(&output).map_err(io_other)
 }

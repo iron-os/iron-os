@@ -13,7 +13,7 @@ use packages::client::Client;
 use packages::packages::{
 	BoardArch, Channel, Package, PackageCfg, PackagesCfg, Source,
 };
-use packages::requests::DeviceId;
+use packages::requests::PackageInfoReq;
 
 use serde::{Deserialize, Serialize};
 
@@ -60,13 +60,9 @@ pub struct ProductToml {
 /// with the packages listed in the provided configuration file
 #[derive(clap::Parser)]
 pub struct Download {
-	/// the location of packages.toml  
+	/// the location of packages.toml
 	/// should be an absolute path
 	config: String,
-
-	/// If you want to specificy as which device we make the request
-	#[clap(long)]
-	device_id: Option<DeviceId>,
 }
 
 pub async fn download(opts: Download) -> Result<()> {
@@ -101,9 +97,8 @@ pub async fn download(opts: Download) -> Result<()> {
 		download_from_source(
 			&mut list,
 			&mut packs,
-			&image_cfg.arch,
-			opts.device_id.as_ref(),
-			&cfg.channel,
+			image_cfg.arch,
+			cfg.channel,
 			&source,
 			&local_packages,
 		)
@@ -180,9 +175,8 @@ pub async fn download(opts: Download) -> Result<()> {
 async fn download_from_source(
 	list: &mut Vec<Option<String>>,
 	packs: &mut Vec<Package>,
-	arch: &BoardArch,
-	device_id: Option<&DeviceId>,
-	channel: &Channel,
+	arch: BoardArch,
+	channel: Channel,
 	source: &SourceToml,
 	packages_dir: &str,
 ) -> Result<()> {
@@ -194,6 +188,7 @@ async fn download_from_source(
 		.map_err(|e| err!(e, "connect to {} failed", source.address))?;
 
 	for list_name in list.iter_mut() {
+		// todo: replace with let Some(name) = .. else
 		let name = match list_name.as_ref() {
 			Some(n) => n,
 			None => continue,
@@ -202,7 +197,15 @@ async fn download_from_source(
 		paint_act!("checking {}", name);
 
 		let pack = client
-			.package_info(*channel, *arch, device_id.cloned(), name.clone())
+			.package_info(PackageInfoReq {
+				channel,
+				arch,
+				name: name.clone(),
+				device_id: None,
+				image_version: None,
+				package_versions: None,
+				ignore_requirements: true,
+			})
 			.await
 			.map_err(|e| err!(e, "could not get package info"))?;
 		let pack = match pack {

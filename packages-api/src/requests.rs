@@ -2,7 +2,7 @@ use crate::action::Action;
 use crate::error::{Error, Result};
 use crate::packages::{BoardArch, Channel, Package, TargetArch};
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::result::Result as StdResult;
 
@@ -53,6 +53,10 @@ pub type DeviceId = Token<32>;
 #[message(json)]
 pub struct EmptyJson;
 
+fn is_false(b: &bool) -> bool {
+	!b
+}
+
 /// Package Info
 ///
 /// Can be called by anyone
@@ -65,7 +69,15 @@ pub struct PackageInfoReq {
 	pub name: String,
 	/// device_id gives the possibility to target an update
 	/// specific for only one device
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub device_id: Option<DeviceId>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub image_version: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub package_versions: Option<HashMap<String, String>>,
+	/// if true the whitelist and version requirements are ignored
+	#[serde(default, skip_serializing_if = "is_false")]
+	pub ignore_requirements: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]

@@ -111,6 +111,9 @@ async fn test_package_info() {
 		arch: BoardArch::Amd64,
 		name: "test".into(),
 		device_id: None,
+		image_version: None,
+		package_versions: None,
+		ignore_requirements: false,
 	};
 
 	// no package
@@ -126,6 +129,9 @@ async fn test_package_info() {
 		arch: BoardArch::Amd64,
 		name: "test".into(),
 		device_id: None,
+		image_version: None,
+		package_versions: None,
+		ignore_requirements: false,
 	};
 
 	// no package
@@ -241,6 +247,9 @@ fn test_pack_req(device_id: &DeviceId) -> PackageInfoReq {
 		arch: BoardArch::Amd64,
 		name: "test".into(),
 		device_id: Some(device_id.clone()),
+		image_version: None,
+		package_versions: None,
+		ignore_requirements: false,
 	}
 }
 

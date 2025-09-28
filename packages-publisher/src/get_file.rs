@@ -5,7 +5,7 @@ use tokio::fs;
 
 use packages::client::Client;
 use packages::packages::BoardArch;
-use packages::requests::DeviceId;
+use packages::requests::PackageInfoReq;
 
 #[derive(clap::Parser)]
 pub struct GetFile {
@@ -14,10 +14,6 @@ pub struct GetFile {
 
 	/// Either `Amd64` or `Arm64`.
 	arch: BoardArch,
-
-	/// If you want to specificy as which device we make the request
-	#[clap(long)]
-	device_id: Option<DeviceId>,
 
 	/// Where should the file be downloaded to
 	dest: Option<String>,
@@ -36,12 +32,15 @@ pub async fn get_file(cfg: GetFile) -> Result<()> {
 		.map_err(|e| err!(e, "connect to {} failed", source.addr))?;
 
 	let package = client
-		.package_info(
-			source.channel,
-			cfg.arch,
-			cfg.device_id.clone(),
-			cfg.name.clone(),
-		)
+		.package_info(PackageInfoReq {
+			channel: source.channel,
+			name: cfg.name.clone(),
+			arch: cfg.arch,
+			device_id: None,
+			image_version: None,
+			package_versions: None,
+			ignore_requirements: true,
+		})
 		.await
 		.map_err(|e| err!(e, "failed to get package info"))?;
 

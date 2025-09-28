@@ -3,7 +3,7 @@ use crate::error::Result;
 
 use packages::client::Client;
 use packages::packages::BoardArch;
-use packages::requests::DeviceId;
+use packages::requests::PackageInfoReq;
 
 #[derive(clap::Parser)]
 pub struct Info {
@@ -13,10 +13,6 @@ pub struct Info {
 	/// if no architecture is selected `Amd64` and `Arm64` are used.
 	#[clap(long)]
 	arch: Option<BoardArch>,
-
-	/// If you want to specificy as which device we make the request
-	#[clap(long)]
-	device_id: Option<DeviceId>,
 }
 
 pub async fn info(cfg: Info) -> Result<()> {
@@ -41,12 +37,15 @@ pub async fn info(cfg: Info) -> Result<()> {
 
 	for arch in archs {
 		let package = client
-			.package_info(
-				source.channel,
-				*arch,
-				cfg.device_id.clone(),
-				cfg.name.clone(),
-			)
+			.package_info(PackageInfoReq {
+				channel: source.channel,
+				name: cfg.name.clone(),
+				arch: *arch,
+				device_id: None,
+				image_version: None,
+				package_versions: None,
+				ignore_requirements: true,
+			})
 			.await
 			.map_err(|e| err!(e, "failed to get package info"))?;
 

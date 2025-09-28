@@ -37,6 +37,7 @@ impl Bootloader {
 		self.inner.lock().await.make_root(path).await
 	}
 
+	#[allow(dead_code)]
 	pub async fn update(&self, req: &UpdateReq) -> Result<VersionInfo> {
 		self.inner.lock().await.update(req).await
 	}

@@ -1,6 +1,6 @@
 use crate::action::Action;
 use crate::error::{Error, Result};
-use crate::packages::{BoardArch, Channel, Package, TargetArch};
+use crate::packages::{Channel, Package};
 use crate::requests::{
 	AuthKey, AuthenticateReaderReq, AuthenticateWriter1Req,
 	AuthenticateWriter2Req, ChangeWhitelistReq, DeviceId, GetFile,
@@ -48,17 +48,8 @@ impl Client {
 	/// can be called by anyone
 	pub async fn package_info(
 		&self,
-		channel: Channel,
-		arch: BoardArch,
-		device_id: Option<DeviceId>,
-		name: String,
+		req: PackageInfoReq,
 	) -> Result<Option<Package>> {
-		let req = PackageInfoReq {
-			channel,
-			arch,
-			name,
-			device_id,
-		};
 		self.inner.request(req).await.map(|r| r.package)
 	}
 

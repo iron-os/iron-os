@@ -373,6 +373,8 @@ struct Update {
 	pub arch: BoardArch,
 	pub channel: Channel,
 	pub device_id: Option<DeviceId>,
+	pub image_version: String,
+	pub package_versions: HashMap<String, String>,
 	pub packages: HashMap<String, PackageUpdateState>,
 	pub image: ImageUpdateState,
 }
@@ -443,6 +445,7 @@ enum ImageUpdateState {
 		get_file: GetFileBuilder,
 	},
 	NoUpdate,
+	#[allow(dead_code)]
 	Updated(VersionInfo),
 	NotFound,
 }
@@ -547,14 +550,17 @@ impl RawPackages {
 	/// Creates the update struct from the current packages
 	pub fn prepare_update(&self, version: &VersionInfo) -> Update {
 		let mut packs = HashMap::new();
+		let mut package_versions = HashMap::with_capacity(self.list.len());
 
 		for (name, pack) in &self.list {
+			let package = pack.package();
 			let state = PackageUpdateState::GatherInfo {
-				version: Some(pack.package().version.clone()),
+				version: Some(package.version.clone()),
 				// todo maybe store &'static str
 				new_folder: pack.other().to_string(),
 			};
 			packs.insert(name.clone(), state);
+			package_versions.insert(name.clone(), package.version_str.clone());
 		}
 
 		let image = ImageUpdateState::GatherInfo {
@@ -566,6 +572,8 @@ impl RawPackages {
 			arch: boot_arch_to_board_arch(version.arch),
 			channel: self.cfg.channel,
 			device_id: version.device_id.clone(),
+			image_version: version.version_str.clone(),
+			package_versions,
 			packages: packs,
 			image,
 		}
