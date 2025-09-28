@@ -149,25 +149,9 @@ impl Client {
 	/// need to be authenticate as a writer.
 	pub async fn change_whitelist(
 		&self,
-		arch: TargetArch,
-		name: String,
-		version: Hash,
-		whitelist: HashSet<DeviceId>,
-		// if the whitelist should added or replaced
-		add: bool,
-		auto_whitelist_limit: u32,
+		req: ChangeWhitelistReq,
 	) -> Result<()> {
-		self.inner
-			.request(ChangeWhitelistReq {
-				arch,
-				name,
-				version,
-				whitelist,
-				add,
-				auto_whitelist_limit,
-			})
-			.await
-			.map(|_| ())
+		self.inner.request(req).await.map(|_| ())
 	}
 
 	pub async fn close(self) {

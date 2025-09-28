@@ -1,13 +1,16 @@
-fn docker_build() {
-	docker_build("packages-server")
-}
-
-fn docker_build(name) {
+fn publish(image) {
 	fs::create_dir("./deps");
 	_copy_dep("packages-api");
 
-	let docker = cmd(["docker", "build", "-t", name, "."]);
-	docker.execute();
+	let build = cmd([
+		"docker", "build", "-t", image, ".", "--pull"
+	]);
+	build.execute();
+
+	let push = cmd([
+		"docker", "push", image
+	]);
+	push.execute();
 }
 
 fn _copy_dep(dep) {
@@ -22,14 +25,4 @@ fn _copy_dep(dep) {
 
 		fs::copy("../" + dep + "/" + child, final_dir);
 	}
-}
-
-fn docker_save() {
-	fs::create_dir("./images");
-
-	let docker = cmd([
-		"docker", "save", "-o", "./images/packages-server.tar",
-		"packages-server"
-	]);
-	docker.execute();
 }

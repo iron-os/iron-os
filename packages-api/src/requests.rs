@@ -622,16 +622,16 @@ pub struct ChangeWhitelistReq {
 	pub arch: TargetArch,
 	pub name: String,
 	pub version: Hash,
-	pub whitelist: HashSet<DeviceId>,
-	#[serde(default)]
-	pub add: bool,
-	/// if auto_whitelist_limit is > 0 and whitelist is empty the whitelist is
-	/// not touched even tough add might not be set
-	///
-	/// if the whitelist get's set and auto_whitelist_limit is == 0 it does not
-	/// get updated
-	#[serde(default)]
-	pub auto_whitelist_limit: u32,
+	pub change: WhitelistChange,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WhitelistChange {
+	Set(HashSet<DeviceId>),
+	Add(HashSet<DeviceId>),
+	// this will not reduce the whitelist amount
+	SetMinAuto(u32),
+	AddAuto(u32),
 }
 
 impl Request for ChangeWhitelistReq {

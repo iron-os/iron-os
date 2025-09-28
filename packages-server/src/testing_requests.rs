@@ -11,7 +11,7 @@ use packages::packages::{BoardArch, Channel, Package, TargetArch};
 use packages::requests::{
 	AuthenticateWriter1Req, AuthenticateWriter2Req, ChangeWhitelistReq,
 	DeviceId, GetFileBuilder, GetFilePartReq, GetFileReq, PackageInfoReq,
-	SetFileReq, SetPackageInfoReq,
+	SetFileReq, SetPackageInfoReq, WhitelistChange,
 };
 use packages::server::{Server, TestingServer};
 
@@ -304,14 +304,9 @@ async fn test_whitelist() {
 			arch: TargetArch::Amd64,
 			name: "test".into(),
 			version: package_2.version.clone(),
-			whitelist: device_ids
-				.iter()
-				.rev()
-				.take(4)
-				.map(Clone::clone)
-				.collect(),
-			add: true,
-			auto_whitelist_limit: 0,
+			change: WhitelistChange::Add(
+				device_ids.iter().rev().take(4).cloned().collect(),
+			),
 		})
 		.await
 		.unwrap();
@@ -336,9 +331,7 @@ async fn test_whitelist() {
 			arch: TargetArch::Amd64,
 			name: "test".into(),
 			version: package_2.version.clone(),
-			whitelist: Default::default(),
-			add: false,
-			auto_whitelist_limit: 50,
+			change: WhitelistChange::SetMinAuto(50),
 		})
 		.await
 		.unwrap();

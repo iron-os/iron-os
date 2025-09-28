@@ -12,7 +12,7 @@ use serde::de::{Error as SerdeError, IntoDeserializer};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use packages::packages::{BoardArch, Channel, Hash, Package, TargetArch};
-use packages::requests::DeviceId;
+use packages::requests::{DeviceId, WhitelistChange};
 
 use file_db::FileDb;
 
@@ -148,9 +148,7 @@ impl PackagesDbFile {
 		arch: &TargetArch,
 		name: &str,
 		version: &Hash,
-		whitelist: HashSet<DeviceId>,
-		mut add: bool,
-		auto_whitelist_limit: u32,
+		change: &WhitelistChange,
 	) -> bool {
 		let entry = self
 			.indexes
@@ -160,31 +158,28 @@ impl PackagesDbFile {
 			})
 			.and_then(|i| i.mut_with_version(name, version));
 
-		// make sure we don't remove whitelist entries if it is probably not
-		// intended
-		if whitelist.is_empty() && auto_whitelist_limit > 0 {
-			add = true;
-		}
-		let whitelist_empty = whitelist.is_empty();
+		let entry = match entry {
+			Some(e) => e,
+			None => return false,
+		};
 
-		if let Some(entry) = entry {
-			if add {
-				for dev in whitelist {
-					entry.whitelist.insert(dev);
-				}
-			} else {
-				entry.whitelist = whitelist;
+		match change {
+			WhitelistChange::Set(whitelist) => {
+				entry.whitelist = whitelist.clone();
 			}
-
-			// now set auto_whitelist_limit
-			if whitelist_empty || auto_whitelist_limit > 0 {
-				entry.auto_whitelist_limit = auto_whitelist_limit;
+			WhitelistChange::Add(whitelist) => {
+				entry.whitelist.extend(whitelist.iter().cloned());
 			}
-
-			true
-		} else {
-			false
+			WhitelistChange::SetMinAuto(auto) => {
+				entry.auto_whitelist_limit =
+					(*auto).max(entry.auto_whitelist_limit);
+			}
+			WhitelistChange::AddAuto(auto) => {
+				entry.auto_whitelist_limit += auto;
+			}
 		}
+
+		true
 	}
 }
 
@@ -418,21 +413,11 @@ impl PackagesDb {
 		arch: &TargetArch,
 		name: &str,
 		version: &Hash,
-		whitelist: HashSet<DeviceId>,
-		add: bool,
-		auto_whitelist_limit: u32,
+		change: &WhitelistChange,
 	) -> bool {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
-		let r = db.change_whitelist(
-			channel,
-			arch,
-			name,
-			version,
-			whitelist,
-			add,
-			auto_whitelist_limit,
-		);
+		let r = db.change_whitelist(channel, arch, name, version, change);
 
 		if self.write {
 			lock.write().await.expect("writing failed unexpectetly");

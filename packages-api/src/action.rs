@@ -6,7 +6,8 @@ pub enum Action {
 	// AllPackages = 10,
 	PackageInfo = 11,
 	SetPackageInfo = 13,
-	ChangeWhitelist = 15,
+	// ChangeWhitelistV1 = 15
+	ChangeWhitelist = 16,
 	GetFile = 20,
 	GetFilePart = 21,
 	SetFile = 22,

@@ -8,7 +8,7 @@ use std::io;
 use packages::client::Client;
 use packages::error::Error as ApiError;
 use packages::packages::{BoardArch, Hash, TargetArch};
-use packages::requests::DeviceId;
+use packages::requests::{ChangeWhitelistReq, DeviceId, WhitelistChange};
 
 use riji::{paint_err, paint_ok};
 
@@ -49,6 +49,22 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 		(_, Some(arch)) => vec![arch.into()],
 	};
 
+	let whitelist: HashSet<_> = opts.whitelist.into_iter().collect();
+
+	// determine which whitelist change to occur
+	let change = match (opts.add, opts.auto_whitelist > 0) {
+		(_, true) if !whitelist.is_empty() => {
+			return Err(err!(
+				"None",
+				"specific and auto-whitelist can't be used together"
+			));
+		}
+		(true, false) => WhitelistChange::Add(whitelist),
+		(false, false) => WhitelistChange::Set(whitelist),
+		(true, true) => WhitelistChange::AddAuto(opts.auto_whitelist),
+		(false, true) => WhitelistChange::SetMinAuto(opts.auto_whitelist),
+	};
+
 	println!("connecting to {}", source.addr);
 
 	// build a connection
@@ -64,16 +80,29 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 		.await
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
-	let whitelist: HashSet<_> = opts.whitelist.into_iter().collect();
-
 	println!();
 	println!("do you really wan't to change the whitelist for package:");
 	println!("channel: {}", source.channel);
 	println!("version: {:?}", opts.version);
 	println!("archs: {:?}", target_archs);
-	println!("add: {:?}", if opts.add { "yes" } else { "no" });
-	println!("auto-whitelist: {:?}", opts.auto_whitelist);
-	println!("whitelist: {:?}", whitelist);
+	match &change {
+		WhitelistChange::Add(devs) => {
+			println!("change: add devices to whitelist");
+			println!("devices: {:?}", devs);
+		}
+		WhitelistChange::Set(devs) => {
+			println!("change: set whitelist");
+			println!("devices: {:?}", devs);
+		}
+		WhitelistChange::AddAuto(n) => {
+			println!("change: add auto-whitelist");
+			println!("min devices: {}", n);
+		}
+		WhitelistChange::SetMinAuto(n) => {
+			println!("change: set auto-whitelist");
+			println!("min devices: {}", n);
+		}
+	}
 	println!();
 	println!("Enter YES to confirm");
 
@@ -89,14 +118,12 @@ pub async fn change_whitelist(opts: ChangeWhitelistOpts) -> Result<()> {
 
 	for arch in target_archs {
 		let r = client
-			.change_whitelist(
+			.change_whitelist(ChangeWhitelistReq {
 				arch,
-				package.name.clone(),
-				opts.version.clone(),
-				whitelist.clone(),
-				opts.add,
-				opts.auto_whitelist,
-			)
+				name: package.name.clone(),
+				version: opts.version.clone(),
+				change: change.clone(),
+			})
 			.await;
 		match r {
 			Ok(_) => {

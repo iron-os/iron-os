@@ -352,9 +352,7 @@ async fn change_whitelist(
 			&req.arch,
 			&req.name,
 			&req.version,
-			req.whitelist,
-			req.add,
-			req.auto_whitelist_limit,
+			&req.change,
 		)
 		.await;
 
