@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::auth::AuthDb;
 use crate::config::{ChannelCfg, Config};
 use crate::files::Files;
@@ -88,6 +90,7 @@ async fn add_test_package_with_ctn(
 	let _ = server
 		.request(SetPackageInfoReq {
 			package: package.clone(),
+			requirements: HashMap::new(),
 			whitelist: Default::default(),
 			auto_whitelist_limit: 0,
 		})
@@ -233,6 +236,7 @@ async fn test_set_package() {
 	let _ = server
 		.request(SetPackageInfoReq {
 			package,
+			requirements: HashMap::new(),
 			whitelist: Default::default(),
 			auto_whitelist_limit: 0,
 		})
@@ -286,6 +290,7 @@ async fn test_whitelist() {
 	let _ = server
 		.request(SetPackageInfoReq {
 			package: package_2.clone(),
+			requirements: HashMap::new(),
 			whitelist: device_ids.iter().take(4).map(Clone::clone).collect(),
 			auto_whitelist_limit: 0,
 		})

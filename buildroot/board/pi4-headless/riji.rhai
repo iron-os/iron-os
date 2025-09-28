@@ -15,13 +15,14 @@ fn create_config(channel, defconfig, linuxconfig, images) {
 
 	// need to add the image.toml
 	let image = images + "/image.toml";
-	fs::copy("./../../package.toml", image);
-	fs::append(image, [
-		"",
+	let image_str = fs::read("./../../package.toml");
+	fs::write(image, [
 		"name = \"image-pi4-headless\"",
 		"board = \"pi4-headless\"",
 		"arch = \"Arm64\"",
-		"single-arch = \"Arm64\""
+		"single-arch = \"Arm64\"",
+		"",
+		image_str
 	]);
 
 	fs::copy("./genimage-uboot.cfg", images + "/");

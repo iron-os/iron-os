@@ -27,6 +27,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sentry = "0.32.2"
 sentry-tracing = "0.32.2"
 time = "=0.3.35"
+semver = { version = "1.0.27", features = ["serde"] }
 
 [dev-dependencies]
 tempfile = "3.8"

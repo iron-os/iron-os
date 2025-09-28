@@ -3,12 +3,11 @@ use crate::error::{Error, Result};
 use crate::packages::{Channel, Package};
 use crate::requests::{
 	AuthKey, AuthenticateReaderReq, AuthenticateWriter1Req,
-	AuthenticateWriter2Req, ChangeWhitelistReq, DeviceId, GetFile,
-	GetFileBuilder, GetFileReq, NewAuthKeyReaderReq, PackageInfoReq,
-	SetFileReq, SetPackageInfoReq,
+	AuthenticateWriter2Req, ChangeWhitelistReq, GetFile, GetFileBuilder,
+	GetFileReq, NewAuthKeyReaderReq, PackageInfoReq, SetFileReq,
+	SetPackageInfoReq,
 };
 
-use std::collections::HashSet;
 use std::time::Duration;
 
 use stream_api::client::{Client as StreamClient, Config, EncryptedBytes};
@@ -54,17 +53,7 @@ impl Client {
 	}
 
 	/// can only be called if you authenticated as a writer
-	pub async fn set_package_info(
-		&self,
-		package: Package,
-		whitelist: HashSet<DeviceId>,
-		auto_whitelist_limit: u32,
-	) -> Result<()> {
-		let req = SetPackageInfoReq {
-			package,
-			whitelist,
-			auto_whitelist_limit,
-		};
+	pub async fn set_package_info(&self, req: SetPackageInfoReq) -> Result<()> {
 		self.inner.request(req).await.map(|_r| ())
 	}
 

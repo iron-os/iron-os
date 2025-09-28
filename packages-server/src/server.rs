@@ -201,6 +201,7 @@ async fn set_package_info(
 			channel,
 			PackageEntry {
 				package: req.package,
+				requirements: req.requirements,
 				whitelist: req.whitelist,
 				auto_whitelist_limit: req.auto_whitelist_limit,
 			},

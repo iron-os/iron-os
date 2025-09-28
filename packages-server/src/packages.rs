@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::result::Result as StdResult;
 
+use semver::VersionReq;
 use tokio::fs;
 use tokio::sync::RwLock;
 
@@ -212,6 +213,8 @@ impl From<bool> for InWhitelist {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageEntry {
 	pub package: Package,
+	#[serde(default)]
+	pub requirements: HashMap<String, VersionReq>,
 	// if the whitelist is empty this means that all devices are allowed
 	// to use the package
 	pub whitelist: HashSet<DeviceId>,

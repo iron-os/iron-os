@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::result::Result as StdResult;
 
+use semver::VersionReq;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
 
@@ -102,9 +103,9 @@ impl Request for PackageInfoReq {
 #[message(json)]
 pub struct SetPackageInfoReq {
 	pub package: Package,
+	pub requirements: HashMap<String, VersionReq>,
 	// if empty no whitelist is applied
 	pub whitelist: HashSet<DeviceId>,
-	#[serde(default)]
 	pub auto_whitelist_limit: u32,
 }
 

@@ -5,33 +5,34 @@ use crate::util::{
 	compress, create_dir, get_priv_key, hash_file, read_toml, remove_dir,
 };
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io;
-use std::iter::FromIterator;
 
 use crypto::signature::Keypair;
 
+use semver::VersionReq;
 use tokio::fs::{self, File};
 
 use packages::client::Client;
 use packages::packages::{BoardArch, Channel, Package, TargetArch};
-use packages::requests::{DeviceId, SetFileReq};
+use packages::requests::{DeviceId, SetFileReq, SetPackageInfoReq};
 
 use riji::paint_act;
 
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct PackageToml {
 	pub name: String,
 	pub version: String,
 	pub binary: Option<String>,
 	/// Default is package.rhai
 	pub script: Option<String>,
-	#[serde(rename = "tar-file")]
 	pub tar_file: Option<String>,
-	#[serde(rename = "single-arch")]
 	pub single_arch: Option<TargetArch>,
+	#[serde(default)]
+	pub requirements: HashMap<String, VersionReq>,
 }
 
 impl PackageToml {
@@ -74,45 +75,23 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 
 	let mut packages = vec![];
 
-	match (package.single_arch, cfg.arch) {
-		(None, None) => {
-			for arch in &[TargetArch::Amd64, TargetArch::Arm64] {
-				packages.push(
-					build(
-						arch,
-						&source.channel,
-						cfg.host_channel.as_ref(),
-						&package,
-						&priv_key,
-					)
-					.await?,
-				);
-			}
-		}
-		(Some(arch), _) => {
-			packages.push(
-				build(
-					&arch,
-					&source.channel,
-					cfg.host_channel.as_ref(),
-					&package,
-					&priv_key,
-				)
-				.await?,
-			);
-		}
-		(_, Some(arch)) => {
-			packages.push(
-				build(
-					&arch.into(),
-					&source.channel,
-					cfg.host_channel.as_ref(),
-					&package,
-					&priv_key,
-				)
-				.await?,
-			);
-		}
+	let archs: &[TargetArch] = match (package.single_arch, cfg.arch) {
+		(None, None) => &[TargetArch::Amd64, TargetArch::Arm64],
+		(Some(arch), _) => &[arch],
+		(_, Some(arch)) => &[arch.into()],
+	};
+
+	for arch in archs {
+		packages.push(
+			build(
+				arch,
+				&source.channel,
+				cfg.host_channel.as_ref(),
+				&package,
+				&priv_key,
+			)
+			.await?,
+		);
 	}
 
 	println!();
@@ -150,12 +129,12 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 		.await
 		.map_err(|e| err!(e, "Authentication failed"))?;
 
-	for (tar_path, package) in packages {
+	for (tar_path, pack) in packages {
 		let tar = File::open(&tar_path).await.expect("tar file deleted");
-		let file_req = SetFileReq::new(package.signature.clone(), tar)
+		let file_req = SetFileReq::new(pack.signature.clone(), tar)
 			.await
 			.expect("reading tar failed");
-		assert_eq!(file_req.hash(), package.version);
+		assert_eq!(file_req.hash(), pack.version);
 
 		client
 			.set_file(file_req)
@@ -163,11 +142,12 @@ pub async fn upload(cfg: Upload) -> Result<()> {
 			.map_err(|e| err!(e, "failed to upload file"))?;
 
 		client
-			.set_package_info(
-				package,
-				HashSet::from_iter(cfg.whitelist.clone()),
-				cfg.auto_whitelist,
-			)
+			.set_package_info(SetPackageInfoReq {
+				package: pack,
+				requirements: package.requirements.clone(),
+				whitelist: cfg.whitelist.iter().cloned().collect(),
+				auto_whitelist_limit: cfg.auto_whitelist,
+			})
 			.await
 			.map_err(|e| err!(e, "failed to upload package"))?;
 

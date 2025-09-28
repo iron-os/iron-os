@@ -13,3 +13,4 @@ serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 file-db = { package = "iron-os-file-db", version = "0.2", features = ["async"] }
 bootloader-api = { package = "service-bootloader-api", version = "0.2", path = "./../service-bootloader-api" }
+semver = { version = "1.0.27", features = ["serde"] }

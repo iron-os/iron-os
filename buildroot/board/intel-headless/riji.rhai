@@ -11,13 +11,14 @@ fn create_config(channel, defconfig, linuxconfig, images) {
 
 	// need to add the image.toml
 	let image = images + "/image.toml";
-	fs::copy("./../../package.toml", image);
-	fs::append(image, [
-		"",
+	let image_str = fs::read("./../../package.toml");
+	fs::write(image, [
 		"name = \"image-intel-headless\"",
 		"board = \"intel-headless\"",
 		"arch = \"Amd64\"",
-		"single-arch = \"Amd64\""
+		"single-arch = \"Amd64\"",
+		"",
+		image_str
 	]);
 
 	fs::write(images + "/using_grub", "using_grub");
