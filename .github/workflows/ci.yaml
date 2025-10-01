@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.71
+        uses: dtolnay/rust-toolchain@1.74
       - name: Check
         run: cd packages-server && cargo check
       - name: Run tests
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.71
+        uses: dtolnay/rust-toolchain@1.74
       - name: Check
         run: cd packages-publisher && cargo check
       - name: Run tests
