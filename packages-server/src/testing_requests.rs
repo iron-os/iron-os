@@ -16,6 +16,7 @@ use packages::requests::{
 	SetFileReq, SetPackageInfoReq, WhitelistChange,
 };
 use packages::server::{Server, TestingServer};
+use semver::VersionReq;
 
 struct SignKey(Keypair);
 
@@ -65,10 +66,12 @@ async fn auth_as_writer(server: &TestingServer) {
 		.unwrap();
 }
 
-async fn add_test_package_with_ctn(
+async fn add_package_with_ctn_and_requirements(
+	name: &str,
 	server: &TestingServer,
 	version_str: &str,
 	ctn: &[u8],
+	requirements: HashMap<String, VersionReq>,
 ) -> Package {
 	let hash = Hasher::hash(ctn);
 	let signature = server.get_data::<SignKey>().0.sign(&hash);
@@ -79,7 +82,7 @@ async fn add_test_package_with_ctn(
 		.unwrap();
 
 	let package = Package {
-		name: "test".into(),
+		name: name.into(),
 		version_str: version_str.into(),
 		version: hash,
 		signature,
@@ -90,13 +93,28 @@ async fn add_test_package_with_ctn(
 	let _ = server
 		.request(SetPackageInfoReq {
 			package: package.clone(),
-			requirements: HashMap::new(),
+			requirements,
 			whitelist: Default::default(),
 			auto_whitelist_limit: 0,
 		})
 		.await;
 
 	package
+}
+
+async fn add_test_package_with_ctn(
+	server: &TestingServer,
+	version_str: &str,
+	ctn: &[u8],
+) -> Package {
+	add_package_with_ctn_and_requirements(
+		"test",
+		server,
+		version_str,
+		ctn,
+		HashMap::new(),
+	)
+	.await
 }
 
 const TEST_FILE_CONTENT: &[u8] = b"this is a test file 1231346531468113153";
@@ -291,13 +309,14 @@ async fn test_whitelist() {
 		.request(SetPackageInfoReq {
 			package: package_2.clone(),
 			requirements: HashMap::new(),
-			whitelist: device_ids.iter().take(4).map(Clone::clone).collect(),
+			whitelist: device_ids.iter().take(4).cloned().collect(),
 			auto_whitelist_limit: 0,
 		})
 		.await
 		.unwrap();
 
 	// first test
+	// the first four should see package 2 and the rest package 1
 	for (i, id) in device_ids.iter().enumerate() {
 		let resp = server
 			.request(test_pack_req(id))
@@ -313,6 +332,7 @@ async fn test_whitelist() {
 		}
 	}
 
+	// allow the last four devices to be whitelisted as well
 	let _ = server
 		.request(ChangeWhitelistReq {
 			arch: TargetArch::Amd64,
@@ -325,6 +345,7 @@ async fn test_whitelist() {
 		.await
 		.unwrap();
 
+	// check that the first 4 and the last 4 see package 2
 	for (i, id) in device_ids.iter().enumerate() {
 		let resp = server
 			.request(test_pack_req(id))
@@ -340,6 +361,7 @@ async fn test_whitelist() {
 		}
 	}
 
+	// authorize in total 50 devices to be whitelisted automatically
 	let _ = server
 		.request(ChangeWhitelistReq {
 			arch: TargetArch::Amd64,
@@ -350,6 +372,7 @@ async fn test_whitelist() {
 		.await
 		.unwrap();
 
+	// check that the first 46 and the last 4 see package 2
 	for (i, id) in device_ids.iter().enumerate() {
 		let resp = server
 			.request(test_pack_req(id))
@@ -366,4 +389,100 @@ async fn test_whitelist() {
 			assert_eq!(resp.version_str, package_1.version_str);
 		}
 	}
+}
+
+#[tokio::test]
+async fn test_requirements() {
+	let server = init();
+	auth_as_writer(&server).await;
+
+	let package_v1 = add_test_package_with_ctn(
+		&server,
+		"v1.0.0",
+		&[TEST_FILE_CONTENT, b"v1"].concat(),
+	)
+	.await;
+
+	let package_v2 = add_package_with_ctn_and_requirements(
+		"test",
+		&server,
+		"v2.0.0",
+		&[TEST_FILE_CONTENT, b"v2"].concat(),
+		HashMap::from([("alice".into(), ">=2.0".parse().unwrap())]),
+	)
+	.await;
+
+	// test with no versions provided
+	let package = server
+		.request(PackageInfoReq {
+			channel: Channel::Debug,
+			arch: BoardArch::Amd64,
+			name: "test".into(),
+			device_id: None,
+			image_version: None,
+			package_versions: None,
+			ignore_requirements: false,
+		})
+		.await
+		.unwrap()
+		.package
+		.unwrap();
+	assert_eq!(package.version_str, package_v1.version_str);
+
+	// test with old versions provided
+	let package = server
+		.request(PackageInfoReq {
+			channel: Channel::Debug,
+			arch: BoardArch::Amd64,
+			name: "test".into(),
+			device_id: None,
+			image_version: None,
+			package_versions: Some(HashMap::from([(
+				"alice".into(),
+				"v1.0.0".into(),
+			)])),
+			ignore_requirements: false,
+		})
+		.await
+		.unwrap()
+		.package
+		.unwrap();
+	assert_eq!(package.version_str, package_v1.version_str);
+
+	// test with new versions provided
+	let package = server
+		.request(PackageInfoReq {
+			channel: Channel::Debug,
+			arch: BoardArch::Amd64,
+			name: "test".into(),
+			device_id: None,
+			image_version: None,
+			package_versions: Some(HashMap::from([(
+				"alice".into(),
+				"v2.0.0".into(),
+			)])),
+			ignore_requirements: false,
+		})
+		.await
+		.unwrap()
+		.package
+		.unwrap();
+	assert_eq!(package.version_str, package_v2.version_str);
+
+	// test with ignore requirements
+	let package = server
+		.request(PackageInfoReq {
+			channel: Channel::Debug,
+			arch: BoardArch::Amd64,
+			name: "test".into(),
+			device_id: None,
+			image_version: None,
+			package_versions: None,
+			ignore_requirements: true,
+		})
+		.await
+		.unwrap()
+		.package
+		.unwrap();
+	assert_eq!(package.version_str, package_v2.version_str);
 }

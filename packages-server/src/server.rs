@@ -162,10 +162,7 @@ async fn package_info(
 	packages: &PackagesDb,
 ) -> ApiResult<PackageInfo> {
 	Ok(PackageInfo {
-		package: packages
-			.get_package(&req.arch, &req.channel, &req.name, &req.device_id)
-			.await
-			.map(|e| e.package),
+		package: packages.get_package(&req).await.map(|e| e.package),
 	})
 }
 

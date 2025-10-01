@@ -61,6 +61,12 @@ fn is_false(b: &bool) -> bool {
 /// Package Info
 ///
 /// Can be called by anyone
+///
+/// ## Version requirements
+/// versions are a string since we want to be tolerant what we
+/// accept here
+/// invalid versions will be treated as not matching
+/// and will be logged
 #[derive(Debug, Clone, Serialize, Deserialize, IntoMessage, FromMessage)]
 #[serde(rename_all = "camelCase")]
 #[message(json)]
@@ -106,6 +112,7 @@ pub struct SetPackageInfoReq {
 	pub requirements: HashMap<String, VersionReq>,
 	// if empty no whitelist is applied
 	pub whitelist: HashSet<DeviceId>,
+	// if this is 0 no auto whitelisting is done
 	pub auto_whitelist_limit: u32,
 }
 

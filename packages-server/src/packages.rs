@@ -5,17 +5,18 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::result::Result as StdResult;
 
-use semver::VersionReq;
+use semver::{Version, VersionReq};
 use tokio::fs;
 use tokio::sync::RwLock;
 
 use serde::de::{Error as SerdeError, IntoDeserializer};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use packages::packages::{BoardArch, Channel, Hash, Package, TargetArch};
-use packages::requests::{DeviceId, WhitelistChange};
+use packages::packages::{Channel, Hash, Package, TargetArch};
+use packages::requests::{DeviceId, PackageInfoReq, WhitelistChange};
 
 use file_db::FileDb;
+use tracing::error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct IndexKey {
@@ -85,28 +86,34 @@ impl PackagesDbFile {
 	/// or might be able to get access to with get_mut
 	///
 	/// ## Important
-	/// Do not just return this check `PackageEntry::needs_write(device_id)`
+	/// Do not just return this check `PackageEntry::in_whitelist(device_id)`
 	/// if you need to call get_mut
 	// todo this api needs to be improved
-	fn get_latest(
-		&self,
-		arch: &BoardArch,
-		channel: &Channel,
-		name: &str,
-		device_id: &Option<DeviceId>,
-	) -> Option<EntryIndex> {
+	fn get_latest(&self, req: &PackageInfoReq) -> Option<EntryIndex> {
 		// first try with the provided arch
 		// else try with the any arch
 
-		self.get_latest_inner(&(*arch).into(), channel, name, device_id)
-			.or_else(|| {
-				self.get_latest_inner(
-					&TargetArch::Any,
-					channel,
-					name,
-					device_id,
-				)
-			})
+		let device_info = DeviceInfo {
+			device_id: req.device_id.clone(),
+			image_version: req.image_version.clone(),
+			package_versions: req.package_versions.clone(),
+			ignore_requirements: req.ignore_requirements,
+		};
+
+		self.get_latest_inner(
+			&(req.arch).into(),
+			&req.channel,
+			&req.name,
+			&device_info,
+		)
+		.or_else(|| {
+			self.get_latest_inner(
+				&TargetArch::Any,
+				&req.channel,
+				&req.name,
+				&device_info,
+			)
+		})
 	}
 
 	fn get_latest_inner(
@@ -114,7 +121,7 @@ impl PackagesDbFile {
 		arch: &TargetArch,
 		channel: &Channel,
 		name: &str,
-		device_id: &Option<DeviceId>,
+		device_info: &DeviceInfo,
 	) -> Option<EntryIndex> {
 		let mut idx = EntryIndex {
 			packages_index: IndexKey {
@@ -126,7 +133,7 @@ impl PackagesDbFile {
 		};
 
 		let packages = self.indexes.get(&idx.packages_index)?;
-		idx.idx = packages.get_latest(name, device_id)?;
+		idx.idx = packages.get_latest(name, device_info)?;
 
 		Some(idx)
 	}
@@ -182,6 +189,14 @@ impl PackagesDbFile {
 
 		true
 	}
+}
+
+#[derive(Debug, Clone)]
+struct DeviceInfo {
+	device_id: Option<DeviceId>,
+	image_version: Option<String>,
+	package_versions: Option<HashMap<String, String>>,
+	ignore_requirements: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,6 +258,50 @@ impl PackageEntry {
 		}
 	}
 
+	fn matches_device(&self, device_info: &DeviceInfo) -> bool {
+		if device_info.ignore_requirements {
+			return true;
+		}
+
+		if !self.in_whitelist(&device_info.device_id).is_or_can_be() {
+			return false;
+		}
+
+		// now check if all requirements match
+		for (name, req) in &self.requirements {
+			let maybe_version = match name.as_str() {
+				"image" => device_info.image_version.as_ref(),
+				_ => device_info
+					.package_versions
+					.as_ref()
+					.and_then(|p| p.get(name)),
+			};
+			let Some(version) = maybe_version else {
+				return false;
+			};
+
+			// trim leading 'v' from version if present
+			let version = version.trim_start_matches('v');
+
+			let version =
+				match Version::parse(version) {
+					Ok(v) => v,
+					Err(_) => {
+						eprintln!("invalid version {version} received for package {name}");
+						error!("invalid version {version} received for package {name}");
+						return false;
+					}
+				};
+
+			if !req.matches(&version) {
+				return false;
+			}
+		}
+
+		// all requirements matched
+		true
+	}
+
 	/// Only call this if it is fine to add the user to the whitelist
 	pub fn update_whitelist(&mut self, device_id: &Option<DeviceId>) {
 		debug_assert!(self.in_whitelist(device_id).is_or_can_be());
@@ -278,14 +337,14 @@ impl PackagesIndex {
 	fn get_latest(
 		&self,
 		name: &str,
-		device_id: &Option<DeviceId>,
+		device_info: &DeviceInfo,
 	) -> Option<usize> {
 		self.list
 			.get(name)?
 			.iter()
 			.enumerate()
 			.rev()
-			.find(|(_, e)| e.in_whitelist(device_id).is_or_can_be())
+			.find(|(_, e)| e.matches_device(device_info))
 			.map(|(idx, _)| idx)
 	}
 
@@ -370,20 +429,19 @@ impl PackagesDb {
 
 	pub async fn get_package(
 		&self,
-		arch: &BoardArch,
-		channel: &Channel,
-		name: &str,
-		device_id: &Option<DeviceId>,
+		req: &PackageInfoReq,
 	) -> Option<PackageEntry> {
 		{
 			let lock = self.inner.read().await;
 			let db = lock.data();
 
-			let idx = db.get_latest(arch, channel, name, device_id)?;
+			let idx = db.get_latest(req)?;
 			let package = db.get(&idx).unwrap();
 
 			// check if we need to add us to the whitelist
-			if !package.in_whitelist(device_id).can_be() {
+			if req.ignore_requirements
+				|| !package.in_whitelist(&req.device_id).can_be()
+			{
 				return Some(package.clone());
 			}
 		};
@@ -391,10 +449,13 @@ impl PackagesDb {
 		let mut lock = self.inner.write().await;
 		let db = lock.data_mut();
 
-		let idx = db.get_latest(arch, channel, name, device_id)?;
+		let idx = db.get_latest(req)?;
 		let package = db.get_mut(&idx).unwrap();
 
-		package.update_whitelist(device_id);
+		// we do not need to check again if we can be added
+		// because get_latest only returns packages where we are or can be
+		// in the whitelist
+		package.update_whitelist(&req.device_id);
 
 		Some(package.clone())
 	}
