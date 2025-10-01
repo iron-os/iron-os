@@ -10,6 +10,7 @@ with chromium as it's gui.
 
 ## Rust
 MSRV: 1.74
+Host MSRV: 1.85
 
 ## image
 the image of iron should be for all uses the same
