@@ -18,7 +18,8 @@ struct Config {
 	release: Option<ConfigValues>,
 }
 
-const PROTO_FILE: &str = "./weston-kiosk-shell.xml";
+const KIOSK_PROTO_FILE: &str = "./weston-kiosk-shell.xml";
+const CAPTURE_PROTO_FILE: &str = "./weston-output-capture.xml";
 
 fn write_extension_config(values: &ConfigValues) {
 	let whitelist_arr = format!(
@@ -45,7 +46,8 @@ fn write_extension_config(values: &ConfigValues) {
 }
 
 fn main() {
-	println!("cargo:rerun-if-changed={}", PROTO_FILE);
+	println!("cargo:rerun-if-changed={}", KIOSK_PROTO_FILE);
+	println!("cargo:rerun-if-changed={}", CAPTURE_PROTO_FILE);
 	println!("cargo:rerun-if-changed=./build-config.toml");
 	println!("cargo:rerun-if-env-changed=BUILD_CHANNEL");
 
@@ -71,8 +73,13 @@ fn main() {
 	write_extension_config(&values);
 
 	generate_code(
-		PROTO_FILE,
+		KIOSK_PROTO_FILE,
 		Path::new(&out_dir).join("weston_kiosk_shell.rs"),
+		Side::Client,
+	);
+	generate_code(
+		CAPTURE_PROTO_FILE,
+		Path::new(&out_dir).join("weston_output_capture.rs"),
 		Side::Client,
 	);
 }
