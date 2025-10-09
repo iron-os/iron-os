@@ -1,5 +1,8 @@
-## 1.2.5 (not released)
+## 1.2.5
 - Trigger StillAlive websocket request when the connection get's opened
+- Include service-bootloader inside the service package this allows us to fix #10
+- Fix #10 sometimes the disk would get corrupted on updates
+- send image_version and package_version to the packages server
 
 ## 1.2.4
 - allow to trigger an update
