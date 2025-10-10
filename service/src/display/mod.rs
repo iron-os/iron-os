@@ -13,11 +13,12 @@ mod kiosk_api;
 
 pub use kiosk_api::State;
 use kiosk_api::{Event, WestonKioskShell};
+use tokio::io::{Interest, Ready};
 
 use std::sync::Arc;
 use std::{io, thread};
 
-use tokio::io::unix::AsyncFd;
+use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, Duration};
@@ -134,6 +135,9 @@ pub fn start() -> (JoinHandle<()>, Display) {
 	(task, display)
 }
 
+// we are always interested in reading
+const DEFAULT_INTEREST: Interest = Interest::READABLE;
+
 async fn handle_display(
 	tx: Arc<watch::Sender<State>>,
 	rx: &mut mpsc::Receiver<Message>,
@@ -141,17 +145,24 @@ async fn handle_display(
 	let display = WlDisplay::connect_to_env()?;
 	let display_fd = AsyncFd::new(display.get_connection_fd())?;
 	let (thread_tx, thread_rx) = mpsc::channel(5);
-	let thread = spawn_thread(display.clone(), tx, thread_rx);
+	let thread = spawn_thread(display, tx, thread_rx);
+
+	enum SelectState<'a> {
+		Message(Message),
+		Ready(AsyncFdReadyGuard<'a, i32>),
+	}
+
+	let mut interest = DEFAULT_INTEREST;
 
 	loop {
-		let (ready_guard, msg) = tokio::select! {
+		let state = tokio::select! {
 			msg = rx.recv() => {
 				let msg = msg.expect("channel closed");
-				(None, Some(msg))
+				SelectState::Message(msg)
 			},
-			r = display_fd.readable() => {
+			r = display_fd.ready(interest) => {
 				match r {
-					Ok(r) => (Some(r), None),
+					Ok(r) => SelectState::Ready(r),
 					Err(e) => {
 						eprintln!("Display: readable failed {:?}", e);
 						return Err(e.into())
@@ -162,17 +173,15 @@ async fn handle_display(
 
 		let (finished_tx, finished_rx) = oneshot::channel();
 
-		let thread_work = match (ready_guard.is_some(), msg) {
+		let thread_work = match &state {
 			// we got a notification from the wayland fd to read events
-			(true, None) => ThreadWork::Read,
-			(false, Some(Message::ChangeState(s))) => {
-				ThreadWork::ChangeState(s)
+			SelectState::Ready(_) => ThreadWork::Ready,
+			SelectState::Message(Message::ChangeState(s)) => {
+				ThreadWork::ChangeState(*s)
 			}
-			(false, Some(Message::ChangeBrightness(b))) => {
-				ThreadWork::ChangeBrightness(b)
+			SelectState::Message(Message::ChangeBrightness(b)) => {
+				ThreadWork::ChangeBrightness(*b)
 			}
-			(true, Some(_)) => unreachable!(),
-			(false, None) => unreachable!(),
 		};
 
 		let thread_send_result =
@@ -187,12 +196,15 @@ async fn handle_display(
 		}
 
 		match finished_rx.await {
-			Ok(WouldBlock::Yes) => {
-				if let Some(mut ready_guard) = ready_guard {
-					ready_guard.clear_ready();
+			Ok((n_interest, clear_ready)) => {
+				interest = n_interest;
+
+				if let SelectState::Ready(mut ready_guard) = state {
+					if !clear_ready.is_empty() {
+						ready_guard.clear_ready_matching(clear_ready);
+					}
 				}
 			}
-			Ok(WouldBlock::No) => {}
 			Err(_) => {
 				// could not receive from thread
 				// the thread has probably fail let's see why
@@ -204,17 +216,11 @@ async fn handle_display(
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum ThreadWork {
-	Read,
+	Ready,
 	ChangeState(State),
 	ChangeBrightness(u8),
-}
-
-#[derive(Debug, Clone)]
-enum WouldBlock {
-	Yes,
-	No,
 }
 
 /// Since the wayland client (EventQueue) is not send we can't use it directly
@@ -224,7 +230,7 @@ enum WouldBlock {
 fn spawn_thread(
 	display: WlDisplay,
 	tx: Arc<watch::Sender<State>>,
-	mut rx: mpsc::Receiver<(ThreadWork, oneshot::Sender<WouldBlock>)>,
+	mut rx: mpsc::Receiver<(ThreadWork, oneshot::Sender<(Interest, Ready)>)>,
 ) -> thread::JoinHandle<Result<(), WaylandError>> {
 	thread::spawn(move || {
 		let mut event_queue = display.create_event_queue();
@@ -237,6 +243,7 @@ fn spawn_thread(
 		// get kiosk api
 		let kiosk = globals.instantiate_exact::<WestonKioskShell>(1)?;
 
+		// listen for events from kiosk
 		kiosk.quick_assign(move |_kiosk, ev, _| match ev {
 			Event::StateChange { state } => {
 				let state = State::from_raw(state).unwrap_or(State::Off);
@@ -255,26 +262,29 @@ fn spawn_thread(
 				ThreadWork::ChangeBrightness(brightness) => {
 					kiosk.set_brightness(brightness as u32);
 				}
-				ThreadWork::Read => {
+				ThreadWork::Ready => {
 					// maybe we could ommit the flush??
 				}
 			}
 
+			let mut interest = DEFAULT_INTEREST;
+			let mut clear_ready = Ready::EMPTY;
+
 			match display.flush() {
 				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-					eprintln!("Display: flush would block");
+					interest |= Interest::WRITABLE;
+					clear_ready |= Ready::WRITABLE;
 				}
 				Err(e) => return Err(e.into()),
 				Ok(_) => {}
 			}
 
-			let mut would_block = WouldBlock::No;
-
 			// if there is already data in the queue we can skip reading more
 			if let Some(guard) = event_queue.prepare_read() {
 				match guard.read_events() {
 					Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-						would_block = WouldBlock::Yes;
+						// we are always interested in reading
+						clear_ready |= Ready::READABLE;
 					}
 					Err(e) => return Err(e.into()),
 					Ok(_) => {}
@@ -287,7 +297,7 @@ fn spawn_thread(
 				.expect("internal wayland error");
 
 			finished
-				.send(would_block)
+				.send((interest, clear_ready))
 				.expect("Display: tokio task failed");
 		}
 	})
