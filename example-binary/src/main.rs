@@ -1,3 +1,4 @@
+use tokio::fs;
 use tokio::time::{sleep, Duration};
 
 use clap::Parser;
@@ -31,6 +32,8 @@ enum SubCommand {
 	ListConnections(ListConnections),
 	/// Connecte to Wifi
 	ConnectWifi(ConnectWifi),
+	/// Take a Screenshot
+	Screenshot,
 }
 
 #[derive(Debug, Parser)]
@@ -152,6 +155,14 @@ async fn main() {
 				.await
 				.unwrap();
 			println!("connected to {:?}", conn);
+		}
+		Some(SubCommand::Screenshot) => {
+			println!("taking screenshot");
+			let png = client.take_screenshot().await.unwrap();
+			fs::write("./screenshot.png", png)
+				.await
+				.expect("could not write screenshot.png");
+			println!("wrote screenshot.png");
 		}
 		None => {
 			println!("opening https://youtube.com in 30s");

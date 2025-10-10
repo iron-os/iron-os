@@ -336,18 +336,6 @@ dependencies = [
 
 [[package]]
 name = "fire-stream"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6443818b62635ac120f303559f0ed43e4f907a548b43ae2b27cc5330bf3a16bb"
-dependencies = [
- "serde",
- "serde_json",
- "simple-bytes",
- "tokio",
-]
-
-[[package]]
-name = "fire-stream"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40571378d678c8c31ae370417a1275978642d5b9806448c775dc6f5bda0510b2"
@@ -362,25 +350,12 @@ dependencies = [
 
 [[package]]
 name = "fire-stream-api"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cd17359f0ba5d449876b019cd4749917b5d306d8d13ab6508fe12f4b9671271"
-dependencies = [
- "fire-stream 0.2.8",
- "serde",
- "serde_json",
- "simple-bytes",
- "tokio",
-]
-
-[[package]]
-name = "fire-stream-api"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ae4cdfed9fa545cfabefbebb31c3e3b28855a38e6eb7d8b33decd50c4000042"
 dependencies = [
  "fire-crypto",
- "fire-stream 0.4.3",
+ "fire-stream",
  "fire-stream-api-codegen",
  "serde",
  "serde_json",
@@ -473,8 +448,8 @@ checksum = "5544cd339f273256ccbc1b5e972f3f08b7cf35707a961cbe3cdcb0046fb797b0"
 dependencies = [
  "base64",
  "fire-crypto",
- "fire-stream 0.4.3",
- "fire-stream-api 0.3.4",
+ "fire-stream",
+ "fire-stream-api",
  "rand",
  "serde",
  "simple-bytes",
@@ -483,12 +458,12 @@ dependencies = [
 
 [[package]]
 name = "iron-os-service-api"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba6ba948ab0fccb8b65cc68f0dda5cd489d8dcc576b465ab5f91e74bc86f77fe"
+checksum = "b75e6e481c45208c663aa5ff70b005a82801944bcc05e375186a10a994a098ea"
 dependencies = [
- "fire-stream 0.2.8",
- "fire-stream-api 0.1.2",
+ "fire-stream",
+ "fire-stream-api",
  "iron-os-packages-api",
  "serde",
  "simple-bytes",
