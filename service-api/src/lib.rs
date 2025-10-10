@@ -36,4 +36,6 @@ pub enum Action {
 	NetworkAddConnection = 52,
 	NetworkRemoveConnection = 53,
 	NetworkAccessPoints = 54,
+	// screenshots
+	TakeScreenshot = 60,
 }

@@ -2,6 +2,7 @@ use crate::error::{Error, Result};
 use crate::requests::device::{
 	DeviceInfo, DeviceInfoReq, Disk, DisksReq, PowerState,
 	SetDisplayBrightnessReq, SetDisplayStateReq, SetPowerStateReq,
+	TakeScreenshotReq,
 };
 use crate::requests::network::{
 	AccessPoints, AccessPointsReq, AddConnectionKind, AddConnectionReq,
@@ -133,5 +134,10 @@ impl Client {
 			.request(RemoveConnectionReq { uuid })
 			.await
 			.map(|_| ())
+	}
+
+	/// Returns a PNG encoded screenshot of the main display
+	pub async fn take_screenshot(&self) -> Result<Vec<u8>> {
+		self.inner.request(TakeScreenshotReq).await.map(|s| s.0)
 	}
 }

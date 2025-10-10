@@ -1,15 +1,22 @@
 //! Read and control various device features
 //!
-//! - get [DeviceInfos](struct.DeviceInfoReq.html) read cpu, ram, disk usage.  
-//! - set [DisplayState](struct.SetDisplayStateReq.html)  
+//! - get [DeviceInfos](struct.DeviceInfoReq.html) read cpu, ram, disk usage.
+//! - set [DisplayState](struct.SetDisplayStateReq.html)
 //! - set [PowerState](struct.SetPowerStateReq.html)
 
 use crate::error::Error;
 use crate::Action;
 
+use bytes::BytesWrite;
 use serde::{Deserialize, Serialize};
 
-use stream_api::{request::Request, FromMessage, IntoMessage};
+use stream::packet::PacketBytes;
+use stream_api::{
+	error::MessageError,
+	message::{FromMessage, IntoMessage, Message},
+	request::Request,
+	FromMessage, IntoMessage,
+};
 
 use super::EmptyJson;
 
@@ -167,3 +174,39 @@ impl Request for SetDisplayBrightnessReq {
 
 // Todo maybe a DisplayStateChange stream should be added
 // for when the display get's waken up by touch
+
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
+pub struct TakeScreenshotReq;
+
+#[derive(Debug)]
+pub struct Screenshot(pub Vec<u8>); // PNG data
+
+impl Request for TakeScreenshotReq {
+	type Action = Action;
+	type Response = Screenshot;
+	type Error = Error;
+
+	const ACTION: Action = Action::TakeScreenshot;
+}
+
+impl<B> FromMessage<Action, B> for Screenshot
+where
+	B: PacketBytes,
+{
+	fn from_message(msg: Message<Action, B>) -> Result<Self, MessageError> {
+		Ok(Self(msg.body().inner().to_vec()))
+	}
+}
+
+impl<B> IntoMessage<Action, B> for Screenshot
+where
+	B: PacketBytes,
+{
+	fn into_message(self) -> Result<Message<Action, B>, MessageError> {
+		let mut msg = Message::new();
+		msg.body_mut().write(self.0);
+
+		Ok(msg)
+	}
+}
