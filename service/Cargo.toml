@@ -7,12 +7,7 @@ edition = "2021"
 lto = true
 
 [dependencies]
-tokio = { version = "1.0", features = [
-    "time",
-    "macros",
-    "rt-multi-thread",
-    "fs",
-] }
+tokio = { version = "1.0", features = ["time", "macros", "rt-multi-thread", "fs", "process"] }
 bootloader-api = { package = "service-bootloader-api", version = "0.2", features = [
     "async",
 ], path = "../service-bootloader-api" }

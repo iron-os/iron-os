@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "iron-os-service-api"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "fire-stream",
  "fire-stream-api",
@@ -586,9 +586,9 @@ checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 
 [[package]]
 name = "libc"
-version = "0.2.153"
+version = "0.2.177"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
+checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
 
 [[package]]
 name = "libdbus-sys"

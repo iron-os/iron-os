@@ -1,18 +1,21 @@
 mod device_info;
 mod network_manager;
 
+use api::requests::device::{Screenshot, TakeScreenshotReq};
 use api::requests::EmptyJson;
 use network_manager::{ApSecurityFlag, DeviceKind, NetworkManager, PropMap};
 use stream_api::api;
+use tokio::process::Command;
 
 use crate::display::{Display, State};
 use crate::packages::Packages;
 use crate::ui::ApiSender;
-use crate::util::io_other;
+use crate::util::{io_other, TempPath};
 use crate::Bootloader;
 
 use std::collections::HashMap;
 use std::io;
+use std::process::Stdio;
 
 use api::error::{Error as ApiError, Result as ApiResult};
 use api::requests::{
@@ -71,6 +74,7 @@ pub async fn start(
 	server.register_request(connections);
 	server.register_request(add_connection);
 	server.register_request(remove_connection);
+	server.register_request(take_screenshot);
 
 	Ok(tokio::spawn(async move {
 		server.run().await.expect("could not run api server")
@@ -243,6 +247,31 @@ async fn update_req(packages: &Packages) -> ApiResult<EmptyJson> {
 	Ok(EmptyJson)
 }
 
+#[api(TakeScreenshotReq)]
+async fn take_screenshot() -> ApiResult<Screenshot> {
+	let path = TempPath::new();
+
+	let status = Command::new("weston-screenshooter")
+		.arg(path.as_ref())
+		.stdin(Stdio::null())
+		.stdout(Stdio::null())
+		.status()
+		.await
+		.map_err(|e| ApiError::Internal(e.to_string()))?;
+
+	if !status.success() {
+		return Err(ApiError::Internal(format!(
+			"weston-screenshooter failed with status {status}"
+		)));
+	}
+
+	let bytes = fs::read(path).await.map_err(|e| {
+		ApiError::Internal(format!("failed to read screenshot file {e}"))
+	})?;
+
+	Ok(Screenshot(bytes))
+}
+
 /*
 Get JournalLogs
 
@@ -290,10 +319,11 @@ fn access_points_sync() -> ApiResult<AccessPoints> {
 	let list = access_points
 		.into_iter()
 		.filter_map(|ap| {
-			let has_mgmt_psk =
-				ap.wpa_flags()
-					.map(|f| f.matches(ApSecurityFlag::KeyMgmtPsk))
-					.unwrap_or(false) || ap
+			let has_mgmt_psk = ap
+				.wpa_flags()
+				.map(|f| f.matches(ApSecurityFlag::KeyMgmtPsk))
+				.unwrap_or(false)
+				|| ap
 					.rsn_flags()
 					.map(|f| f.matches(ApSecurityFlag::KeyMgmtPsk))
 					.unwrap_or(false);
