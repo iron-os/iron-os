@@ -47,7 +47,8 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	// create boot dir
 	fs::create_dir(target_dir + "/boot");
 
-	if fs::is_dir(target_dir + "/etc/ssh") == true {
+	let sshd_config = target_dir + "/etc/ssh/sshd_config";
+	if fs::is_file(sshd_config) == true {
 		// make open ssh work without rw
 		let sshd_keygen = regex("ExecStartPre=.*");
 		sshd_keygen.replace_file(
@@ -55,7 +56,6 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 			"ExecStartPre=/usr/bin/ssh-keygen -A -f /data"
 		);
 
-		let sshd_config = target_dir + "/etc/ssh/sshd_config";
 		if fs::contains(sshd_config, "/data/etc") == false {
 			fs::append(sshd_config, [
 				"HostKey /data/etc/ssh/ssh_host_rsa_key",
