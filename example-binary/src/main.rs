@@ -34,6 +34,8 @@ enum SubCommand {
 	ConnectWifi(ConnectWifi),
 	/// Take a Screenshot
 	Screenshot,
+	/// Simulate a mouse click at normalized coordinates (0.0-1.0)
+	MouseClick(MouseClick),
 }
 
 #[derive(Debug, Parser)]
@@ -70,6 +72,14 @@ struct ConnectWifi {
 	pub interface_name: String,
 	pub ssid: String,
 	pub password: String,
+}
+
+#[derive(Debug, Parser)]
+struct MouseClick {
+	/// X coordinate (0.0-1.0, normalized)
+	pub x: f32,
+	/// Y coordinate (0.0-1.0, normalized)
+	pub y: f32,
 }
 
 #[tokio::main]
@@ -163,6 +173,14 @@ async fn main() {
 				.await
 				.expect("could not write screenshot.png");
 			println!("wrote screenshot.png");
+		}
+		Some(SubCommand::MouseClick(click)) => {
+			println!("simulating mouse click at ({}, {})", click.x, click.y);
+			client
+				.mouse_click(click.x, click.y)
+				.await
+				.expect("failed to send mouse click");
+			println!("mouse click sent");
 		}
 		None => {
 			println!("opening https://youtube.com in 30s");

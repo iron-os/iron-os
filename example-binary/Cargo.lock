@@ -458,9 +458,9 @@ dependencies = [
 
 [[package]]
 name = "iron-os-service-api"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b75e6e481c45208c663aa5ff70b005a82801944bcc05e375186a10a994a098ea"
+checksum = "a948eff1918740aa21507e258941dff5a00a74a05f25894c3f9a57d2517e08b1"
 dependencies = [
  "fire-stream",
  "fire-stream-api",
