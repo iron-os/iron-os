@@ -58,6 +58,7 @@ impl From<GlobalError> for WaylandError {
 enum Message {
 	ChangeState(State),
 	ChangeBrightness(u8),
+	MouseClick { x: f32, y: f32 },
 }
 
 #[derive(Clone)]
@@ -79,6 +80,11 @@ impl Display {
 			.send(Message::ChangeBrightness(brightness))
 			.await
 			.ok()
+	}
+
+	pub async fn mouse_click(&self, x: f32, y: f32) -> Option<()> {
+		eprintln!("Display: mouse_click x:{} y:{}", x, y);
+		self.tx.send(Message::MouseClick { x, y }).await.ok()
 	}
 
 	#[allow(dead_code)]
@@ -182,6 +188,9 @@ async fn handle_display(
 			SelectState::Message(Message::ChangeBrightness(b)) => {
 				ThreadWork::ChangeBrightness(*b)
 			}
+			SelectState::Message(Message::MouseClick { x, y }) => {
+				ThreadWork::MouseClick { x: *x, y: *y }
+			}
 		};
 
 		let thread_send_result =
@@ -221,6 +230,7 @@ enum ThreadWork {
 	Ready,
 	ChangeState(State),
 	ChangeBrightness(u8),
+	MouseClick { x: f32, y: f32 },
 }
 
 /// Since the wayland client (EventQueue) is not send we can't use it directly
@@ -261,6 +271,9 @@ fn spawn_thread(
 				}
 				ThreadWork::ChangeBrightness(brightness) => {
 					kiosk.set_brightness(brightness as u32);
+				}
+				ThreadWork::MouseClick { x, y } => {
+					kiosk.mouse_click(x as f64, y as f64);
 				}
 				ThreadWork::Ready => {
 					// maybe we could ommit the flush??

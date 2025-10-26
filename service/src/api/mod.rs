@@ -1,7 +1,7 @@
 mod device_info;
 mod network_manager;
 
-use api::requests::device::{Screenshot, TakeScreenshotReq};
+use api::requests::device::{MouseClickReq, Screenshot, TakeScreenshotReq};
 use api::requests::EmptyJson;
 use network_manager::{ApSecurityFlag, DeviceKind, NetworkManager, PropMap};
 use stream_api::api;
@@ -75,6 +75,7 @@ pub async fn start(
 	server.register_request(add_connection);
 	server.register_request(remove_connection);
 	server.register_request(take_screenshot);
+	server.register_request(mouse_click);
 
 	Ok(tokio::spawn(async move {
 		server.run().await.expect("could not run api server")
@@ -270,6 +271,18 @@ async fn take_screenshot() -> ApiResult<Screenshot> {
 	})?;
 
 	Ok(Screenshot(bytes))
+}
+
+#[api(MouseClickReq)]
+async fn mouse_click(
+	req: MouseClickReq,
+	display: &Display,
+) -> ApiResult<EmptyJson> {
+	display
+		.mouse_click(req.x, req.y)
+		.await
+		.ok_or_else(|| ApiError::internal_display("could not send mouse click"))
+		.map(|_| EmptyJson)
 }
 
 /*
