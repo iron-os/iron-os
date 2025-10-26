@@ -38,4 +38,5 @@ pub enum Action {
 	NetworkAccessPoints = 54,
 	// screenshots
 	TakeScreenshot = 60,
+	MouseClick = 61,
 }

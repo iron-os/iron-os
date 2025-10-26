@@ -210,3 +210,20 @@ where
 		Ok(msg)
 	}
 }
+
+#[derive(Debug, Serialize, Deserialize, IntoMessage, FromMessage)]
+#[message(json)]
+pub struct MouseClickReq {
+	// 0-1
+	pub x: f32,
+	// 0-1
+	pub y: f32,
+}
+
+impl Request for MouseClickReq {
+	type Action = Action;
+	type Response = EmptyJson;
+	type Error = Error;
+
+	const ACTION: Action = Action::MouseClick;
+}

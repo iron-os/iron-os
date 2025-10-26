@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::requests::device::{
-	DeviceInfo, DeviceInfoReq, Disk, DisksReq, PowerState,
+	DeviceInfo, DeviceInfoReq, Disk, DisksReq, MouseClickReq, PowerState,
 	SetDisplayBrightnessReq, SetDisplayStateReq, SetPowerStateReq,
 	TakeScreenshotReq,
 };
@@ -139,5 +139,9 @@ impl Client {
 	/// Returns a PNG encoded screenshot of the main display
 	pub async fn take_screenshot(&self) -> Result<Vec<u8>> {
 		self.inner.request(TakeScreenshotReq).await.map(|s| s.0)
+	}
+
+	pub async fn mouse_click(&self, x: f32, y: f32) -> Result<()> {
+		self.inner.request(MouseClickReq { x, y }).await.map(|_| ())
 	}
 }
