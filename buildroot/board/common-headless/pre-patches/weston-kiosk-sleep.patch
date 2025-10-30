@@ -7,7 +7,7 @@ index 35fe608e20..a213764619 100644
 -sha256  a8150505b126a59df781fe8c30c8e6f87da7013e179039eb844a5bbbcc7c79b3  weston-14.0.1.tar.xz
 -sha512  2d782f98f28b39b990acecfc885f62ab34c9cdd22ef06b09c5d8df792112c47b365f89c2bf05d871e36ddfb4c49aa7e6d05ff60fe67a2657727162e4f564a412  weston-14.0.1.tar.xz
 -sha256  fdb65868f65d0fbdb05c2d3b779e10ce9969fa0c4b9262ba4f260e87086ab860  COPYING
-+sha256  8ddb39040367069536e2b072500a1ac048fcccefadceb0048c4a6b98f174207e  kiosk-sleep-v14.0.3.tar.gz
++sha256  7d0403fcbff5dded289ff21fb86b8dbbd3074c999d47ee27dc6f5c32df790ac2  kiosk-sleep-v14.0.3.tar.gz
 diff --git a/package/weston/weston.mk b/package/weston/weston.mk
 index 7d43132073..ab9896fa0e 100644
 --- a/package/weston/weston.mk
