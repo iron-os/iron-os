@@ -1,5 +1,5 @@
 name = "service"
-version = "v1.2.6+alpha.2"
+version = "v1.2.6"
 binary = "service"
 
 [requirements]
