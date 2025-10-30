@@ -1,3 +1,7 @@
+## 1.2.6
+- Add Screenshot API
+- Add MouseClick API
+
 ## 1.2.5
 - Trigger StillAlive websocket request when the connection get's opened
 - Include service-bootloader inside the service package this allows us to fix #10
