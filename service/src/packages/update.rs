@@ -389,5 +389,8 @@ async fn fix_10_update_image(
 	// now parse the version info
 	let output = String::from_utf8(output.stdout).map_err(io_other)?;
 
-	stdio_api::deserialize(&output).map_err(io_other)
+	stdio_api::deserialize(&output).map_err(|e| {
+		eprintln!("failed to deserialize command {output:?} {e:?}");
+		io_other(e)
+	})
 }

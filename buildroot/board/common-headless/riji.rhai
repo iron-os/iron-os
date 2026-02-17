@@ -36,9 +36,6 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	fs::copy("./rootfs/weston", target_dir + "/etc/");
 	fs::copy("./rootfs/NetworkManager.conf", target_dir + "/etc/NetworkManager/");
 
-	// disable dnssec by default (having some problem on our local wifi)
-	let dnssec = regex("#DNSSEC=\\S*");
-	dnssec.replace_file(target_dir + "/etc/systemd/resolved.conf", "DNSSEC=no");
 
 	// create empty data folder (needed for fresh build since else
 	// device_table.mk failes)
@@ -46,6 +43,19 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 
 	// create boot dir
 	fs::create_dir(target_dir + "/boot");
+
+	// disable dnssec by default (having some problem on our local wifi)
+	let dnssec = regex("#DNSSEC=\\S*");
+	dnssec.replace_file(target_dir + "/etc/systemd/resolved.conf", "DNSSEC=no");
+
+	let dns_config = target_dir + "/usr/lib/systemd/system/systemd-resolved.service";
+	if fs::contains(dns_config, "Requires=var.mount") == false {
+		let after_regex = regex("After=.*");
+		after_regex.replace_file(dns_config,
+			"After=systemd-sysctl.service systemd-sysusers.service var.mount\n" +
+			"Requires=var.mount"
+		);
+	}
 
 	let sshd_config = target_dir + "/etc/ssh/sshd_config";
 	if fs::is_file(sshd_config) == true {

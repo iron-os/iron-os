@@ -308,12 +308,11 @@ async fn authenticate_writer2(
 
 	// need to increase the body limit (since we are a writer)
 	if let Some(conf) = session.get::<Configurator<ServerConfig>>() {
-		// this should always be available instead while testing
-		tracing::warn!("no conf");
+		// this should always be available, except in tests
 
 		let mut cfg = conf.read();
-		// the limit should be 200mb
-		cfg.body_limit = 200_000_000;
+		// the limit should be 300mb
+		cfg.body_limit = 300_000_000;
 		conf.update(cfg);
 	}
 

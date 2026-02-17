@@ -27,13 +27,12 @@ use rand::RngCore;
 // bzImage max size is 20m which allows to have a bzImage tmp
 const BOOT_SIZE: u64 = 52_396_032;
 
-// should create around 500mb
-// that should be enough since our rootfs at the moment
-// is 180mb
+// well this is an issues, because previously it was 500mb.
+// It might be a real pain to increase this.
 //
 // in bytes
 // is divisable by 512 and 4096
-const ROOTFS_SIZE: u64 = 524_288_000;
+const ROOTFS_SIZE: u64 = 1_048_576_000;
 
 #[cfg(target_arch = "x86_64")]
 const IMAGE_NAME: &str = "bzImage";
@@ -185,7 +184,7 @@ impl Disk {
 		};
 
 		if let Err(e) = me.open_gpt() {
-			println!("could not open gpt on {:?} with {:?}", name, e);
+			eprintln!("could not open gpt on {:?} with {:?}", name, e);
 		}
 
 		// if necessary should load block_size (so we can show binary size)
@@ -539,7 +538,7 @@ fn copy_len_to_new(
 
 		// this is just an info
 		if rem != read_b {
-			println!(
+			eprintln!(
 				"could not fill entire buffer expected {} filled {}",
 				rem, read_b
 			);
