@@ -302,7 +302,7 @@ fn create_image_fakeroot(host_dir, binaries_dir, buildroot_dir) {
 		"-m", "5",
 		"-L", "data",
 		binaries_dir + "/data.ext2",
-		"400M"
+		"450M"
 	]);
 	mkfs.dir(binaries_dir);
 	mkfs.execute();
@@ -397,11 +397,10 @@ fn apply_patch(channel, buildroot) {
 
 	/*
 		source "package/setserial/Config.in"
-	source "package/service-bootloader/Config.in"
+		source "package/service-bootloader/Config.in"
 	*/
 	let package_config = buildroot + "/package/Config.in";
 	if fs::contains(package_config, "service-bootloader") == false {
-		// make open ssh work without rw
 		let pack_regex = regex("source \"package/setserial/Config.in\"");
 		pack_regex.replace_file(
 			package_config,
@@ -418,7 +417,4 @@ fn apply_patch(channel, buildroot) {
 	print("patch weston");
 	let weston_diff = diff_from_file("./pre-patches/weston-kiosk-sleep.patch");
 	buildroot_repo.apply_diff(weston_diff);
-	print("patch rust");
-	let rust_diff = diff_from_file("./pre-patches/rust-1.86.patch");
-	buildroot_repo.apply_diff(rust_diff);
 }
