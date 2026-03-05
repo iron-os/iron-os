@@ -1,15 +1,15 @@
 use crate::version_info::{version_info, version_info_db};
 
 use bootloader_api::requests::UpdateReq;
-use stdio_api::{serialize, deserialize};
+use stdio_api::{deserialize, serialize};
 
 pub fn update_image_fix_10(arg: &str) {
 	let req: UpdateReq = deserialize(arg).unwrap();
 
 	let euid = unsafe { libc::geteuid() };
-    if euid != 0 {
-        panic!("not executed as root");
-    }
+	if euid != 0 {
+		panic!("not executed as root");
+	}
 
 	unsafe {
 		// Set the real and effective user ID to 0 (root)

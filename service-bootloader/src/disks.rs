@@ -185,7 +185,7 @@ impl Disk {
 		};
 
 		if let Err(e) = me.open_gpt() {
-			println!("could not open gpt on {:?} with {:?}", name, e);
+			eprintln!("could not open gpt on {:?} with {:?}", name, e);
 		}
 
 		// if necessary should load block_size (so we can show binary size)
@@ -539,7 +539,7 @@ fn copy_len_to_new(
 
 		// this is just an info
 		if rem != read_b {
-			println!(
+			eprintln!(
 				"could not fill entire buffer expected {} filled {}",
 				rem, read_b
 			);
