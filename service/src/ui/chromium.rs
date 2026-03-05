@@ -63,7 +63,7 @@ pub async fn start(url: &str, client: &Bootloader) -> io::Result<()> {
 
 	if context::is_image_debug() {
 		write_arg!(args, "--remote-debugging-port=9222");
-	};
+	}
 
 	let product = client
 		.version_info()
