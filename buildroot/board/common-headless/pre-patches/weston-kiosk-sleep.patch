@@ -1,5 +1,73 @@
+diff --git a/package/wayland-protocols/wayland-protocols.hash b/package/wayland-protocols/wayland-protocols.hash
+index f35c054dff..efa79a364d 100644
+--- a/package/wayland-protocols/wayland-protocols.hash
++++ b/package/wayland-protocols/wayland-protocols.hash
+@@ -1,4 +1,4 @@
+-# From https://lore.freedesktop.org/wayland-devel/aEw0AP7h6T8l11ug@gmail.com/T/#u
+-sha256  4d2b2a9e3e099d017dc8107bf1c334d27bb87d9e4aff19a0c8d856d17cd41ef0  wayland-protocols-1.45.tar.xz
+-sha512  d0557a75eb486fb824f182648bec346e270cb1ada8727613377ab95b0ccb595c516de242f486110c88b7009e98c87b071bf5b598f84466e5624aa1d81f19e195  wayland-protocols-1.45.tar.xz
++# From https://lore.freedesktop.org/wayland-devel/AzTKh6JewwfUBFKaOS86DT4obISpv5b5bjFghXGwYrMPyk6Wxpz6H4_trRcEOyF9VpVV-0p1-UTNv7_esjO6ppw5SyIyGxWB8R5xI_SJYfA=@emersion.fr/
++sha256  fd0de056a895fa48bd1aa5f0b8dfeed454101b88bc7e1c61a953422eb71db167  wayland-protocols-1.46.tar.xz
++sha512  867b55357b9ca49d14504e3066c2d4e39762b4706bae4ca30330d8e8fad954531d2e055595d1ceb544e37cca6cce68152f12cf093ee9805987975619a3b24958  wayland-protocols-1.46.tar.xz
+ sha256  f1a2b233e8a9a71c40f4aa885be08a0842ac85bb8588703c1dd7e6e6502e3124  COPYING
+diff --git a/package/wayland-protocols/wayland-protocols.mk b/package/wayland-protocols/wayland-protocols.mk
+index 0cb23f8438..9a91220d1c 100644
+--- a/package/wayland-protocols/wayland-protocols.mk
++++ b/package/wayland-protocols/wayland-protocols.mk
+@@ -4,7 +4,7 @@
+ #
+ ################################################################################
+ 
+-WAYLAND_PROTOCOLS_VERSION = 1.45
++WAYLAND_PROTOCOLS_VERSION = 1.46
+ WAYLAND_PROTOCOLS_SITE = https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/$(WAYLAND_PROTOCOLS_VERSION)/downloads
+ WAYLAND_PROTOCOLS_SOURCE = wayland-protocols-$(WAYLAND_PROTOCOLS_VERSION).tar.xz
+ WAYLAND_PROTOCOLS_LICENSE = MIT
+diff --git a/package/weston/0001-build-Allow-libdisplay-info-0.3.0.patch b/package/weston/0001-build-Allow-libdisplay-info-0.3.0.patch
+deleted file mode 100644
+index d97d1a9bf4..0000000000
+--- a/package/weston/0001-build-Allow-libdisplay-info-0.3.0.patch
++++ /dev/null
+@@ -1,37 +0,0 @@
+-From 83b49400c1dfb72e3019267fd03f165d0bffec76 Mon Sep 17 00:00:00 2001
+-From: Fiona Klute <fiona.klute@gmx.de>
+-Date: Mon, 6 Oct 2025 15:20:26 +0200
+-Subject: [PATCH] build: Allow libdisplay-info 0.3.0
+-
+-This is a backport of the change in upstream commit
+-683eabb61ec43a270f2e3ed67c63bbe3754b1214 "build: Allow libdisplay-info 0.3.0"
+-[1], applying the loosened version limit to the DRM backend only. The dependency
+-definition was moved to the top level meson.build in [2], and the lower bound
+-increased in [3].
+-
+-[1] https://gitlab.freedesktop.org/wayland/weston/-/commit/683eabb61ec43a270f2e3ed67c63bbe3754b1214
+-[2] https://gitlab.freedesktop.org/wayland/weston/-/commit/76e659f45edd23a8b1b253a93316ec73c709bc71
+-[3] https://gitlab.freedesktop.org/wayland/weston/-/commit/82c5b386d860a479ed5a157f4dde58ffe202b948
+-
+-Upstream: https://gitlab.freedesktop.org/wayland/weston/-/commit/683eabb61ec43a270f2e3ed67c63bbe3754b1214 (backported)
+-Signed-off-by: Fiona Klute (WIWA) <fiona.klute@gmx.de>
+----
+- libweston/backend-drm/meson.build | 2 +-
+- 1 file changed, 1 insertion(+), 1 deletion(-)
+-
+-diff --git a/libweston/backend-drm/meson.build b/libweston/backend-drm/meson.build
+-index 002669e6..a8f2ea59 100644
+---- a/libweston/backend-drm/meson.build
+-+++ b/libweston/backend-drm/meson.build
+-@@ -4,7 +4,7 @@ endif
+- 
+- dep_libdisplay_info = dependency(
+- 	'libdisplay-info',
+--	version: ['>= 0.1.1', '< 0.3.0'],
+-+	version: ['>= 0.1.1', '< 0.4.0'],
+- 	fallback: ['display-info', 'di_dep'],
+- 	default_options: [
+- 		'werror=false',
+--- 
+-2.51.0
+-
 diff --git a/package/weston/weston.hash b/package/weston/weston.hash
-index 35fe608e20..a213764619 100644
+index cd2a82508d..955c152a53 100644
 --- a/package/weston/weston.hash
 +++ b/package/weston/weston.hash
 @@ -1,4 +1,2 @@
@@ -7,9 +75,9 @@ index 35fe608e20..a213764619 100644
 -sha256  b47216b3530da76d02a3a1acbf1846a9cd41d24caa86448f9c46f78f20b6e0ac  weston-14.0.2.tar.xz
 -sha512  e8214ec893e6c3ae94eb3c92feba104b0201843e9143f726a3e9a4d396d02523c94da706c1348cf934bc339fb1a4bc1fecdb865f0ea914115fd346d9eda091f5  weston-14.0.2.tar.xz
 -sha256  fdb65868f65d0fbdb05c2d3b779e10ce9969fa0c4b9262ba4f260e87086ab860  COPYING
-+sha256  7d0403fcbff5dded289ff21fb86b8dbbd3074c999d47ee27dc6f5c32df790ac2  kiosk-sleep-v14.0.3.tar.gz
++sha256  c1712421dcb1e88ab6ff9d6e13df3aac2197d8b7af889e0ad885c37bd1c9689b  kiosk-sleep-v15.0.0.tar.gz
 diff --git a/package/weston/weston.mk b/package/weston/weston.mk
-index 7d43132073..ab9896fa0e 100644
+index 57869b7e63..cb8ffb68ed 100644
 --- a/package/weston/weston.mk
 +++ b/package/weston/weston.mk
 @@ -4,9 +4,9 @@
@@ -19,9 +87,62 @@ index 7d43132073..ab9896fa0e 100644
 -WESTON_VERSION = 14.0.2
 -WESTON_SITE = https://gitlab.freedesktop.org/wayland/weston/-/releases/$(WESTON_VERSION)/downloads
 -WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
-+WESTON_VERSION = 14.0.3
++WESTON_VERSION = 15.0.0
 +WESTON_SITE = https://github.com/iron-os/weston/archive/refs/heads
 +WESTON_SOURCE = kiosk-sleep-v$(WESTON_VERSION).tar.gz
  WESTON_LICENSE = MIT
  WESTON_LICENSE_FILES = COPYING
  WESTON_CPE_ID_VENDOR = wayland
+@@ -70,6 +70,12 @@ WESTON_CONF_OPTS += \
+ 	-Dbackend-pipewire=false
+ endif
+ 
++ifeq ($(BR2_PACKAGE_HAS_VULKAN_HEADERS),y)
++WESTON_CONF_OPTS += -Drenderer-vulkan=true
++else
++WESTON_CONF_OPTS += -Drenderer-vulkan=false
++endif
++
+ WESTON_CONF_OPTS += -Dsimple-clients=$(subst $(space),$(comma),$(strip $(WESTON_SIMPLE_CLIENTS)))
+ 
+ ifeq ($(BR2_PACKAGE_WESTON_RDP),y)
+@@ -114,13 +120,6 @@ else
+ WESTON_CONF_OPTS += -Dxwayland=false
+ endif
+ 
+-ifeq ($(BR2_PACKAGE_LIBVA),y)
+-WESTON_CONF_OPTS += -Dbackend-drm-screencast-vaapi=true
+-WESTON_DEPENDENCIES += libva
+-else
+-WESTON_CONF_OPTS += -Dbackend-drm-screencast-vaapi=false
+-endif
+-
+ ifeq ($(BR2_PACKAGE_LCMS2),y)
+ WESTON_CONF_OPTS += -Dcolor-management-lcms=true
+ WESTON_DEPENDENCIES += lcms2
+@@ -148,12 +147,6 @@ else
+ WESTON_CONF_OPTS += -Dshell-desktop=false
+ endif
+ 
+-ifeq ($(BR2_PACKAGE_WESTON_SHELL_FULLSCREEN),y)
+-WESTON_CONF_OPTS += -Dshell-fullscreen=true
+-else
+-WESTON_CONF_OPTS += -Dshell-fullscreen=false
+-endif
+-
+ ifeq ($(BR2_PACKAGE_WESTON_SHELL_IVI),y)
+ WESTON_CONF_OPTS += -Dshell-ivi=true
+ else
+@@ -166,11 +159,7 @@ else
+ WESTON_CONF_OPTS += -Dshell-kiosk=false
+ endif
+ 
+-ifeq ($(BR2_PACKAGE_WESTON_SCREENSHARE),y)
+-WESTON_CONF_OPTS += -Dscreenshare=true
+-else
+-WESTON_CONF_OPTS += -Dscreenshare=false
+-endif
++WESTON_CONF_OPTS += -Dshell-lua=false
+ 
+ ifeq ($(BR2_PACKAGE_WESTON_DEMO_CLIENTS),y)
+ WESTON_CONF_OPTS += -Ddemo-clients=true
