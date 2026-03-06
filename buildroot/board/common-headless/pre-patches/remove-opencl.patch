@@ -1,0 +1,24 @@
+diff --git a/package/mesa3d/Config.in b/package/mesa3d/Config.in
+index e1faea95d5..0dedd9d74c 100644
+--- a/package/mesa3d/Config.in
++++ b/package/mesa3d/Config.in
+@@ -23,7 +23,6 @@ config BR2_PACKAGE_MESA3D_NEEDS_ELFUTILS
+ 
+ config BR2_PACKAGE_MESA3D_NEEDS_PRECOMP_COMPILER
+ 	bool
+-	select BR2_PACKAGE_MESA3D_OPENCL
+ 	select BR2_PACKAGE_SPIRV_LLVM_TRANSLATOR
+ 	select BR2_PACKAGE_SPIRV_TOOLS
+ 
+diff --git a/package/mesa3d/mesa3d.mk b/package/mesa3d/mesa3d.mk
+index 325756d92e..9907a2714c 100644
+--- a/package/mesa3d/mesa3d.mk
++++ b/package/mesa3d/mesa3d.mk
+@@ -301,6 +301,7 @@ HOST_MESA3D_CONF_OPTS = \
+ 	-Dtools=$(subst $(space),$(comma),$(HOST_MESA3D_TOOLS)) \
+ 	-Dinstall-mesa-clc=true \
+ 	-Dllvm=enabled \
++	-Dcpp_rtti=false \
+ 	-Dmesa-clc=enabled \
+ 	-Dplatforms= \
+ 	-Dprecomp-compiler=enabled \
