@@ -401,23 +401,6 @@ fn create_config(channel, defconfig, linuxconfig) {
 }
 
 fn apply_patch(channel, buildroot) {
-	fs::delete(buildroot + "/package/service-bootloader");
-	fs::copy("./package/service-bootloader", buildroot + "/package/");
-
-	/*
-		source "package/setserial/Config.in"
-		source "package/service-bootloader/Config.in"
-	*/
-	let package_config = buildroot + "/package/Config.in";
-	if fs::contains(package_config, "service-bootloader") == false {
-		let pack_regex = regex("source \"package/setserial/Config.in\"");
-		pack_regex.replace_file(
-			package_config,
-			"source \"package/setserial/Config.in\"\n" +
-			"source \"package/service-bootloader/Config.in\""
-		);
-	}
-
 	// patch gcc.mk file
 	let buildroot_repo = git(buildroot);
 	print("patch gcc");

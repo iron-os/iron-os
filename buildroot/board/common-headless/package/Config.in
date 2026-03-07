@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_IRON_OS_PATH/service-bootloader/Config.in"

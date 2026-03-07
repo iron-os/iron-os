@@ -78,7 +78,11 @@ fn patch_internal(buildroot, board, channel) {
 
 	// create .config file
 	let make_config = cmd([
-		"make", "O=" + full_br_out_dir, "defconfig", "BR2_DEFCONFIG=" + full_br_out_dir + "/defconfig"
+		"make",
+		"O=" + full_br_out_dir,
+		"BR2_EXTERNAL=../board/common-headless/package",
+		"defconfig",
+		"BR2_DEFCONFIG=" + full_br_out_dir + "/defconfig"
 	]);
 	make_config.dir(buildroot);
 	print("build config");
