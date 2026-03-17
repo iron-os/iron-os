@@ -20,7 +20,7 @@ pub async fn start(
 	client: Bootloader,
 	mut receiver: ApiReceiver,
 ) -> io::Result<JoinHandle<()>> {
-	if context::is_headless() {
+	if true {
 		// if we are in headless mode don't start the ui
 		// just spawn a mockup task
 		return Ok(tokio::spawn(async move {
