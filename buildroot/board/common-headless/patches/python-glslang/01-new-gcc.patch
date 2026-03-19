@@ -1,0 +1,7 @@
+diff --git a/SPIRV/SpvBuilder.h b/SPIRV/SpvBuilder.h
+--- a/SPIRV/SpvBuilder.h
++++ b/SPIRV/SpvBuilder.h
+@@ -58,2 +58,3 @@
+ #include <algorithm>
++#include <cstdint>
+ #include <map>
