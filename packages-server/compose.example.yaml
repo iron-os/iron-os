@@ -1,11 +1,13 @@
-version: "3.8"
 services:
   packages-server:
-    image: packages-server
+    image: myregistry/iron-os/packages-server
     restart: unless-stopped
     ports:
-      - "5426:5426"
+      - '5426:5426'
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
     volumes:
-      - "/data/packages-server/data:/data"
+      - './data:/data'
+    logging:
+      options:
+        max-size: '20m'
