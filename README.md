@@ -1,12 +1,13 @@
+# Iron OS
+Iron OS is an operation system based on linux/buildroot with chromium as
+its gui.
 
+[Documentation](https://iron-os.com)
 
-## Name
+## Outdated Readme
 
-- iron OS
-
-## Description
-Iron OS is an operation system based on linux/buildroot
-with chromium as it's gui.
+Readme.md files inside this project might be outdated, refer to the
+documentation the get the latest info.
 
 ## Rust
 MSRV: 1.74
