@@ -45,6 +45,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.74
+      - name: Create build-config.toml
+        run: |
+          cat > service/build-config.toml <<'EOF'
+          [debug]
+          whitelist = ["127.0.0.1", "localhost"]
+          EOF
       - name: Check
         run: cd service && cargo check
       - name: Run tests
