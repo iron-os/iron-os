@@ -10,6 +10,9 @@ hero:
     - theme: brand
       text: Getting Started
       link: /docs/getting-started/introduction
+    - theme: alt
+      text: Github
+      link: https://github.com/iron-os/iron-os
 
 # features:
 #   - title: Feature A
