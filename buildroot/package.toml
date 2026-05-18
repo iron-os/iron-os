@@ -1,5 +1,5 @@
 # release-year.release-month.patch+alpha.1
-version = "2026.5.1"
+version = "2026.5.2"
 tar-file = "./image-copy.tar.gz"
 
 [requirements]
