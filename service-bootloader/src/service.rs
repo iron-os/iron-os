@@ -1,5 +1,6 @@
 use crate::command::Command;
 use crate::disks::{api_disks, install_on};
+use crate::egalax_reset::reset_egalax;
 use crate::io_other;
 use crate::util::chown;
 use crate::version_info::{version_info, version_info_db};
@@ -8,6 +9,8 @@ use std::fs::File;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::thread::sleep;
+use std::time::Duration;
 
 use bootloader_api::error::Error;
 use bootloader_api::requests::{
@@ -104,6 +107,20 @@ request_handler! {
 
 request_handler! {
 	fn restart(_req: RestartReq) -> Result<(), Error> {
+		match version_info() {
+			Ok(v) if v.product == "explorer" => {
+				eprintln!("reset egalax-device early");
+				let r = reset_egalax();
+				if let Err(e) = r {
+					eprintln!("could not reset egalax-device: {e}");
+				}
+
+				sleep(Duration::from_secs(3));
+			}
+			Ok(_) => {}
+			Err(e) => eprintln!("could not get version info: {e}")
+		}
+
 		Command::new("shutdown")
 			.args(&["-r", "now"])
 			.exec()
