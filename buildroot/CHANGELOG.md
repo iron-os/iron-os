@@ -1,3 +1,6 @@
+## 2026.6.1
+- add Noto Emoji font
+
 ## 2025.9.1
 - fix startup.nsh file being wrong
 - add rtl8188eu support
