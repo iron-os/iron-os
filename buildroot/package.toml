@@ -3,4 +3,4 @@ version = "2026.10.1"
 tar-file = "./image-copy.tar.gz"
 
 [requirements]
-service = ">=1.2.5"
+service = ">=1.2.7"
