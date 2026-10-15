@@ -430,6 +430,9 @@ fn write_gpt_to_new_disk(
 	root_b.name = "root b".into();
 
 	// data partition
+	if root_b.last_lba >= header.last_usable {
+		return Err(io_other("disk is to small").into());
+	}
 	let data_lba = (header.last_usable - root_b.last_lba) / 2;
 	let mut data = install_disk
 		.clone_part("data")
