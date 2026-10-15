@@ -43,7 +43,7 @@ For than you can run **outside the container**:
 ```bash
 sudo nano /data/packages-server/data/config.toml
 # first edit these entries to those values
-fies-dir = "/data/files"
+files-dir = "/data/files"
 auths-file = "/data/auths.fdb"
 packages-file = "/data/packages.fdb"
 ```

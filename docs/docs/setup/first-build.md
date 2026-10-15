@@ -43,7 +43,8 @@ If you built `intel` or `pi4` you will need to publish `chromium` as well.
 If you just want to get the current chromium (which is really old) you can
 download the following [file](https://drive.google.com/file/d/1FI40A_R5ceuzOxsAgpwp1ly2XDTHdT-u/view?usp=sharing)
 
-Extract the files into `chromium/amd64/release/chromium`.
+Extract the archive into `chromium/output/amd64/release/`, so the files end
+up in `chromium/output/amd64/release/chromium`.
 
 ### Manual
 
