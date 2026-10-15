@@ -136,6 +136,20 @@ async fn create_tar_gz(cfg: &ImageToml) -> Result<()> {
 		));
 	}
 
+	let rootfs_size = fs::metadata(format!("{tmp_path}/rootfs.ext2"))
+		.await
+		.map_err(|e| err!(format!("{e:?}"), "could not read rootfs metadata"))?
+		.len();
+
+	// devices installed before 2026.10 have root partitions of 1000MiB after
+	// the migration (see service-bootloader/src/layout.rs), new installs 1.5GiB
+	if rootfs_size > 1000 * 1024 * 1024 {
+		return Err(err!(
+			format!("{:.0}mib", rootfs_size / (1024 * 1024)),
+			"rootfs size to big"
+		));
+	}
+
 	// todo: maybe use the version as a name?
 	compress("image.tar.gz", "./image_tmp", &cfg.name)?;
 	remove_dir("./image_tmp").await?;
