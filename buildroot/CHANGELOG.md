@@ -1,3 +1,9 @@
+## 2026.10.1
+- update to buildroot 2025.02.18
+- new installs: boot partition 128M, root partitions 1.5GiB (#22)
+- requires service 1.2.7, which migrates older devices to 1000MiB root
+  partitions (#22)
+
 ## 2025.9.1
 - fix startup.nsh file being wrong
 - add rtl8188eu support
