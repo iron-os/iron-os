@@ -1,5 +1,6 @@
 use crate::command::Command;
 use crate::io_other;
+use crate::layout::{self, Plan, ALIGNMENT};
 use crate::util::{boot_image, cp, list_files, mount, root_uuid, umount};
 use crate::version_info::update_version_info;
 
@@ -8,11 +9,13 @@ use std::convert::TryFrom;
 use std::fmt::Write as FmtWrite;
 use std::fs::{self, create_dir_all, read_to_string, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
 use gpt::disk::LogicalBlockSize;
+use gpt::header::{Header, HeaderBuilder};
 use gpt::mbr::{MBRError, ProtectiveMBR};
 use gpt::partition::Partition as GptPartition;
 use gpt::{GptConfig, GptDisk, GptError};
@@ -23,17 +26,25 @@ use uuid::Uuid;
 use bootloader_api::requests::{Architecture, Disk as ApiDisk, VersionInfo};
 use rand::RngCore;
 
-// the size is set in genimage-efi.cfg
-// bzImage max size is 20m which allows to have a bzImage tmp
-const BOOT_SIZE: u64 = 52_396_032;
+// the size of the boot partition for new installs (128M - 32K)
+//
+// the boot partition of the install disk gets copied into it, so it needs to
+// be at least as big as the one in genimage-efi.cfg and genimage-uboot.cfg
+//
+// devices installed before 2026.10 have 52_396_032 bytes (50M - 32K) which
+// limits the kernel to 20mb (bzImage and bzImageB need to fit), pack-image
+// enforces that limit
+const BOOT_SIZE: u64 = 134_184_960;
 
-// should create around 500mb
-// that should be enough since our rootfs at the moment
-// is 180mb
+// the size of each root partition for new installs (1.5GiB)
+//
+// devices installed before 2026.10 have 500MiB and get migrated to 1000MiB
+// on their next update (see layout.rs), pack-image limits the rootfs to the
+// smaller size
 //
 // in bytes
 // is divisable by 512 and 4096
-const ROOTFS_SIZE: u64 = 524_288_000;
+const ROOTFS_SIZE: u64 = 1536 * 1024 * 1024;
 
 #[cfg(target_arch = "x86_64")]
 const IMAGE_NAME: &str = "bzImage";
@@ -273,6 +284,33 @@ impl Disk {
 		Some(Path::new("/dev/disk/by-partuuid").join(uuid.to_string()))
 	}
 
+	/// the logical block size the gpt uses
+	pub fn lb_size(&self) -> io::Result<LogicalBlockSize> {
+		self.gpt_disk
+			.as_ref()
+			.map(|d| *d.logical_block_size())
+			.ok_or_else(|| io_other("no gpt"))
+	}
+
+	/// Returns the device of a partition
+	///
+	/// Partitions added while running might not have a /dev/disk/by-partuuid
+	/// link yet, in that case the kernel partition with the same start and
+	/// size is used.
+	pub fn part_device(&self, name: &str) -> io::Result<PathBuf> {
+		let path = self
+			.part_path(name)
+			.ok_or_else(|| io_other(format!("{name} partition not found")))?;
+		if path.exists() {
+			return Ok(path);
+		}
+
+		let part = self.get_part(name).unwrap();
+		find_kernel_partition(&self.path, self.lb_size()?.as_u64(), part)?
+			.map(|kp| Path::new("/dev").join(kp.name))
+			.ok_or_else(|| io_other(format!("no device for {name}")))
+	}
+
 	pub fn size(&self) -> io::Result<u64> {
 		let mut file = File::open(&self.path)?;
 		file.seek(SeekFrom::Start(0))?;
@@ -373,13 +411,14 @@ fn write_gpt_to_new_disk(
 	boot.last_lba = boot.first_lba + boot_sectors - 1; // -1 because inclusive
 
 	let rootfs_sectors = ROOTFS_SIZE / sector_size;
+	let align = (ALIGNMENT / sector_size).max(1);
 
 	// now create first root fs partition
 	let mut root_a = install_disk
 		.clone_part("root")
 		.ok_or_else(|| InstallError::PartitionNotFound("root"))?;
 	root_a.part_guid = Uuid::new_v4();
-	root_a.first_lba = boot.last_lba + 1;
+	root_a.first_lba = (boot.last_lba + 1).div_ceil(align) * align;
 	root_a.last_lba = root_a.first_lba + rootfs_sectors - 1;
 	root_a.name = "root a".into();
 
@@ -668,7 +707,15 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	let boot_img = boot_image()?;
 	let part_uuid = root_uuid()?;
 
-	let disk = Disks::root_disk()?;
+	let rootfs_path = format!("{path}/rootfs.ext2");
+	let mut rootfs_file = File::open(&rootfs_path)?;
+	let rootfs_len = rootfs_file.metadata()?.len();
+
+	let mut disk = Disks::root_disk()?;
+
+	// find out which partition to write to and migrate the partition layout
+	// if needed see #22
+	let other = prepare_partitions(&mut disk, &part_uuid, rootfs_len)?;
 
 	// get all partitions
 
@@ -678,12 +725,10 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 		.part_guid
 		.to_string();
 
-	let part_a = disk
-		.get_part("root a")
-		.ok_or_else(|| io_other("root a partition not found"))?;
-	let part_b = disk
-		.get_part("root b")
-		.ok_or_else(|| io_other("root b partition not found"))?;
+	let other_part = disk
+		.get_part(other)
+		.ok_or_else(|| io_other(format!("{other} partition not found")))?;
+	let other_uuid = other_part.part_guid;
 
 	let data_uuid = disk
 		.get_part("data")
@@ -691,24 +736,13 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 		.part_guid
 		.to_string();
 
-	let (other_part, other_uuid, other) = if part_a.part_guid == part_uuid {
-		(part_b, part_b.part_guid, "root b")
-	} else if part_b.part_guid == part_uuid {
-		(part_a, part_a.part_guid, "root a")
-	} else {
-		return Err(io_other("root partition not found"));
-	};
-
 	// get the partition we wan't to write the update to
-	let part_path = disk.part_path(other).unwrap();
+	let part_path = disk.part_device(other)?;
 	let mut part_file = OpenOptions::new().write(true).open(&part_path)?;
 
-	let rootfs_path = format!("{path}/rootfs.ext2");
-	let mut rootfs_file = File::open(&rootfs_path)?;
-
 	// clear partition first
-	let part_len = other_part.bytes_len(LogicalBlockSize::Lb512)?;
-	eprintln!("writing zeroes {part_len}");
+	let part_len = other_part.bytes_len(disk.lb_size()?)?;
+	eprintln!("writing zeroes {part_len} to {part_path:?}");
 	write_zeroes(&mut part_file, part_len as usize)?;
 
 	part_file.seek(SeekFrom::Start(0))?;
@@ -717,6 +751,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	io::copy(&mut rootfs_file, &mut part_file)?;
 
 	part_file.flush()?;
+	part_file.sync_all()?;
 
 	// update fstab file to mount the correct partitions
 	mount(&part_path, "/mnt")?;
@@ -836,6 +871,10 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 		}
 	}
 
+	unsafe {
+		libc::sync();
+	}
+
 	// wait until really all files are written to disk
 	// i just had a system after an update not restart
 	// pulling the plug and powering it on again, everything works fine
@@ -843,4 +882,569 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	thread::sleep(Duration::from_secs(10));
 
 	Ok(())
+}
+
+/// Returns the name of the root partition the update should be written to.
+///
+/// If the device still has the old partition layout, the partition table gets
+/// migrated first (see layout.rs). Nothing is changed if the rootfs would not
+/// fit into the target partition.
+fn prepare_partitions(
+	disk: &mut Disk,
+	running: &Uuid,
+	rootfs_len: u64,
+) -> io::Result<&'static str> {
+	let lb_size = disk.lb_size()?;
+	let gpt = disk
+		.gpt_disk
+		.as_ref()
+		.ok_or_else(|| io_other("root disk has no gpt"))?;
+	let header = gpt
+		.primary_header()
+		.or_else(|_| gpt.backup_header())
+		.map_err(io_other)?;
+
+	let plan = layout::plan(
+		gpt.partitions(),
+		lb_size.as_u64(),
+		header.last_usable,
+		running,
+	)
+	.map_err(io_other)?;
+
+	let Plan {
+		target,
+		change,
+		skipped,
+	} = plan;
+
+	if let Some(reason) = skipped {
+		eprintln!("not migrating the partition layout: {reason}");
+	}
+
+	let partitions = change
+		.as_ref()
+		.map(|c| &c.partitions)
+		.unwrap_or_else(|| gpt.partitions());
+	let target_len = partitions
+		.values()
+		.find(|p| p.name == target)
+		.ok_or_else(|| io_other(format!("{target} partition not found")))?
+		.bytes_len(lb_size)?;
+
+	if rootfs_len > target_len {
+		return Err(io_other(format!(
+			"rootfs of {rootfs_len} bytes does not fit into {target} \
+			 with {target_len} bytes"
+		)));
+	}
+
+	if let Some(change) = change {
+		eprintln!(
+			"changing the partition table, removing {:?} adding {:?}",
+			change.removed, change.added
+		);
+
+		write_gpt_safely(&disk.path, &change.partitions)?;
+		update_kernel_partitions(&disk.path, lb_size.as_u64(), &change)?;
+
+		disk.open_gpt().map_err(io_other)?;
+	}
+
+	// if the last update was interrupted after changing the partition table
+	// the kernel might still have the old partitions
+	let part = disk
+		.get_part(target)
+		.ok_or_else(|| io_other(format!("{target} partition not found")))?;
+	sync_kernel_partition(&disk.path, lb_size.as_u64(), part)?;
+
+	Ok(target)
+}
+
+/// Writes a new partition table to a disk which might be in use.
+///
+/// The gpt crate writes both partition arrays before both headers, a power
+/// loss in between would leave no valid table. Here the backup array and
+/// header are written and synced first and then the primary ones. Linux and
+/// UEFI use the backup if the primary is invalid, so there is always one valid
+/// table.
+fn write_gpt_safely(
+	path: &Path,
+	partitions: &BTreeMap<u32, GptPartition>,
+) -> io::Result<()> {
+	let gpt = GptConfig::new().open(path).map_err(io_other)?;
+	let lb_size = *gpt.logical_block_size();
+	let header = gpt
+		.primary_header()
+		.or_else(|_| gpt.backup_header())
+		.map_err(io_other)?;
+
+	let used: Vec<_> = partitions.values().filter(|p| p.is_used()).collect();
+	if used.len() > header.num_parts as usize {
+		return Err(io_other("to many partitions"));
+	}
+
+	let mut sorted = used.clone();
+	sorted.sort_by_key(|p| p.first_lba);
+	for (i, p) in sorted.iter().enumerate() {
+		let overlaps = i > 0 && sorted[i - 1].last_lba >= p.first_lba;
+		if p.first_lba < header.first_usable
+			|| p.last_lba > header.last_usable
+			|| p.first_lba > p.last_lba
+			|| overlaps
+		{
+			return Err(io_other(format!("invalid partition {p:?}")));
+		}
+	}
+
+	let mut primary = HeaderBuilder::from_header(header)
+		.primary(true)
+		.build(lb_size)
+		.map_err(io_other)?;
+	let mut backup = HeaderBuilder::from_header(&primary)
+		.primary(false)
+		.build(lb_size)
+		.map_err(io_other)?;
+	drop(gpt);
+
+	let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+
+	write_gpt_copy(&mut file, &mut backup, &used, lb_size)?;
+	write_gpt_copy(&mut file, &mut primary, &used, lb_size)?;
+
+	Ok(())
+}
+
+/// writes the partition array and then the header of one gpt copy
+fn write_gpt_copy(
+	file: &mut File,
+	header: &mut Header,
+	used: &[&GptPartition],
+	lb_size: LogicalBlockSize,
+) -> io::Result<()> {
+	for (i, p) in used.iter().enumerate() {
+		p.write_to_device(
+			file,
+			i as u64,
+			header.part_start,
+			lb_size,
+			header.part_size,
+		)?;
+	}
+	GptPartition::write_zero_entries_to_device(
+		file,
+		used.len() as u64,
+		header.num_parts as u64 - used.len() as u64,
+		header.part_start,
+		lb_size,
+		header.part_size,
+	)?;
+
+	if header.current_lba < header.backup_lba {
+		header.write_primary(file, lb_size).map_err(io_other)?;
+	} else {
+		header.write_backup(file, lb_size).map_err(io_other)?;
+	}
+
+	file.flush()?;
+	file.sync_all()
+}
+
+// see linux/blkpg.h
+const BLKPG: libc::c_ulong = 0x1269;
+const BLKPG_ADD_PARTITION: libc::c_int = 1;
+const BLKPG_DEL_PARTITION: libc::c_int = 2;
+
+#[repr(C)]
+struct BlkpgPartition {
+	// in bytes
+	start: libc::c_longlong,
+	// in bytes
+	length: libc::c_longlong,
+	pno: libc::c_int,
+	devname: [libc::c_char; 64],
+	volname: [libc::c_char; 64],
+}
+
+#[repr(C)]
+struct BlkpgIoctlArg {
+	op: libc::c_int,
+	flags: libc::c_int,
+	datalen: libc::c_int,
+	data: *mut libc::c_void,
+}
+
+fn blkpg(
+	disk: &File,
+	op: libc::c_int,
+	pno: u32,
+	start: u64,
+	length: u64,
+) -> io::Result<()> {
+	let mut part = BlkpgPartition {
+		start: start as _,
+		length: length as _,
+		pno: pno as _,
+		devname: [0; 64],
+		volname: [0; 64],
+	};
+	let mut arg = BlkpgIoctlArg {
+		op,
+		flags: 0,
+		datalen: std::mem::size_of::<BlkpgPartition>() as _,
+		data: &mut part as *mut BlkpgPartition as *mut _,
+	};
+
+	let r = unsafe { libc::ioctl(disk.as_raw_fd(), BLKPG as _, &mut arg) };
+	if r == -1 {
+		Err(io::Error::last_os_error())
+	} else {
+		Ok(())
+	}
+}
+
+/// A partition as the kernel knows it
+#[derive(Debug, Clone)]
+struct KernelPartition {
+	name: String,
+	number: u32,
+	// in 512 byte sectors
+	start: u64,
+	// in 512 byte sectors
+	size: u64,
+}
+
+fn kernel_partitions(disk_path: &Path) -> io::Result<Vec<KernelPartition>> {
+	let disk_name = disk_path
+		.file_name()
+		.and_then(|n| n.to_str())
+		.ok_or_else(|| io_other("invalid disk path"))?;
+
+	let read_num = |path: PathBuf| -> io::Result<u64> {
+		read_to_string(path)?.trim().parse().map_err(io_other)
+	};
+
+	let mut list = vec![];
+	for entry in fs::read_dir(Path::new("/sys/block").join(disk_name))? {
+		let entry = entry?;
+		let dir = entry.path();
+		let Ok(number) = read_num(dir.join("partition")) else {
+			continue;
+		};
+
+		list.push(KernelPartition {
+			name: entry.file_name().to_string_lossy().into_owned(),
+			number: number as u32,
+			start: read_num(dir.join("start"))?,
+			size: read_num(dir.join("size"))?,
+		});
+	}
+
+	Ok(list)
+}
+
+/// Returns the kernel partition which matches the gpt partition exactly
+fn find_kernel_partition(
+	disk_path: &Path,
+	lb_size: u64,
+	part: &GptPartition,
+) -> io::Result<Option<KernelPartition>> {
+	let start = part.first_lba * lb_size / 512;
+	let size = (part.last_lba + 1 - part.first_lba) * lb_size / 512;
+
+	Ok(kernel_partitions(disk_path)?
+		.into_iter()
+		.find(|kp| kp.start == start && kp.size == size))
+}
+
+/// Makes sure the kernel knows the partition with its current size
+///
+/// Partitions which overlap with it get removed from the kernel (not from the
+/// disk). This fails if one of them is in use.
+fn sync_kernel_partition(
+	disk_path: &Path,
+	lb_size: u64,
+	part: &GptPartition,
+) -> io::Result<()> {
+	if find_kernel_partition(disk_path, lb_size, part)?.is_some() {
+		return Ok(());
+	}
+
+	let file = OpenOptions::new().read(true).open(disk_path)?;
+
+	let start = part.first_lba * lb_size / 512;
+	let end = (part.last_lba + 1) * lb_size / 512;
+	for kp in kernel_partitions(disk_path)? {
+		if kp.start < end && start < kp.start + kp.size {
+			eprintln!("removing kernel partition {kp:?}");
+			blkpg(&file, BLKPG_DEL_PARTITION, kp.number, 0, 0)?;
+		}
+	}
+
+	let number = kernel_partitions(disk_path)?
+		.iter()
+		.map(|kp| kp.number)
+		.max()
+		.unwrap_or(0)
+		+ 1;
+
+	eprintln!("adding kernel partition {number} for {part:?}");
+	blkpg(
+		&file,
+		BLKPG_ADD_PARTITION,
+		number,
+		part.first_lba * lb_size,
+		(part.last_lba + 1 - part.first_lba) * lb_size,
+	)
+}
+
+/// Tells the kernel about the changed partitions without rereading the
+/// partition table, which is not possible while partitions are mounted.
+fn update_kernel_partitions(
+	disk_path: &Path,
+	lb_size: u64,
+	change: &layout::Change,
+) -> io::Result<()> {
+	let file = OpenOptions::new().read(true).open(disk_path)?;
+
+	for p in &change.removed {
+		if let Some(kp) = find_kernel_partition(disk_path, lb_size, p)? {
+			eprintln!("removing kernel partition {kp:?}");
+			blkpg(&file, BLKPG_DEL_PARTITION, kp.number, 0, 0)?;
+		}
+	}
+
+	for p in &change.added {
+		sync_kernel_partition(disk_path, lb_size, p)?;
+	}
+
+	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	use crate::layout::{OLD_ROOT_A, ROOT_A, ROOT_B};
+
+	use gpt::partition_types;
+
+	const OLD_BOOT_SIZE: u64 = 52_396_032;
+	const OLD_ROOTFS_SIZE: u64 = 524_288_000;
+	// an 8GB disk
+	const DISK_SIZE: u64 = 15_633_408 * 512;
+
+	struct TmpFile(PathBuf);
+
+	impl Drop for TmpFile {
+		fn drop(&mut self) {
+			let _ = fs::remove_file(&self.0);
+		}
+	}
+
+	/// creates a sparse file with the layout install_on created until 2026.10
+	fn old_disk(name: &str) -> TmpFile {
+		let path = std::env::temp_dir()
+			.join(format!("iron-disks-{}-{name}.img", std::process::id()));
+		let file = File::create(&path).unwrap();
+		file.set_len(DISK_SIZE).unwrap();
+		drop(file);
+		let tmp = TmpFile(path);
+
+		let mut file = OpenOptions::new()
+			.read(true)
+			.write(true)
+			.open(&tmp.0)
+			.unwrap();
+		ProtectiveMBR::with_lb_size((DISK_SIZE / 512 - 1) as u32)
+			.overwrite_lba0(&mut file)
+			.unwrap();
+
+		let mut disk = GptConfig::new()
+			.writable(true)
+			.change_partition_count(true)
+			.logical_block_size(LogicalBlockSize::Lb512)
+			.create(&tmp.0)
+			.unwrap();
+		disk.update_partitions(BTreeMap::new()).unwrap();
+		let header = disk.primary_header().unwrap().clone();
+
+		let part = |name: &str, first_lba: u64, len: u64| GptPartition {
+			part_type_guid: partition_types::LINUX_FS,
+			part_guid: Uuid::new_v4(),
+			first_lba,
+			last_lba: first_lba + len / 512 - 1,
+			flags: 0,
+			name: name.into(),
+		};
+		let boot = part("boot", header.first_usable, OLD_BOOT_SIZE);
+		let a = part(ROOT_A, boot.last_lba + 1, OLD_ROOTFS_SIZE);
+		let b = part(ROOT_B, a.last_lba + 1, OLD_ROOTFS_SIZE);
+		let data_len = (header.last_usable - b.last_lba) / 2 * 512;
+		let data = part("data", b.last_lba + 1, data_len);
+
+		disk.update_partitions(BTreeMap::from([
+			(1, boot),
+			(2, a),
+			(3, b),
+			(4, data),
+		]))
+		.unwrap();
+		disk.write_inplace().unwrap();
+
+		tmp
+	}
+
+	fn read(path: &Path) -> GptDisk<File> {
+		GptConfig::new()
+			.only_valid_headers(true)
+			.open(path)
+			.unwrap()
+	}
+
+	/// the partitions sorted like they are written to disk
+	fn entries(parts: &BTreeMap<u32, GptPartition>) -> Vec<GptPartition> {
+		parts.values().filter(|p| p.is_used()).cloned().collect()
+	}
+
+	fn uuid(disk: &GptDisk<File>, name: &str) -> Uuid {
+		disk.partitions()
+			.values()
+			.find(|p| p.name == name)
+			.unwrap()
+			.part_guid
+	}
+
+	fn plan_on(path: &Path, running: &Uuid) -> layout::Plan {
+		let disk = read(path);
+		let header = disk.primary_header().unwrap();
+		layout::plan(disk.partitions(), 512, header.last_usable, running)
+			.unwrap()
+	}
+
+	/// lets sfdisk validate the disk if it is installed
+	fn verify_with_sfdisk(path: &Path) {
+		let Ok(out) = std::process::Command::new("sfdisk")
+			.arg("--verify")
+			.arg(path)
+			.output()
+		else {
+			eprintln!("sfdisk not found, skipping");
+			return;
+		};
+		let stdout = String::from_utf8_lossy(&out.stdout);
+		let stderr = String::from_utf8_lossy(&out.stderr);
+		assert!(out.status.success(), "sfdisk: {stdout} {stderr}");
+		assert!(!stderr.contains("corrupt"), "sfdisk: {stderr}");
+	}
+
+	#[test]
+	fn migrate_on_disk() {
+		let tmp = old_disk("migrate");
+		verify_with_sfdisk(&tmp.0);
+		let running = uuid(&read(&tmp.0), ROOT_A);
+
+		// step 1
+		let plan = plan_on(&tmp.0, &running);
+		let change = plan.change.unwrap();
+		write_gpt_safely(&tmp.0, &change.partitions).unwrap();
+
+		let disk = read(&tmp.0);
+		assert_eq!(entries(disk.partitions()), entries(&change.partitions));
+		assert_eq!(
+			disk.primary_header().unwrap().crc32_parts,
+			disk.backup_header().unwrap().crc32_parts
+		);
+		verify_with_sfdisk(&tmp.0);
+
+		// step 2, running from the new root b
+		let new_b = uuid(&disk, ROOT_B);
+		let plan = plan_on(&tmp.0, &new_b);
+		assert_eq!(plan.target, ROOT_A);
+		let change = plan.change.unwrap();
+		write_gpt_safely(&tmp.0, &change.partitions).unwrap();
+
+		let disk = read(&tmp.0);
+		assert_eq!(entries(disk.partitions()), entries(&change.partitions));
+		let names: Vec<_> =
+			disk.partitions().values().map(|p| p.name.clone()).collect();
+		assert_eq!(names, ["boot", ROOT_A, "data", ROOT_B]);
+		verify_with_sfdisk(&tmp.0);
+	}
+
+	/// simulates a power loss after the backup copy was written
+	#[test]
+	fn power_loss_between_copies() {
+		let tmp = old_disk("power-loss");
+		let before = read(&tmp.0);
+		let running = uuid(&before, ROOT_B);
+		let plan = plan_on(&tmp.0, &running);
+		let new = plan.change.unwrap().partitions;
+
+		// only write the backup, like write_gpt_safely does first
+		let header = before.primary_header().unwrap();
+		let primary = HeaderBuilder::from_header(header)
+			.primary(true)
+			.build(LogicalBlockSize::Lb512)
+			.unwrap();
+		let mut backup = HeaderBuilder::from_header(&primary)
+			.primary(false)
+			.build(LogicalBlockSize::Lb512)
+			.unwrap();
+		let used: Vec<_> = new.values().filter(|p| p.is_used()).collect();
+		let mut file = OpenOptions::new()
+			.read(true)
+			.write(true)
+			.open(&tmp.0)
+			.unwrap();
+		write_gpt_copy(&mut file, &mut backup, &used, LogicalBlockSize::Lb512)
+			.unwrap();
+
+		// both headers are valid, the primary still has the old table
+		let disk = read(&tmp.0);
+		assert_eq!(entries(disk.partitions()), entries(before.partitions()));
+
+		// planning again with the old table gives the same result
+		let again = plan_on(&tmp.0, &running);
+		assert_eq!(again.target, ROOT_B);
+		assert!(again.change.is_some());
+
+		// a torn primary header falls back to the backup with the new table
+		file.seek(SeekFrom::Start(512)).unwrap();
+		file.write_all(&[0xff; 64]).unwrap();
+		file.sync_all().unwrap();
+		let disk = GptConfig::new().open(&tmp.0).unwrap();
+		assert!(disk.primary_header().is_err());
+		let header = disk.backup_header().unwrap();
+		let names: Vec<_> = gpt::partition::file_read_partitions(
+			&mut File::open(&tmp.0).unwrap(),
+			header,
+			LogicalBlockSize::Lb512,
+		)
+		.unwrap()
+		.into_values()
+		.map(|p| p.name)
+		.collect();
+		assert_eq!(names, ["boot", OLD_ROOT_A, "old root b", "data", ROOT_B]);
+
+		// and writing the full table again repairs it
+		write_gpt_safely(&tmp.0, &new).unwrap();
+		let disk = read(&tmp.0);
+		assert_eq!(entries(disk.partitions()), entries(&new));
+		verify_with_sfdisk(&tmp.0);
+	}
+
+	#[test]
+	fn rejects_overlapping_partitions() {
+		let tmp = old_disk("overlap");
+		let disk = read(&tmp.0);
+		let mut parts = disk.partitions().clone();
+		parts.get_mut(&3).unwrap().first_lba -= 1;
+		assert!(write_gpt_safely(&tmp.0, &parts).is_err());
+		// nothing was written
+		assert_eq!(
+			entries(read(&tmp.0).partitions()),
+			entries(disk.partitions())
+		);
+	}
 }
