@@ -1,6 +1,7 @@
 mod command;
 mod disks;
 mod hardware_fixes;
+mod layout;
 mod service;
 mod util;
 mod version_info;
