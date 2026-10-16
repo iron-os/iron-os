@@ -356,17 +356,25 @@ fn install_to_new_disk(
 		}
 	}
 
-	// do we need to write the entire drive
-	// or is it enough to
-	write_gpt_to_new_disk(install_disk, new_disk)?;
+	{
+		// every write to the disk makes udev reread the partition table and
+		// recreate the partitions and their /dev/disk/by-partuuid links,
+		// maybe while mkfs or mount uses them. So udev is kept away while
+		// installing and the partitions are used by their kernel device.
+		let lock = DiskLock::new(&new_disk.path)?;
 
-	// wait until linux reads the new gpt table
-	thread::sleep(Duration::from_secs(2));
+		// do we need to write the entire drive
+		// or is it enough to
+		write_gpt_to_new_disk(install_disk, new_disk)?;
+		lock.sync()?;
+		lock.reread_partitions()?;
+
+		copy_to_new_disk(install_disk, new_disk)?;
+
+		configure_disk(new_disk)?;
+	}
+	// now udev creates the links
 	udev_settle();
-
-	copy_to_new_disk(install_disk, new_disk)?;
-
-	configure_disk(new_disk)?;
 
 	// wait until really all files are written to disk
 	thread::sleep(Duration::from_secs(10));
@@ -529,27 +537,12 @@ fn copy_to_new_disk(
 		new_first_byte,
 	)?;
 
-	// writing to the disk makes udev reread the partition table, which
-	// recreates the /dev/disk/by-partuuid links
-	udev_settle();
-
 	// since the data filesystem is mounted rw
 	// and /var can write to it
 	// we need to copy the files manually
 	// for this we need to first create a filesystem
 	//
-	let data_path = new_disk
-		.part_path("data")
-		.ok_or_else(|| InstallError::PartitionNotFound("data"))?;
-
-	// wait max 10s until the path exists
-	// todo this can probably be removed
-	for _ in 0..10 {
-		thread::sleep(Duration::from_secs(1));
-		if data_path.exists() {
-			break;
-		}
-	}
+	let data_path = new_disk.part_device("data")?;
 
 	// create data filesystem
 	Command::new("mkfs")
@@ -614,7 +607,9 @@ fn copy_len_to_new(
 		new.write_all(&buf[..read_b])?;
 	}
 
-	new.flush()?;
+	// the partitions get written through their own device which has its
+	// own cache, so this needs to be on the disk before they are used
+	new.sync_all()?;
 
 	Ok(())
 }
@@ -636,6 +631,47 @@ fn udev_settle() {
 	}
 }
 
+/// Holds an exclusive lock on a whole disk
+///
+/// While the lock is held udev doesn't process the events of the disk, so
+/// it doesn't reread the partition table after a write. The events are
+/// processed once the lock is released.
+/// See https://systemd.io/BLOCK_DEVICE_LOCKING/
+struct DiskLock(File);
+
+impl DiskLock {
+	fn new(path: &Path) -> io::Result<Self> {
+		let file = File::open(path)?;
+		// waits until udev is done with the disk
+		let r = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
+		if r != 0 {
+			return Err(io::Error::last_os_error());
+		}
+
+		Ok(Self(file))
+	}
+
+	/// Writes everything written to the disk (by any file) to the disk
+	fn sync(&self) -> io::Result<()> {
+		self.0.sync_all()
+	}
+
+	/// Makes the kernel read the partition table of the disk
+	///
+	/// Fails if a partition of the disk is in use.
+	fn reread_partitions(&self) -> io::Result<()> {
+		// _IO(0x12, 95)
+		const BLKRRPART: libc::c_ulong = 0x125f;
+
+		let r = unsafe { libc::ioctl(self.0.as_raw_fd(), BLKRRPART) };
+		if r != 0 {
+			return Err(io::Error::last_os_error());
+		}
+
+		Ok(())
+	}
+}
+
 /// Creates a ramdom machine id which can be stored in
 /// /etc/machine-id
 fn random_machine_id() -> String {
@@ -653,9 +689,7 @@ fn random_machine_id() -> String {
 /// configure the newly installed disk
 fn configure_disk(disk: &mut Disk) -> Result<(), InstallError> {
 	// update fstab to with the new uuid
-	let root_path = disk
-		.part_path("root a")
-		.ok_or_else(|| InstallError::PartitionNotFound("root a"))?;
+	let root_path = disk.part_device("root a")?;
 
 	let boot_uuid = disk
 		.get_part("boot")
@@ -684,9 +718,7 @@ fn configure_disk(disk: &mut Disk) -> Result<(), InstallError> {
 
 	// update grub
 
-	let boot_path = disk
-		.part_path("boot")
-		.ok_or_else(|| InstallError::PartitionNotFound("boot"))?;
+	let boot_path = disk.part_device("boot")?;
 
 	let root_uuid = disk
 		.get_part("root a")
