@@ -366,6 +366,7 @@ fn install_to_new_disk(
 		// do we need to write the entire drive
 		// or is it enough to
 		write_gpt_to_new_disk(install_disk, new_disk)?;
+		lock.sync()?;
 		lock.reread_partitions()?;
 
 		copy_to_new_disk(install_disk, new_disk)?;
@@ -606,7 +607,9 @@ fn copy_len_to_new(
 		new.write_all(&buf[..read_b])?;
 	}
 
-	new.flush()?;
+	// the partitions get written through their own device which has its
+	// own cache, so this needs to be on the disk before they are used
+	new.sync_all()?;
 
 	Ok(())
 }
@@ -646,6 +649,11 @@ impl DiskLock {
 		}
 
 		Ok(Self(file))
+	}
+
+	/// Writes everything written to the disk (by any file) to the disk
+	fn sync(&self) -> io::Result<()> {
+		self.0.sync_all()
 	}
 
 	/// Makes the kernel read the partition table of the disk
