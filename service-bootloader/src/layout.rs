@@ -45,6 +45,10 @@ pub enum LayoutError {
 	RunningRootNotFound,
 	OldRootsNotAdjacent,
 	InvalidPartition(String),
+	/// the free space at the end of the disk is to small for the new root b
+	NotEnoughSpace {
+		needed: u64,
+	},
 }
 
 impl fmt::Display for LayoutError {
@@ -58,6 +62,11 @@ impl fmt::Display for LayoutError {
 				write!(f, "old root a and old root b are not adjacent")
 			}
 			Self::InvalidPartition(n) => write!(f, "invalid partition {n}"),
+			Self::NotEnoughSpace { needed } => write!(
+				f,
+				"not enough free space at the end of the disk to migrate the \
+				 partition layout, need {needed} bytes"
+			),
 		}
 	}
 }
@@ -71,8 +80,6 @@ pub struct Plan {
 	pub target: &'static str,
 	/// if the partition table needs to change, the new table
 	pub change: Option<Change>,
-	/// why the migration was not started, only informational
-	pub skipped: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,12 +152,6 @@ fn start_migration(
 		return Err(LayoutError::RunningRootNotFound);
 	};
 
-	let normal = |skipped: Option<String>| Plan {
-		target: other,
-		change: None,
-		skipped,
-	};
-
 	let sectors_a = sectors(root_a)?;
 	let sectors_b = sectors(root_b)?;
 
@@ -158,19 +159,29 @@ fn start_migration(
 		&& sectors_a == sectors_b
 		&& sectors_a * lb_size < MIGRATE_BELOW_ROOTFS_SIZE;
 	if !is_old_layout {
-		return Ok(normal(None));
+		return Ok(Plan {
+			target: other,
+			change: None,
+		});
 	}
 
 	// the new root b gets the size of both old roots together, which is
 	// the size root a will have after the migration
+	//
+	// the migration is required, images can be bigger than the old roots, so
+	// the update fails if there is not enough space (shouldn't happen since
+	// install_on only used half of the free space for data)
 	let new_sectors = sectors_a + sectors_b;
+	let not_enough_space = || LayoutError::NotEnoughSpace {
+		needed: new_sectors * lb_size,
+	};
 	let align = (ALIGNMENT / lb_size).max(1);
 	// exclusive end
 	let end = (last_usable + 1) / align * align;
-	let first_lba = match end.checked_sub(new_sectors) {
-		Some(f) => f / align * align,
-		None => return Ok(normal(Some("disk too small".into()))),
+	let Some(first_lba) = end.checked_sub(new_sectors) else {
+		return Err(not_enough_space());
 	};
+	let first_lba = first_lba / align * align;
 	let last_lba = first_lba + new_sectors - 1;
 
 	let used_until = partitions
@@ -180,10 +191,7 @@ fn start_migration(
 		.max()
 		.unwrap_or(0);
 	if first_lba <= used_until {
-		return Ok(normal(Some(format!(
-			"not enough free space at the end of the disk, need {} bytes",
-			new_sectors * lb_size
-		))));
+		return Err(not_enough_space());
 	}
 
 	let mut new = partitions.clone();
@@ -214,7 +222,6 @@ fn start_migration(
 			removed: vec![],
 			added: vec![new_b],
 		}),
-		skipped: None,
 	})
 }
 
@@ -236,7 +243,6 @@ fn continue_migration(
 		return Ok(Plan {
 			target: ROOT_B,
 			change: None,
-			skipped: None,
 		});
 	}
 
@@ -269,7 +275,6 @@ fn continue_migration(
 			removed: vec![old_a.clone(), old_b.clone()],
 			added: vec![root_a],
 		}),
-		skipped: None,
 	})
 }
 
@@ -393,8 +398,7 @@ mod tests {
 			plan_b,
 			Plan {
 				target: ROOT_A,
-				change: None,
-				skipped: None
+				change: None
 			}
 		);
 		let plan_a = plan(&step2, LB, LAST_USABLE, &root_a.part_guid).unwrap();
@@ -402,8 +406,7 @@ mod tests {
 			plan_a,
 			Plan {
 				target: ROOT_B,
-				change: None,
-				skipped: None
+				change: None
 			}
 		);
 	}
@@ -446,23 +449,29 @@ mod tests {
 			planned,
 			Plan {
 				target: ROOT_B,
-				change: None,
-				skipped: None
+				change: None
 			}
 		);
 	}
 
 	#[test]
-	fn no_space_falls_back_to_a_normal_update() {
+	fn no_space_fails() {
 		let mut old = old_layout(OLD_ROOT_SECTORS);
 		// data takes the full disk
 		old.get_mut(&4).unwrap().last_lba = LAST_USABLE;
 		let running = guid(&old, ROOT_B);
 
-		let planned = plan(&old, LB, LAST_USABLE, &running).unwrap();
-		assert_eq!(planned.target, ROOT_A);
-		assert_eq!(planned.change, None);
-		assert!(planned.skipped.is_some());
+		let err = plan(&old, LB, LAST_USABLE, &running).unwrap_err();
+		assert_eq!(
+			err,
+			LayoutError::NotEnoughSpace {
+				needed: 2 * OLD_ROOT_SECTORS * LB
+			}
+		);
+
+		// a disk smaller than the new root b
+		let err = plan(&old, LB, OLD_ROOT_SECTORS, &running).unwrap_err();
+		assert!(matches!(err, LayoutError::NotEnoughSpace { .. }));
 	}
 
 	#[test]
