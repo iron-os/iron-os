@@ -1007,15 +1007,7 @@ fn prepare_partitions(
 	)
 	.map_err(io_other)?;
 
-	let Plan {
-		target,
-		change,
-		skipped,
-	} = plan;
-
-	if let Some(reason) = skipped {
-		eprintln!("not migrating the partition layout: {reason}");
-	}
+	let Plan { target, change } = plan;
 
 	let partitions = change
 		.as_ref()
