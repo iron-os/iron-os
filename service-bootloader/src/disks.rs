@@ -345,6 +345,7 @@ fn install_to_new_disk(
 
 	// wait until linux reads the new gpt table
 	thread::sleep(Duration::from_secs(2));
+	udev_settle();
 
 	copy_to_new_disk(install_disk, new_disk)?;
 
@@ -511,6 +512,10 @@ fn copy_to_new_disk(
 		new_first_byte,
 	)?;
 
+	// writing to the disk makes udev reread the partition table, which
+	// recreates the /dev/disk/by-partuuid links
+	udev_settle();
+
 	// since the data filesystem is mounted rw
 	// and /var can write to it
 	// we need to copy the files manually
@@ -595,6 +600,23 @@ fn copy_len_to_new(
 	new.flush()?;
 
 	Ok(())
+}
+
+/// Waits until udev handled all events
+///
+/// After a write to a whole disk is closed, udev rereads its partition table
+/// and removes and recreates the partition links in /dev/disk, on a slow
+/// device this can take seconds.
+fn udev_settle() {
+	// let udev notice the closed file first
+	thread::sleep(Duration::from_secs(1));
+
+	let r = Command::new("udevadm")
+		.args(&["settle", "--timeout=60"])
+		.exec();
+	if let Err(e) = r {
+		eprintln!("udevadm settle failed {e}");
+	}
 }
 
 /// Creates a ramdom machine id which can be stored in
@@ -950,6 +972,7 @@ fn prepare_partitions(
 
 		write_gpt_safely(&disk.path, &change.partitions)?;
 		update_kernel_partitions(&disk.path, lb_size.as_u64(), &change)?;
+		udev_settle();
 
 		disk.open_gpt().map_err(io_other)?;
 	}
