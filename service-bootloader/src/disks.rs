@@ -364,9 +364,17 @@ fn install_to_new_disk(
 	thread::sleep(Duration::from_secs(2));
 	udev_settle();
 
-	copy_to_new_disk(install_disk, new_disk)?;
+	{
+		// writing to the disk would make udev reread the partition table
+		// and recreate the /dev/disk/by-partuuid links, maybe while mkfs
+		// or mount uses them
+		let _lock = DiskLock::new(&new_disk.path)?;
 
-	configure_disk(new_disk)?;
+		copy_to_new_disk(install_disk, new_disk)?;
+
+		configure_disk(new_disk)?;
+	}
+	udev_settle();
 
 	// wait until really all files are written to disk
 	thread::sleep(Duration::from_secs(10));
@@ -529,10 +537,6 @@ fn copy_to_new_disk(
 		new_first_byte,
 	)?;
 
-	// writing to the disk makes udev reread the partition table, which
-	// recreates the /dev/disk/by-partuuid links
-	udev_settle();
-
 	// since the data filesystem is mounted rw
 	// and /var can write to it
 	// we need to copy the files manually
@@ -633,6 +637,27 @@ fn udev_settle() {
 		.exec();
 	if let Err(e) = r {
 		eprintln!("udevadm settle failed {e}");
+	}
+}
+
+/// Holds an exclusive lock on a whole disk
+///
+/// While the lock is held udev doesn't process the events of the disk, so
+/// it doesn't reread the partition table after a write. The events are
+/// processed once the lock is released.
+/// See https://systemd.io/BLOCK_DEVICE_LOCKING/
+struct DiskLock(File);
+
+impl DiskLock {
+	fn new(path: &Path) -> io::Result<Self> {
+		let file = File::open(path)?;
+		// waits until udev is done with the disk
+		let r = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
+		if r != 0 {
+			return Err(io::Error::last_os_error());
+		}
+
+		Ok(Self(file))
 	}
 }
 
