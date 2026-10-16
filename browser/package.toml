@@ -1,0 +1,4 @@
+# replaces the chromium package, the service starts it the same way
+name = "chromium"
+version = "44.8.0"
+binary = "chrome"

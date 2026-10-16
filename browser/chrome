@@ -1,0 +1,7 @@
+#!/bin/sh
+# started by the service like chromium was, the chromium arguments are ignored
+# (except --remote-debugging-port). The ozone platform has to be set on the
+# command line, app.commandLine is too late for it.
+D=$(dirname "$(readlink -f "$0")")
+export LD_LIBRARY_PATH="$D/lib"
+exec "$D/electron" --ozone-platform=wayland "$@"
