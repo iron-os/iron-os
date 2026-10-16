@@ -828,7 +828,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	let other_path = format!("/boot/{other_kernel}");
 	let _ = fs::remove_file(&other_path);
 
-	fs::copy(&kernel_image_path, &other_path)?;
+	copy_synced(&kernel_image_path, &other_path)?;
 
 	// update bootloader
 	match version.arch {
@@ -844,7 +844,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			// update bootloader
 			let new_bootloader = Path::new(path).join("bootx64.efi");
 			if new_bootloader.is_file() {
-				fs::copy(new_bootloader, "/boot/EFI/BOOT/bootx64.efi.tmp")?;
+				copy_synced(new_bootloader, "/boot/EFI/BOOT/bootx64.efi.tmp")?;
 				fs::rename(
 					"/boot/EFI/BOOT/bootx64.efi.tmp",
 					"/boot/EFI/BOOT/bootx64.efi",
@@ -856,7 +856,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			if new_grub_templ.is_file() {
 				// first copy the file to the same mount point and the rename
 				// atomic
-				fs::copy(new_grub_templ, "/boot/EFI/BOOT/grub.templ.tmp")?;
+				copy_synced(new_grub_templ, "/boot/EFI/BOOT/grub.templ.tmp")?;
 				fs::rename(
 					"/boot/EFI/BOOT/grub.templ.tmp",
 					"/boot/EFI/BOOT/grub.templ",
@@ -867,7 +867,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			let grub = read_to_string("/boot/EFI/BOOT/grub.templ")?;
 			let grub = grub.replace("ROOTFS_UUID", &&other_uuid.to_string());
 			let grub = grub.replace("KERNEL_NAME", other_kernel);
-			fs::write("/boot/EFI/BOOT/grub.tmp", grub)?;
+			write_synced("/boot/EFI/BOOT/grub.tmp", grub)?;
 			fs::rename("/boot/EFI/BOOT/grub.tmp", "/boot/EFI/BOOT/grub.cfg")?;
 		}
 		Architecture::Arm64 => {
@@ -882,7 +882,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			// update bootloader
 			let new_bootloader = Path::new(path).join("u-boot.bin");
 			if new_bootloader.is_file() {
-				fs::copy(new_bootloader, "/boot/u-boot.bin.tmp")?;
+				copy_synced(new_bootloader, "/boot/u-boot.bin.tmp")?;
 				fs::rename("/boot/u-boot.bin.tmp", "/boot/u-boot.bin")?;
 			}
 
@@ -891,7 +891,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			if new_extlinux_templ.is_file() {
 				// first copy the file to the same mount point and the rename
 				// atomic
-				fs::copy(
+				copy_synced(
 					new_extlinux_templ,
 					"/boot/extlinux/extlinux.templ.tmp",
 				)?;
@@ -905,7 +905,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 			let uboot = read_to_string("/boot/extlinux/extlinux.templ")?;
 			let uboot = uboot.replace("ROOTFS_UUID", &&other_uuid.to_string());
 			let uboot = uboot.replace("KERNEL_NAME", other_kernel);
-			fs::write("/boot/extlinux/extlinux.tmp", uboot)?;
+			write_synced("/boot/extlinux/extlinux.tmp", uboot)?;
 			fs::rename(
 				"/boot/extlinux/extlinux.tmp",
 				"/boot/extlinux/extlinux.conf",
@@ -924,6 +924,24 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	thread::sleep(Duration::from_secs(10));
 
 	Ok(())
+}
+
+/// Copies a file and makes sure it is on disk
+///
+/// Files on the boot partition get renamed into place after this, the rename
+/// must never reach the disk before the content.
+fn copy_synced(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
+	fs::copy(from, &to)?;
+	File::open(to)?.sync_all()
+}
+
+/// Writes a file and makes sure it is on disk, see copy_synced
+fn write_synced(
+	path: impl AsRef<Path>,
+	data: impl AsRef<[u8]>,
+) -> io::Result<()> {
+	fs::write(&path, data)?;
+	File::open(path)?.sync_all()
 }
 
 /// Returns the name of the root partition the update should be written to.
