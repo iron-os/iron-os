@@ -67,7 +67,7 @@ index d97d1a9bf4..0000000000
 -2.51.0
 -
 diff --git a/package/weston/weston.hash b/package/weston/weston.hash
-index cd2a82508d..955c152a53 100644
+index cd2a82508d..d9906bdc36 100644
 --- a/package/weston/weston.hash
 +++ b/package/weston/weston.hash
 @@ -1,4 +1,2 @@
@@ -75,9 +75,9 @@ index cd2a82508d..955c152a53 100644
 -sha256  b47216b3530da76d02a3a1acbf1846a9cd41d24caa86448f9c46f78f20b6e0ac  weston-14.0.2.tar.xz
 -sha512  e8214ec893e6c3ae94eb3c92feba104b0201843e9143f726a3e9a4d396d02523c94da706c1348cf934bc339fb1a4bc1fecdb865f0ea914115fd346d9eda091f5  weston-14.0.2.tar.xz
 -sha256  fdb65868f65d0fbdb05c2d3b779e10ce9969fa0c4b9262ba4f260e87086ab860  COPYING
-+sha256  c1712421dcb1e88ab6ff9d6e13df3aac2197d8b7af889e0ad885c37bd1c9689b  kiosk-sleep-v15.0.0.tar.gz
++sha256  6529781384ef041b82d366b30ed732b03bb152dc22c1a48ee669848b7ef2ebdf  kiosk-sleep-v16.0.0.tar.gz
 diff --git a/package/weston/weston.mk b/package/weston/weston.mk
-index 57869b7e63..cb8ffb68ed 100644
+index 57869b7e63..9b3532e34c 100644
 --- a/package/weston/weston.mk
 +++ b/package/weston/weston.mk
 @@ -4,9 +4,9 @@
@@ -87,13 +87,37 @@ index 57869b7e63..cb8ffb68ed 100644
 -WESTON_VERSION = 14.0.2
 -WESTON_SITE = https://gitlab.freedesktop.org/wayland/weston/-/releases/$(WESTON_VERSION)/downloads
 -WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
-+WESTON_VERSION = 15.0.0
++WESTON_VERSION = 16.0.0
 +WESTON_SITE = https://github.com/iron-os/weston/archive/refs/heads
 +WESTON_SOURCE = kiosk-sleep-v$(WESTON_VERSION).tar.gz
  WESTON_LICENSE = MIT
  WESTON_LICENSE_FILES = COPYING
  WESTON_CPE_ID_VENDOR = wayland
-@@ -70,6 +70,12 @@ WESTON_CONF_OPTS += \
+@@ -18,7 +18,7 @@ WESTON_DEPENDENCIES = host-pkgconf wayland wayland-protocols \
+ 
+ WESTON_CONF_OPTS = \
+ 	-Ddoc=false \
+-	-Dremoting=false \
++	-Ddeprecated-remoting=false \
+ 	-Dbackend-vnc=false \
+ 	-Dtools=calibrator,debug,info,terminal,touch-calibrator
+ 
+@@ -58,18 +58,24 @@ ifeq ($(BR2_PACKAGE_WESTON_SIMPLE_CLIENTS),y)
+ WESTON_SIMPLE_CLIENTS += dmabuf-egl dmabuf-feedback egl
+ endif
+ ifeq ($(BR2_PACKAGE_PIPEWIRE)$(BR2_PACKAGE_WESTON_DRM),yy)
+-WESTON_CONF_OPTS += -Dpipewire=true -Dbackend-pipewire=true
++WESTON_CONF_OPTS += -Ddeprecated-pipewire=true -Dbackend-pipewire=true
+ WESTON_DEPENDENCIES += pipewire
+ else
+-WESTON_CONF_OPTS += -Dpipewire=false -Dbackend-pipewire=false
++WESTON_CONF_OPTS += -Ddeprecated-pipewire=false -Dbackend-pipewire=false
+ endif
+ else
+ WESTON_CONF_OPTS += \
+ 	-Drenderer-gl=false \
+-	-Dpipewire=false \
++	-Ddeprecated-pipewire=false \
  	-Dbackend-pipewire=false
  endif
  
