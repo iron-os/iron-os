@@ -339,6 +339,23 @@ fn install_to_new_disk(
 	install_disk: &mut Disk,
 	new_disk: &mut Disk,
 ) -> Result<(), InstallError> {
+	// the boot and root partition get copied, so they need to fit
+	let lb_size = install_disk
+		.lb_size()
+		.map_err(|_| io_other("could not get sector_size"))?;
+	for (name, max) in [("boot", BOOT_SIZE), ("root", ROOTFS_SIZE)] {
+		let len = install_disk
+			.get_part(name)
+			.ok_or(InstallError::PartitionNotFound(name))?
+			.bytes_len(lb_size)?;
+		if len > max {
+			return Err(io_other(format!(
+				"{name} partition with {len} bytes is bigger than {max} bytes"
+			))
+			.into());
+		}
+	}
+
 	// do we need to write the entire drive
 	// or is it enough to
 	write_gpt_to_new_disk(install_disk, new_disk)?;
