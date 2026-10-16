@@ -1,3 +1,12 @@
+## 1.2.7
+- Grow the root partitions of devices installed before 2026.10 to 1000MiB on
+  the next image update, without touching the data partition (#22)
+- Refuse image updates whose rootfs doesn't fit into the root partition
+- Write partition table changes so that a power loss always leaves one valid
+  copy
+- Sync the kernel and bootloader files before switching to them
+- Refuse to write an incomplete rootfs
+
 ## 1.2.6
 - Add Screenshot API
 - Add MouseClick API
