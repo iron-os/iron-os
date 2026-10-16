@@ -752,6 +752,7 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	let rootfs_path = format!("{path}/rootfs.ext2");
 	let mut rootfs_file = File::open(&rootfs_path)?;
 	let rootfs_len = rootfs_file.metadata()?.len();
+	check_ext_fs_len(&mut rootfs_file, rootfs_len)?;
 
 	let mut disk = Disks::root_disk()?;
 
@@ -922,6 +923,40 @@ pub fn update(path: &str, version: &VersionInfo) -> io::Result<()> {
 	// pulling the plug and powering it on again, everything works fine
 	// maybe something was not fully readable or something???
 	thread::sleep(Duration::from_secs(10));
+
+	Ok(())
+}
+
+/// Makes sure the file contains a complete ext2/3/4 filesystem
+///
+/// Writing a truncated rootfs would leave a root partition which doesn't boot.
+fn check_ext_fs_len(file: &mut File, len: u64) -> io::Result<()> {
+	// the superblock starts at byte 1024
+	let mut sb = [0u8; 1024];
+	file.seek(SeekFrom::Start(1024))?;
+	file.read_exact(&mut sb)?;
+	file.seek(SeekFrom::Start(0))?;
+
+	let u32_at =
+		|o: usize| u32::from_le_bytes(sb[o..o + 4].try_into().unwrap());
+	let magic = u16::from_le_bytes([sb[0x38], sb[0x39]]);
+	if magic != 0xEF53 {
+		return Err(io_other("rootfs is not an ext filesystem"));
+	}
+
+	let mut blocks = u32_at(0x04) as u64;
+	// INCOMPAT_64BIT
+	if u32_at(0x60) & 0x80 != 0 {
+		blocks |= (u32_at(0x150) as u64) << 32;
+	}
+	let block_size = 1024u64 << u32_at(0x18);
+
+	let fs_len = blocks * block_size;
+	if len < fs_len {
+		return Err(io_other(format!(
+			"rootfs is incomplete, {len} bytes of {fs_len}"
+		)));
+	}
 
 	Ok(())
 }
@@ -1493,6 +1528,35 @@ mod tests {
 		let disk = read(&tmp.0);
 		assert_eq!(entries(disk.partitions()), entries(&new));
 		verify_with_sfdisk(&tmp.0);
+	}
+
+	#[test]
+	fn ext_fs_len() {
+		let path = std::env::temp_dir()
+			.join(format!("iron-disks-{}-ext.img", std::process::id()));
+		let tmp = TmpFile(path);
+		File::create(&tmp.0)
+			.unwrap()
+			.set_len(8 * 1024 * 1024)
+			.unwrap();
+		let ok = std::process::Command::new("mkfs.ext4")
+			.args(["-q", "-F"])
+			.arg(&tmp.0)
+			.status();
+		if !matches!(ok, Ok(s) if s.success()) {
+			eprintln!("mkfs.ext4 not found, skipping");
+			return;
+		}
+
+		let mut file = File::open(&tmp.0).unwrap();
+		let len = file.metadata().unwrap().len();
+		check_ext_fs_len(&mut file, len).unwrap();
+		assert!(check_ext_fs_len(&mut file, len - 4096).is_err());
+
+		let zeros = File::create(&tmp.0).unwrap();
+		zeros.set_len(len).unwrap();
+		let mut file = File::open(&tmp.0).unwrap();
+		assert!(check_ext_fs_len(&mut file, len).is_err());
 	}
 
 	#[test]
