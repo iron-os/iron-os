@@ -1,3 +1,7 @@
+## 2026.11.2
+- same as 2026.11.1, the second image update completes the partition
+  migration of older devices (merges the old roots into root a, #22)
+
 ## 2026.11.1
 - update to buildroot 2025.02.18
 - new installs: boot partition 128M, root partitions 1.5GiB (#22)
