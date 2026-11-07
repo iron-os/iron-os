@@ -4,3 +4,6 @@ tar-file = "./image-copy.tar.gz"
 
 [requirements]
 service = ">=1.2.8"
+# devices must run 2026.11.1 first, so this image completes the partition
+# migration (#22) instead of starting it
+image = ">=2026.11.1"
