@@ -13,6 +13,7 @@ mod input;
 mod kiosk;
 mod render;
 mod state;
+mod stats;
 
 use state::{Backend, State};
 

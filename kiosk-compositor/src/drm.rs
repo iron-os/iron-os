@@ -6,6 +6,7 @@
 
 use crate::render;
 use crate::state::{Backend, State};
+use crate::stats::Stats;
 
 use std::time::{Duration, Instant};
 
@@ -34,7 +35,7 @@ use smithay::reexports::input::Libinput;
 use smithay::reexports::rustix::fs::OFlags;
 use smithay::reexports::wayland_server::backend::GlobalId;
 use smithay::utils::{DeviceFd, Transform};
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 type GbmDrmCompositor = DrmCompositor<
 	GbmAllocator<DrmDeviceFd>,
@@ -75,6 +76,7 @@ struct Surface {
 	timer_pending: bool,
 	render_queued: bool,
 	redraw: bool,
+	stats: Stats,
 }
 
 pub fn init(
@@ -350,6 +352,7 @@ fn create_surface(
 		timer_pending: false,
 		render_queued: false,
 		redraw: true,
+		stats: Stats::new(),
 	};
 
 	Ok((surface, output))
@@ -418,6 +421,7 @@ fn render(state: &mut State) {
 	// display was off a still pending flip can mark old buffers as valid)
 	s.compositor.reset_buffers();
 
+	let start = Instant::now();
 	let elements = render::elements(&mut b.renderer, &state.space, &output);
 	let res = s.compositor.render_frame(
 		&mut b.renderer,
@@ -426,7 +430,6 @@ fn render(state: &mut State) {
 		FrameFlags::empty(),
 	);
 
-	debug!("rendered frame");
 	let queued = match res {
 		Ok(res) if !res.is_empty => match s.compositor.queue_frame(()) {
 			Ok(()) => true,
@@ -441,6 +444,8 @@ fn render(state: &mut State) {
 			false
 		}
 	};
+
+	s.stats.frame(start.elapsed(), queued);
 
 	if queued {
 		s.flip_pending = Some(Instant::now());
@@ -475,7 +480,9 @@ fn vblank(state: &mut State, crtc: crtc::Handle) {
 		return;
 	}
 
-	s.flip_pending = None;
+	if let Some(since) = s.flip_pending.take() {
+		s.stats.flipped(since.elapsed());
+	}
 	if let Err(e) = s.compositor.frame_submitted() {
 		warn!("frame submitted {e}");
 	}
