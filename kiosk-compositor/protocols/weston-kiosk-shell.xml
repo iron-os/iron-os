@@ -1,0 +1,34 @@
+<protocol name="weston_kiosk">
+  <interface name="weston_kiosk_shell" version="1">
+
+    <description summary="turn display on and off">
+      Traditional user interfaces can rely on this interface to define the
+      foundations of typical desktops. Currently it's possible to set up
+      background, panels and locking surfaces.
+    </description>
+
+    <request name="set_state">
+      <arg name="state" type="uint" />
+    </request>
+
+    <request name="set_brightness">
+      <!-- should be 0-255 -->
+      <arg name="brightness" type="uint" />
+    </request>
+
+    <enum name="state">
+      <entry name="off" value="0" />
+      <entry name="on" value="1" />
+    </enum>
+
+    <event name="state_change">
+      <arg name="state" type="uint" />
+    </event>
+
+    <request name="mouse_click">
+      <arg name="x" type="fixed" summary="normalized x coordinate (0.0-1.0)" />
+      <arg name="y" type="fixed" summary="normalized y coordinate (0.0-1.0)" />
+    </request>
+
+  </interface>
+</protocol>

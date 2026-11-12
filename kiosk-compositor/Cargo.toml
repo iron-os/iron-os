@@ -1,0 +1,32 @@
+[package]
+name = "kiosk-compositor"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Wayland kiosk compositor for Iron OS, replaces weston"
+
+[dependencies]
+smithay = { version = "0.7", default-features = false, features = [
+	"backend_drm",
+	"backend_gbm",
+	"backend_egl",
+	"backend_libinput",
+	"backend_udev",
+	"backend_session_libseat",
+	"renderer_gl",
+	"desktop",
+	"wayland_frontend",
+] }
+wayland-server = "0.31"
+wayland-backend = "0.3"
+wayland-scanner = "0.31"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2"
+
+[profile.release]
+lto = true
+
+[dev-dependencies]
+wayland-client = "0.31"
