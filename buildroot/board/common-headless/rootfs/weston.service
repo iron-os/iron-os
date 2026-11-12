@@ -7,7 +7,8 @@ Description=Run weston
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/weston -c /etc/weston/weston.ini -S wayland-0
+# kiosk-compositor replaces weston, touch /data/use-weston to go back
+ExecStart=/bin/sh -c 'if [ -e /data/use-weston ]; then exec /usr/bin/weston -c /etc/weston/weston.ini -S wayland-0; else exec /usr/bin/kiosk-compositor -S wayland-0; fi'
 Restart=always
 RestartSec=2
 User=user

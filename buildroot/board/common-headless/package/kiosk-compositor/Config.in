@@ -1,0 +1,9 @@
+config BR2_PACKAGE_KIOSK_COMPOSITOR
+	bool "kiosk-compositor"
+	depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS
+	select BR2_PACKAGE_HOST_RUSTC
+	select BR2_PACKAGE_SEATD
+	select BR2_PACKAGE_LIBINPUT
+	select BR2_PACKAGE_LIBXKBCOMMON
+	help
+	  Wayland kiosk compositor written with smithay, replaces weston.

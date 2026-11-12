@@ -1,2 +1,3 @@
 source "$BR2_EXTERNAL_IRON_OS_PATH/service-bootloader/Config.in"
+source "$BR2_EXTERNAL_IRON_OS_PATH/kiosk-compositor/Config.in"
 source "$BR2_EXTERNAL_IRON_OS_PATH/noto-emoji/Config.in"
