@@ -34,7 +34,7 @@ use smithay::reexports::input::Libinput;
 use smithay::reexports::rustix::fs::OFlags;
 use smithay::reexports::wayland_server::backend::GlobalId;
 use smithay::utils::{DeviceFd, Transform};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 type GbmDrmCompositor = DrmCompositor<
 	GbmAllocator<DrmDeviceFd>,
@@ -69,6 +69,8 @@ struct Surface {
 	refresh: Duration,
 	/// a page flip was queued and its vblank did not arrive yet
 	flip_pending: Option<Instant>,
+	/// a timer checks that the pending flip completes
+	flip_timer: bool,
 	/// waiting a refresh after a frame without damage or an error
 	timer_pending: bool,
 	render_queued: bool,
@@ -344,6 +346,7 @@ fn create_surface(
 		global,
 		refresh,
 		flip_pending: None,
+		flip_timer: false,
 		timer_pending: false,
 		render_queued: false,
 		redraw: true,
@@ -383,8 +386,25 @@ fn render(state: &mut State) {
 	}
 
 	if let Some(since) = s.flip_pending {
-		if since.elapsed() < FLIP_TIMEOUT {
-			// the vblank will render again
+		let elapsed = since.elapsed();
+		if elapsed < FLIP_TIMEOUT {
+			// the vblank renders again, if it never comes this timer does
+			if !s.flip_timer {
+				s.flip_timer = true;
+				let res = state.loop_handle.insert_source(
+					Timer::from_duration(FLIP_TIMEOUT - elapsed),
+					|_, _, state| {
+						if let Some(s) = surface(state) {
+							s.flip_timer = false;
+						}
+						frame_done(state);
+						TimeoutAction::Drop
+					},
+				);
+				if let Err(e) = res {
+					error!("could not insert flip timer {e}");
+				}
+			}
 			return;
 		}
 		warn!("page flip did not complete, rendering anyway");
@@ -392,6 +412,11 @@ fn render(state: &mut State) {
 	}
 
 	s.redraw = false;
+	// always draw complete frames: with one fullscreen window this costs
+	// almost nothing and partial updates showed stale areas (virtio-gpu only
+	// copies the damaged rects, panels with psr2 do the same, and after the
+	// display was off a still pending flip can mark old buffers as valid)
+	s.compositor.reset_buffers();
 
 	let elements = render::elements(&mut b.renderer, &state.space, &output);
 	let res = s.compositor.render_frame(
@@ -401,6 +426,7 @@ fn render(state: &mut State) {
 		FrameFlags::empty(),
 	);
 
+	debug!("rendered frame");
 	let queued = match res {
 		Ok(res) if !res.is_empty => match s.compositor.queue_frame(()) {
 			Ok(()) => true,
@@ -472,9 +498,8 @@ pub fn set_awake(state: &mut State, awake: bool) {
 	};
 
 	if awake {
-		// make sure the next frame is drawn completely, which also
-		// turns the crtc on again
-		s.compositor.reset_buffers();
+		// the next frame turns the crtc on again
+		s.redraw = true;
 	} else if let Err(e) = s.compositor.clear() {
 		warn!("could not turn the display off {e}");
 	}
