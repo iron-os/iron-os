@@ -1,5 +1,8 @@
+use crate::debug::Debug;
+
 use smithay::backend::allocator::Fourcc;
 use smithay::backend::renderer::damage::OutputDamageTracker;
+use smithay::backend::renderer::element::solid::SolidColorRenderElement;
 use smithay::backend::renderer::element::surface::WaylandSurfaceRenderElement;
 use smithay::backend::renderer::gles::{GlesRenderer, GlesTexture};
 use smithay::backend::renderer::{
@@ -10,20 +13,33 @@ use smithay::desktop::{Space, Window};
 use smithay::output::Output;
 use smithay::utils::{Physical, Rectangle, Size, Transform};
 
-pub type Element = SpaceRenderElements<
-	GlesRenderer,
-	WaylandSurfaceRenderElement<GlesRenderer>,
->;
+smithay::backend::renderer::element::render_elements! {
+	pub Element<=GlesRenderer>;
+	Space=SpaceRenderElements<
+		GlesRenderer,
+		WaylandSurfaceRenderElement<GlesRenderer>,
+	>,
+	Debug=SolidColorRenderElement,
+}
 
 /// same as the weston background-color in weston.ini
 pub const CLEAR_COLOR: Color32F = Color32F::new(1.0, 1.0, 1.0, 1.0);
 
+/// The elements of a frame front to back, the debug overlays first.
 pub fn elements(
 	renderer: &mut GlesRenderer,
 	space: &Space<Window>,
 	output: &Output,
+	debug: &mut Debug,
 ) -> Vec<Element> {
-	space_render_elements(renderer, [space], output, 1.0).unwrap_or_default()
+	let mut elements: Vec<Element> = match space.output_geometry(output) {
+		Some(geo) => debug.elements(geo).into_iter().map(Into::into).collect(),
+		None => vec![],
+	};
+	let space = space_render_elements(renderer, [space], output, 1.0)
+		.unwrap_or_default();
+	elements.extend(space.into_iter().map(Element::from));
+	elements
 }
 
 /// Renders the output into memory as XRGB8888 (little endian, so the bytes
@@ -32,12 +48,13 @@ pub fn render_to_memory(
 	renderer: &mut GlesRenderer,
 	space: &Space<Window>,
 	output: &Output,
+	debug: &mut Debug,
 ) -> Result<(Size<i32, Physical>, Vec<u8>), String> {
 	let mode = output.current_mode().ok_or("output has no mode")?;
 	let size = mode.size;
 	let buffer_size = size.to_logical(1).to_buffer(1, Transform::Normal);
 
-	let elements = elements(renderer, space, output);
+	let elements = elements(renderer, space, output, debug);
 
 	let mut texture: GlesTexture = renderer
 		.create_buffer(Fourcc::Xrgb8888, buffer_size)

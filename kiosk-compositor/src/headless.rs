@@ -138,7 +138,9 @@ fn render(state: &mut State) {
 			Some(OutputDamageTracker::from_output(&output));
 	}
 
-	let elements = render::elements(renderer, &state.space, &output);
+	let start = std::time::Instant::now();
+	let elements =
+		render::elements(renderer, &state.space, &output, &mut state.debug);
 	let target = backend.target.as_mut().unwrap();
 	let damage_tracker = backend.damage_tracker.as_mut().unwrap();
 	match renderer.bind(target) {
@@ -157,5 +159,9 @@ fn render(state: &mut State) {
 		Err(e) => warn!("bind {e}"),
 	}
 
+	state.debug.frame(start.elapsed(), true);
 	state.send_frames();
+	if state.debug.animating() {
+		schedule_render(state);
+	}
 }

@@ -14,6 +14,24 @@ display and implements:
 
 A touch on a display that is off only wakes the display, the touch is not passed to the app.
 
+## Debugging
+The compositor keeps the last 2000 events in memory and has a debug socket next to the wayland
+socket (`$XDG_RUNTIME_DIR/kiosk-compositor.sock`):
+
+```
+kiosk-compositor debug stats        # fps, commits/s, render times of the last 120 frames
+kiosk-compositor debug events       # live stream of json lines
+kiosk-compositor debug dump         # the last 2000 events
+kiosk-compositor debug damage on    # flash every area a client repaints
+kiosk-compositor debug hud on       # graph: frame interval (line = 60fps), render time, commits
+```
+
+Events: `commit` (client, surface, damage rects), `frame` (render time, interval), `flip` (time until
+the frame was on the display), `display`, `kiosk_*` requests, `touch_*` (position, if a window got it,
+if it only woke the display), `pointer_button`, `key`, `window_*`, `output`, `capture`.
+Once a minute while drawing, the journal gets a `stats:` line. The overlays also show up in
+screenshots.
+
 ## Run
 `kiosk-compositor -S wayland-0` from weston.service (logind session on tty1).
 `/data/use-weston` makes weston.service start weston instead.

@@ -1,10 +1,12 @@
 use crate::capture::CaptureState;
+use crate::debug::Debug;
 use crate::kiosk::KioskState;
 use crate::{drm, headless};
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use serde_json::json;
 use smithay::backend::input::TouchSlot;
 use smithay::backend::renderer::gles::GlesRenderer;
 use smithay::backend::renderer::utils::on_commit_buffer_handler;
@@ -32,7 +34,7 @@ use smithay::utils::{Logical, Point, Rectangle, Serial, SERIAL_COUNTER};
 use smithay::wayland::buffer::BufferHandler;
 use smithay::wayland::compositor::{
 	get_parent, is_sync_subsurface, with_states, CompositorClientState,
-	CompositorHandler, CompositorState,
+	CompositorHandler, CompositorState, Damage, SurfaceAttributes,
 };
 use smithay::wayland::dmabuf::{
 	DmabufGlobal, DmabufHandler, DmabufState, ImportNotifier,
@@ -110,6 +112,8 @@ pub struct State {
 	pub awake: bool,
 	/// touch points that woke the display, these are not forwarded
 	pub swallowed_touches: Vec<TouchSlot>,
+
+	pub debug: Debug,
 }
 
 impl State {
@@ -167,6 +171,7 @@ impl State {
 			pointer_devices: 0,
 			awake: true,
 			swallowed_touches: vec![],
+			debug: Debug::new(),
 		})
 	}
 
@@ -184,6 +189,16 @@ impl State {
 		if let Some(output) = &output {
 			self.space.map_output(output, (0, 0));
 		}
+		let mode = output.as_ref().and_then(|o| o.current_mode());
+		self.debug.event(
+			"output",
+			json!({
+				"name": output.as_ref().map(|o| o.name()),
+				"w": mode.map(|m| m.size.w),
+				"h": mode.map(|m| m.size.h),
+				"refresh": mode.map(|m| m.refresh),
+			}),
+		);
 		self.output = output;
 
 		let windows: Vec<_> = self.space.elements().cloned().collect();
@@ -255,6 +270,7 @@ impl State {
 
 		info!("display {}", if awake { "on" } else { "off" });
 		self.awake = awake;
+		self.debug.event("display", json!({ "on": awake }));
 
 		match &self.backend {
 			Backend::Drm(_) => drm::set_awake(self, awake),
@@ -349,6 +365,8 @@ impl CompositorHandler for State {
 	}
 
 	fn commit(&mut self, surface: &WlSurface) {
+		// before the buffer handler, it takes the buffer and the damage
+		self.debug_commit(surface);
 		on_commit_buffer_handler::<Self>(surface);
 
 		if !is_sync_subsurface(surface) {
@@ -434,6 +452,9 @@ impl XdgShellHandler for State {
 
 	fn new_toplevel(&mut self, surface: ToplevelSurface) {
 		info!("new window");
+		let surface_id = surface.wl_surface().id().protocol_id();
+		self.debug
+			.event("window_new", json!({ "surface": surface_id }));
 		let window = Window::new_wayland_window(surface);
 		self.configure_fullscreen(&window);
 		// the newest window is always on top
@@ -443,6 +464,9 @@ impl XdgShellHandler for State {
 
 	fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
 		info!("window closed");
+		let surface_id = surface.wl_surface().id().protocol_id();
+		self.debug
+			.event("window_closed", json!({ "surface": surface_id }));
 		let window = self
 			.space
 			.elements()
@@ -509,6 +533,84 @@ impl XdgShellHandler for State {
 }
 
 impl State {
+	/// Records a commit with its damage in output coordinates (subsurfaces
+	/// are shown at the position of their parent).
+	fn debug_commit(&mut self, surface: &WlSurface) {
+		let (damage, buffer) = with_states(surface, |states| {
+			let mut attrs = states.cached_state.get::<SurfaceAttributes>();
+			let attrs = attrs.current();
+			let damage: Vec<Rectangle<i32, Logical>> = attrs
+				.damage
+				.iter()
+				.map(|d| match d {
+					Damage::Surface(r) => *r,
+					// buffer scale and transform are always 1 and normal
+					Damage::Buffer(r) => Rectangle::new(
+						(r.loc.x, r.loc.y).into(),
+						(r.size.w, r.size.h).into(),
+					),
+				})
+				.collect();
+			(damage, attrs.buffer.is_some())
+		});
+
+		let mut root = surface.clone();
+		while let Some(parent) = get_parent(&root) {
+			root = parent;
+		}
+
+		let (kind, offset) = if let Some(popup) = self.popups.find_popup(&root)
+		{
+			let toplevel = get_popup_toplevel_coords(&popup);
+			("popup", toplevel + popup.geometry().loc)
+		} else if let Some(window) = self
+			.space
+			.elements()
+			.find(|w| w.toplevel().map(|t| t.wl_surface()) == Some(&root))
+		{
+			let loc = self.space.element_location(window).unwrap_or_default();
+			("window", loc - window.geometry().loc)
+		} else {
+			("other", (0, 0).into())
+		};
+		let kind = if &root != surface { "subsurface" } else { kind };
+
+		let damage: Vec<_> = damage
+			.into_iter()
+			.map(|mut r| {
+				r.loc += offset;
+				r
+			})
+			.collect();
+		let area: i64 = damage
+			.iter()
+			.map(|r| r.size.w as i64 * r.size.h as i64)
+			.sum();
+		let pid = self
+			.display_handle
+			.get_client(surface.id())
+			.ok()
+			.and_then(|c| c.get_credentials(&self.display_handle).ok())
+			.map(|c| c.pid);
+
+		self.debug.commit(&damage);
+		self.debug.event(
+			"commit",
+			json!({
+				"surface": surface.id().protocol_id(),
+				"pid": pid,
+				"kind": kind,
+				"buffer": buffer,
+				"damage_px": area,
+				"damage": damage
+					.iter()
+					.take(8)
+					.map(|r| [r.loc.x, r.loc.y, r.size.w, r.size.h])
+					.collect::<Vec<_>>(),
+			}),
+		);
+	}
+
 	fn unconstrain_popup(&self, popup: &PopupSurface) {
 		let Ok(root) = find_popup_root_surface(&PopupKind::Xdg(popup.clone()))
 		else {

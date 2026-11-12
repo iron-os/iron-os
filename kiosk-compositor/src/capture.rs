@@ -6,6 +6,7 @@
 use crate::render;
 use crate::state::State;
 
+use serde_json::json;
 use smithay::reexports::wayland_server::protocol::wl_buffer::WlBuffer;
 use smithay::reexports::wayland_server::protocol::wl_shm;
 use smithay::reexports::wayland_server::{
@@ -134,15 +135,19 @@ fn capture(state: &mut State, src: &WestonCaptureSourceV1, buffer: &WlBuffer) {
 	};
 
 	let renderer = state.backend.renderer();
-	let (size, pixels) =
-		match render::render_to_memory(renderer, &state.space, &output) {
-			Ok(r) => r,
-			Err(e) => {
-				warn!("capture failed {e}");
-				src.failed(Some(e));
-				return;
-			}
-		};
+	let (size, pixels) = match render::render_to_memory(
+		renderer,
+		&state.space,
+		&output,
+		&mut state.debug,
+	) {
+		Ok(r) => r,
+		Err(e) => {
+			warn!("capture failed {e}");
+			src.failed(Some(e));
+			return;
+		}
+	};
 
 	let res = with_buffer_contents_mut(buffer, |ptr, len, data| {
 		let format_ok = matches!(
@@ -179,6 +184,9 @@ fn capture(state: &mut State, src: &WestonCaptureSourceV1, buffer: &WlBuffer) {
 	match res {
 		Ok(true) => {
 			info!("captured {}x{}", size.w, size.h);
+			state
+				.debug
+				.event("capture", json!({ "w": size.w, "h": size.h }));
 			src.complete();
 		}
 		Ok(false) => {

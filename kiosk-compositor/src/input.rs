@@ -1,9 +1,11 @@
 use crate::state::State;
 
+use serde_json::json;
 use smithay::backend::input::{
-	AbsolutePositionEvent, Axis, AxisSource, Device, DeviceCapability, Event,
-	InputBackend, InputEvent, KeyboardKeyEvent, PointerAxisEvent,
-	PointerButtonEvent, PointerMotionEvent, TouchEvent,
+	AbsolutePositionEvent, Axis, AxisSource, ButtonState, Device,
+	DeviceCapability, Event, InputBackend, InputEvent, KeyState,
+	KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
+	TouchEvent, TouchSlot,
 };
 use smithay::input::keyboard::FilterResult;
 use smithay::input::pointer::{
@@ -21,6 +23,10 @@ impl State {
 		match event {
 			InputEvent::DeviceAdded { device } => {
 				info!("input device added: {}", device.name());
+				self.debug.event(
+					"input_device_added",
+					json!({ "name": device.name() }),
+				);
 				if device.has_capability(DeviceCapability::Pointer) {
 					self.pointer_devices += 1;
 					if self.seat.get_pointer().is_none() {
@@ -30,6 +36,10 @@ impl State {
 			}
 			InputEvent::DeviceRemoved { device } => {
 				info!("input device removed: {}", device.name());
+				self.debug.event(
+					"input_device_removed",
+					json!({ "name": device.name() }),
+				);
 				if device.has_capability(DeviceCapability::Pointer) {
 					self.pointer_devices =
 						self.pointer_devices.saturating_sub(1);
@@ -39,6 +49,13 @@ impl State {
 				}
 			}
 			InputEvent::Keyboard { event } => {
+				self.debug.event(
+					"key",
+					json!({
+						"code": u32::from(event.key_code()),
+						"pressed": event.state() == KeyState::Pressed,
+					}),
+				);
 				self.wake_by_input();
 				let Some(keyboard) = self.seat.get_keyboard() else {
 					return;
@@ -102,6 +119,13 @@ impl State {
 				pointer.frame(self);
 			}
 			InputEvent::PointerButton { event } => {
+				self.debug.event(
+					"pointer_button",
+					json!({
+						"button": event.button_code(),
+						"pressed": event.state() == ButtonState::Pressed,
+					}),
+				);
 				self.wake_by_input();
 				let Some(pointer) = self.seat.get_pointer() else {
 					return;
@@ -149,6 +173,7 @@ impl State {
 				// a touch on a dark display only wakes it up, the app
 				// should not get a click the user could not see
 				if !self.awake {
+					self.touch_event("touch_down", slot, None, false, true);
 					self.wake_by_input();
 					self.swallowed_touches.push(slot);
 					return;
@@ -161,6 +186,13 @@ impl State {
 				let pos =
 					event.position_transformed(geo.size) + geo.loc.to_f64();
 				let under = self.surface_under(pos);
+				self.touch_event(
+					"touch_down",
+					slot,
+					Some(pos),
+					under.is_some(),
+					false,
+				);
 				touch.down(
 					self,
 					under,
@@ -184,6 +216,13 @@ impl State {
 				let pos =
 					event.position_transformed(geo.size) + geo.loc.to_f64();
 				let under = self.surface_under(pos);
+				self.touch_event(
+					"touch_motion",
+					event.slot(),
+					Some(pos),
+					under.is_some(),
+					false,
+				);
 				touch.motion(
 					self,
 					under,
@@ -199,9 +238,11 @@ impl State {
 				if let Some(i) =
 					self.swallowed_touches.iter().position(|s| *s == slot)
 				{
+					self.touch_event("touch_up", slot, None, false, true);
 					self.swallowed_touches.swap_remove(i);
 					return;
 				}
+				self.touch_event("touch_up", slot, None, false, false);
 				let Some(touch) = self.seat.get_touch() else {
 					return;
 				};
@@ -220,6 +261,7 @@ impl State {
 				}
 			}
 			InputEvent::TouchCancel { .. } => {
+				self.debug.event("touch_cancel", json!({}));
 				self.swallowed_touches.clear();
 				if let Some(touch) = self.seat.get_touch() {
 					touch.cancel(self);
@@ -227,6 +269,26 @@ impl State {
 			}
 			_ => {}
 		}
+	}
+
+	fn touch_event(
+		&mut self,
+		kind: &str,
+		slot: TouchSlot,
+		pos: Option<Point<f64, Logical>>,
+		focused: bool,
+		swallowed: bool,
+	) {
+		self.debug.event(
+			kind,
+			json!({
+				"slot": i32::from(slot),
+				"x": pos.map(|p| p.x.round()),
+				"y": pos.map(|p| p.y.round()),
+				"focused": focused,
+				"swallowed": swallowed,
+			}),
+		);
 	}
 
 	fn clamp(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {

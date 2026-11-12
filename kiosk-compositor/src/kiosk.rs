@@ -6,6 +6,7 @@ use crate::state::State;
 
 use std::time::Duration;
 
+use serde_json::json;
 use smithay::backend::input::ButtonState;
 use smithay::input::pointer::{ButtonEvent, MotionEvent};
 use smithay::reexports::calloop::timer::{TimeoutAction, Timer};
@@ -91,6 +92,7 @@ impl Dispatch<WestonKioskShell, ()> for State {
 		match request {
 			weston_kiosk_shell::Request::SetState { state: s } => {
 				let awake = s != 0;
+				state.debug.event("kiosk_set_state", json!({ "on": awake }));
 				if state.set_awake(awake) {
 					resource.state_change(awake as u32);
 				}
@@ -98,12 +100,17 @@ impl Dispatch<WestonKioskShell, ()> for State {
 			weston_kiosk_shell::Request::SetBrightness { brightness } => {
 				// same limits as weston, never fully dark
 				let brightness = brightness.clamp(5, 255);
+				state.debug.event(
+					"kiosk_brightness",
+					json!({ "brightness": brightness }),
+				);
 				info!("set brightness {brightness}");
 				if let Err(e) = backlight::set(brightness) {
 					warn!("could not set brightness {e}");
 				}
 			}
 			weston_kiosk_shell::Request::MouseClick { x, y } => {
+				state.debug.event("kiosk_click", json!({ "x": x, "y": y }));
 				mouse_click(state, x, y);
 			}
 		}

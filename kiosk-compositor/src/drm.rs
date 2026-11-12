@@ -10,6 +10,7 @@ use crate::stats::Stats;
 
 use std::time::{Duration, Instant};
 
+use serde_json::json;
 use smithay::backend::allocator::gbm::{
 	GbmAllocator, GbmBufferFlags, GbmDevice,
 };
@@ -422,7 +423,12 @@ fn render(state: &mut State) {
 	s.compositor.reset_buffers();
 
 	let start = Instant::now();
-	let elements = render::elements(&mut b.renderer, &state.space, &output);
+	let elements = render::elements(
+		&mut b.renderer,
+		&state.space,
+		&output,
+		&mut state.debug,
+	);
 	let res = s.compositor.render_frame(
 		&mut b.renderer,
 		&elements,
@@ -445,7 +451,13 @@ fn render(state: &mut State) {
 		}
 	};
 
-	s.stats.frame(start.elapsed(), queued);
+	let took = start.elapsed();
+	s.stats.frame(took, queued);
+	state.debug.frame(took, queued);
+	// the debug overlays change every frame
+	if state.debug.animating() {
+		s.redraw = true;
+	}
 
 	if queued {
 		s.flip_pending = Some(Instant::now());
@@ -480,11 +492,16 @@ fn vblank(state: &mut State, crtc: crtc::Handle) {
 		return;
 	}
 
-	if let Some(since) = s.flip_pending.take() {
-		s.stats.flipped(since.elapsed());
+	let took = s.flip_pending.take().map(|since| since.elapsed());
+	if let Some(took) = took {
+		s.stats.flipped(took);
 	}
 	if let Err(e) = s.compositor.frame_submitted() {
 		warn!("frame submitted {e}");
+	}
+	if let Some(took) = took {
+		let ms = took.as_secs_f64() * 1000.0;
+		state.debug.event("flip", json!({ "ms": ms }));
 	}
 
 	frame_done(state);

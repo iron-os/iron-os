@@ -7,6 +7,7 @@
 
 mod backlight;
 mod capture;
+mod debug;
 mod drm;
 mod headless;
 mod input;
@@ -19,10 +20,10 @@ use state::{Backend, State};
 
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use smithay::reexports::calloop::EventLoop;
 use smithay::reexports::wayland_server::Display;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Parser)]
 #[command(version)]
@@ -38,10 +39,29 @@ struct Args {
 	headless_size: String,
 	#[arg(long, default_value = "kiosk_compositor=info,warn")]
 	tracing: String,
+	#[command(subcommand)]
+	cmd: Option<Cmd>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Cmd {
+	/// talk to the running compositor: events, dump, stats,
+	/// damage on|off, hud on|off
+	Debug { command: Vec<String> },
 }
 
 fn main() -> ExitCode {
 	let args = Args::parse();
+
+	if let Some(Cmd::Debug { command }) = &args.cmd {
+		return match debug::client(command) {
+			Ok(()) => ExitCode::SUCCESS,
+			Err(e) => {
+				eprintln!("{e}");
+				ExitCode::FAILURE
+			}
+		};
+	}
 
 	tracing_subscriber::fmt()
 		.with_env_filter(args.tracing.as_str())
@@ -76,6 +96,10 @@ fn run(args: Args) -> Result<(), String> {
 
 	let mut state =
 		State::new(display, &event_loop.handle(), backend, &args.socket)?;
+
+	if let Err(e) = debug::listen(&mut state, &event_loop.handle()) {
+		warn!("no debug socket {e}");
+	}
 
 	match &state.backend {
 		Backend::Drm(_) => drm::start(&mut state),
