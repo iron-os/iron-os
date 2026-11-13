@@ -71,20 +71,19 @@ pub struct Display {
 impl Display {
 	pub async fn set_state(&self, state: State) -> Option<()> {
 		eprintln!("Display: set_state {:?}", state);
-		self.tx.send(Message::ChangeState(state)).await.ok()
+		// never wait for the compositor, while it is away the requests
+		// fail instead of piling up
+		self.tx.try_send(Message::ChangeState(state)).ok()
 	}
 
 	pub async fn set_brightness(&self, brightness: u8) -> Option<()> {
 		eprintln!("Display: set_brightness {:?}", brightness);
-		self.tx
-			.send(Message::ChangeBrightness(brightness))
-			.await
-			.ok()
+		self.tx.try_send(Message::ChangeBrightness(brightness)).ok()
 	}
 
 	pub async fn mouse_click(&self, x: f32, y: f32) -> Option<()> {
 		eprintln!("Display: mouse_click x:{} y:{}", x, y);
-		self.tx.send(Message::MouseClick { x, y }).await.ok()
+		self.tx.try_send(Message::MouseClick { x, y }).ok()
 	}
 
 	#[allow(dead_code)]
@@ -126,10 +125,23 @@ pub fn start() -> (JoinHandle<()>, Display) {
 		// could not be fixed by an update
 		let mut wait = Duration::from_secs(2);
 		loop {
-			// no message in the channel
-			// create one to power on the screen
-			if MPSC_CAP == tx.capacity() {
-				let _ = tx.try_send(Message::ChangeState(State::On));
+			// requests from while the compositor was away: only the last
+			// state and brightness still matter, old clicks would hit
+			// whatever is shown now
+			let mut state = None;
+			let mut brightness = None;
+			while let Ok(msg) = rx.try_recv() {
+				match msg {
+					Message::ChangeState(s) => state = Some(s),
+					Message::ChangeBrightness(b) => brightness = Some(b),
+					Message::MouseClick { .. } => {}
+				}
+			}
+			// without a request power on the screen
+			let state = state.unwrap_or(State::On);
+			let _ = tx.try_send(Message::ChangeState(state));
+			if let Some(b) = brightness {
+				let _ = tx.try_send(Message::ChangeBrightness(b));
 			}
 
 			// a connection which worked for a while starts the backoff again
@@ -143,7 +155,7 @@ pub fn start() -> (JoinHandle<()>, Display) {
 			}
 
 			sleep(wait).await;
-			wait = (wait * 2).min(Duration::from_secs(60));
+			wait = (wait * 2).min(Duration::from_secs(10));
 		}
 	});
 
