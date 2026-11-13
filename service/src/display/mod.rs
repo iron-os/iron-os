@@ -21,7 +21,7 @@ use std::{io, thread};
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, Duration, Instant};
 
 use wayland_client::{
 	ConnectError, Display as WlDisplay, GlobalError, GlobalManager,
@@ -121,21 +121,30 @@ pub fn start() -> (JoinHandle<()>, Display) {
 		let mut rx = rx;
 		let tx = tx;
 
-		for _ in 0..10 {
+		// never give up: if this task ended the whole service would restart
+		// and with it a running package update, so a broken compositor
+		// could not be fixed by an update
+		let mut wait = Duration::from_secs(2);
+		loop {
 			// no message in the channel
 			// create one to power on the screen
 			if MPSC_CAP == tx.capacity() {
 				let _ = tx.try_send(Message::ChangeState(State::On));
 			}
 
-			if let Err(e) = handle_display(w_tx.clone(), &mut rx).await {
-				eprintln!("handle display error {:?}", e);
+			// a connection which worked for a while starts the backoff again
+			let started = Instant::now();
+			let res = handle_display(w_tx.clone(), &mut rx).await;
+			if started.elapsed() > Duration::from_secs(60) {
+				wait = Duration::from_secs(2);
+			}
+			if let Err(e) = res {
+				eprintln!("handle display error {:?}, retry in {:?}", e, wait);
 			}
 
-			sleep(Duration::from_secs(2)).await;
+			sleep(wait).await;
+			wait = (wait * 2).min(Duration::from_secs(60));
 		}
-
-		panic!("display failed to many times")
 	});
 
 	(task, display)

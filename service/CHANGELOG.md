@@ -1,3 +1,7 @@
+## Unreleased
+- Keep retrying the display connection instead of restarting the service,
+  so package updates also work while the compositor is broken
+
 ## 1.2.8
 - Grow the root partitions of devices installed before 2026.10 to 1000MiB on
   the next image update, without touching the data partition (#22)
