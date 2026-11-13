@@ -1,5 +1,5 @@
-use crate::capture::CaptureState;
-use crate::debug::Debug;
+use crate::capture;
+use crate::debug::{self, Debug};
 use crate::kiosk::KioskState;
 use crate::touch_stats::TouchStats;
 use crate::{drm, headless};
@@ -18,12 +18,13 @@ use smithay::desktop::{
 };
 use smithay::input::keyboard::XkbConfig;
 use smithay::input::{Seat, SeatHandler, SeatState};
-use smithay::output::Output;
+use smithay::output::{Mode as OutputMode, Output, PhysicalProperties};
 use smithay::reexports::calloop::generic::Generic;
+use smithay::reexports::calloop::timer::{TimeoutAction, Timer};
 use smithay::reexports::calloop::{Interest, LoopHandle, Mode, PostAction};
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
 use smithay::reexports::wayland_server::backend::{
-	ClientData, ClientId, DisconnectReason,
+	ClientData, ClientId, DisconnectReason, GlobalId,
 };
 use smithay::reexports::wayland_server::protocol::{
 	wl_buffer, wl_seat, wl_surface::WlSurface,
@@ -31,11 +32,13 @@ use smithay::reexports::wayland_server::protocol::{
 use smithay::reexports::wayland_server::{
 	Client, Display, DisplayHandle, Resource,
 };
-use smithay::utils::{Logical, Point, Rectangle, Serial, SERIAL_COUNTER};
+use smithay::utils::{
+	Logical, Point, Rectangle, Serial, Transform, SERIAL_COUNTER,
+};
 use smithay::wayland::buffer::BufferHandler;
 use smithay::wayland::compositor::{
-	get_parent, is_sync_subsurface, with_states, CompositorClientState,
-	CompositorHandler, CompositorState, Damage, SurfaceAttributes,
+	get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler,
+	CompositorState,
 };
 use smithay::wayland::dmabuf::{
 	DmabufGlobal, DmabufHandler, DmabufState, ImportNotifier,
@@ -48,7 +51,7 @@ use smithay::wayland::selection::data_device::{
 use smithay::wayland::selection::SelectionHandler;
 use smithay::wayland::shell::xdg::{
 	PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler,
-	XdgShellState, XdgToplevelSurfaceData,
+	XdgShellState,
 };
 use smithay::wayland::shm::{ShmHandler, ShmState};
 use smithay::wayland::socket::ListeningSocketSource;
@@ -61,8 +64,8 @@ use smithay::{
 use tracing::{info, warn};
 
 pub enum Backend {
-	Drm(drm::DrmBackend),
-	Headless(headless::HeadlessBackend),
+	Drm(Box<drm::DrmBackend>),
+	Headless(Box<headless::HeadlessBackend>),
 }
 
 impl Backend {
@@ -71,6 +74,41 @@ impl Backend {
 			Self::Drm(b) => &mut b.renderer,
 			Self::Headless(b) => &mut b.renderer,
 		}
+	}
+}
+
+/// Creates an output with one mode at 0,0 and its global.
+pub fn create_output(
+	dh: &DisplayHandle,
+	name: String,
+	properties: PhysicalProperties,
+	mode: OutputMode,
+) -> (Output, GlobalId) {
+	let output = Output::new(name, properties);
+	output.change_current_state(
+		Some(mode),
+		Some(Transform::Normal),
+		None,
+		Some((0, 0).into()),
+	);
+	output.set_preferred(mode);
+	let global = output.create_global::<State>(dh);
+	(output, global)
+}
+
+/// Removes an output global, delayed so a client which binds it at the same
+/// time doesn't get killed.
+pub fn remove_output_global(state: &State, global: GlobalId) {
+	state.display_handle.disable_global::<State>(global.clone());
+	let res = state.loop_handle.insert_source(
+		Timer::from_duration(Duration::from_secs(5)),
+		move |_, _, state| {
+			state.display_handle.remove_global::<State>(global.clone());
+			TimeoutAction::Drop
+		},
+	);
+	if let Err(e) = res {
+		warn!("could not remove the output global {e}");
 	}
 }
 
@@ -87,22 +125,10 @@ pub struct State {
 	pub compositor_state: CompositorState,
 	pub xdg_shell_state: XdgShellState,
 	pub shm_state: ShmState,
-	// keeps the global alive
-	#[allow(dead_code)]
-	pub output_manager_state: OutputManagerState,
 	pub seat_state: SeatState<State>,
 	pub data_device_state: DataDeviceState,
 	pub dmabuf_state: DmabufState,
-	// keeps the global alive
-	#[allow(dead_code)]
-	pub dmabuf_global: Option<DmabufGlobal>,
-	// keeps the global alive
-	#[allow(dead_code)]
-	pub viewporter_state: ViewporterState,
 	pub kiosk: KioskState,
-	// keeps the global alive
-	#[allow(dead_code)]
-	pub capture: CaptureState,
 
 	pub seat: Seat<State>,
 	/// physical pointer devices (mice), without them we hide the pointer
@@ -113,6 +139,8 @@ pub struct State {
 	pub awake: bool,
 	/// touch points that woke the display, these are not forwarded
 	pub swallowed_touches: Vec<TouchSlot>,
+	/// touch points the client got a down for and no up yet
+	pub forwarded_touches: Vec<TouchSlot>,
 
 	pub debug: Debug,
 	pub touch_stats: TouchStats,
@@ -131,17 +159,17 @@ impl State {
 		let xdg_shell_state = XdgShellState::new::<Self>(&dh);
 		let shm_formats: Vec<_> = backend.renderer().shm_formats().collect();
 		let shm_state = ShmState::new::<Self>(&dh, shm_formats);
-		let output_manager_state =
-			OutputManagerState::new_with_xdg_output::<Self>(&dh);
+		// these only create globals, their state is not needed
+		OutputManagerState::new_with_xdg_output::<Self>(&dh);
+		ViewporterState::new::<Self>(&dh);
+		capture::init(&dh);
 		let mut seat_state = SeatState::new();
 		let data_device_state = DataDeviceState::new::<Self>(&dh);
-		let viewporter_state = ViewporterState::new::<Self>(&dh);
 		let kiosk = KioskState::new(&dh);
-		let capture = CaptureState::new(&dh);
 
 		let mut dmabuf_state = DmabufState::new();
 		let formats = backend.renderer().dmabuf_formats();
-		let dmabuf_global = dmabuf_state.create_global::<Self>(&dh, formats);
+		dmabuf_state.create_global::<Self>(&dh, formats);
 
 		let mut seat = seat_state.new_wl_seat(&dh, "seat0");
 		seat.add_keyboard(XkbConfig::default(), 200, 25)
@@ -161,18 +189,15 @@ impl State {
 			compositor_state,
 			xdg_shell_state,
 			shm_state,
-			output_manager_state,
 			seat_state,
 			data_device_state,
 			dmabuf_state,
-			dmabuf_global: Some(dmabuf_global),
-			viewporter_state,
 			kiosk,
-			capture,
 			seat,
 			pointer_devices: 0,
 			awake: true,
 			swallowed_touches: vec![],
+			forwarded_touches: vec![],
 			debug: Debug::new(),
 			touch_stats: TouchStats::new(),
 		})
@@ -265,6 +290,14 @@ impl State {
 		}
 	}
 
+	/// Sets up the output once everything is ready.
+	pub fn start_backend(&mut self) {
+		match &self.backend {
+			Backend::Drm(_) => drm::start(self),
+			Backend::Headless(_) => headless::start(self),
+		}
+	}
+
 	/// Turns the display on or off, returns true if the state changed.
 	pub fn set_awake(&mut self, awake: bool) -> bool {
 		if self.awake == awake {
@@ -278,9 +311,7 @@ impl State {
 		// fingers still down (or stuck in the touch controller) must not
 		// carry over to the next wake up
 		if !awake {
-			if let Some(touch) = self.seat.get_touch() {
-				touch.cancel(self);
-			}
+			self.cancel_touches();
 		}
 
 		match &self.backend {
@@ -293,6 +324,14 @@ impl State {
 		}
 
 		true
+	}
+
+	/// Tells the client that all its touch points are gone.
+	pub fn cancel_touches(&mut self) {
+		self.forwarded_touches.clear();
+		if let Some(touch) = self.seat.get_touch() {
+			touch.cancel(self);
+		}
 	}
 
 	/// The display was woken up by input.
@@ -377,7 +416,7 @@ impl CompositorHandler for State {
 
 	fn commit(&mut self, surface: &WlSurface) {
 		// before the buffer handler, it takes the buffer and the damage
-		self.debug_commit(surface);
+		debug::commit(self, surface);
 		on_commit_buffer_handler::<Self>(surface);
 
 		if !is_sync_subsurface(surface) {
@@ -400,18 +439,10 @@ impl CompositorHandler for State {
 			.elements()
 			.find(|w| w.toplevel().map(|t| t.wl_surface()) == Some(surface))
 		{
-			let toplevel = window.toplevel().unwrap();
-			let initial_sent = with_states(surface, |states| {
-				states
-					.data_map
-					.get::<XdgToplevelSurfaceData>()
-					.unwrap()
-					.lock()
-					.unwrap()
-					.initial_configure_sent
-			});
-			if !initial_sent {
-				toplevel.send_configure();
+			if let Some(toplevel) = window.toplevel() {
+				if !toplevel.is_initial_configure_sent() {
+					toplevel.send_configure();
+				}
 			}
 		}
 
@@ -519,7 +550,8 @@ impl XdgShellHandler for State {
 		// chromium does that on its own
 	}
 
-	// windows are always fullscreen, ignore all requests to change that
+	// windows are always fullscreen, all requests to change that are
+	// answered with the unchanged state
 	fn fullscreen_request(
 		&mut self,
 		surface: ToplevelSurface,
@@ -527,101 +559,31 @@ impl XdgShellHandler for State {
 			smithay::reexports::wayland_server::protocol::wl_output::WlOutput,
 		>,
 	) {
-		surface.send_pending_configure();
+		answer_configure(&surface);
 	}
 
 	fn unfullscreen_request(&mut self, surface: ToplevelSurface) {
-		surface.send_pending_configure();
+		answer_configure(&surface);
 	}
 
 	fn maximize_request(&mut self, surface: ToplevelSurface) {
-		surface.send_pending_configure();
+		answer_configure(&surface);
 	}
 
 	fn unmaximize_request(&mut self, surface: ToplevelSurface) {
-		surface.send_pending_configure();
+		answer_configure(&surface);
+	}
+}
+
+/// The client waits for a configure after a request, even if nothing changed.
+fn answer_configure(surface: &ToplevelSurface) {
+	// before the initial commit the initial configure answers
+	if surface.is_initial_configure_sent() {
+		surface.send_configure();
 	}
 }
 
 impl State {
-	/// Records a commit with its damage in output coordinates (subsurfaces
-	/// are shown at the position of their parent).
-	fn debug_commit(&mut self, surface: &WlSurface) {
-		let (damage, buffer) = with_states(surface, |states| {
-			let mut attrs = states.cached_state.get::<SurfaceAttributes>();
-			let attrs = attrs.current();
-			let damage: Vec<Rectangle<i32, Logical>> = attrs
-				.damage
-				.iter()
-				.map(|d| match d {
-					Damage::Surface(r) => *r,
-					// buffer scale and transform are always 1 and normal
-					Damage::Buffer(r) => Rectangle::new(
-						(r.loc.x, r.loc.y).into(),
-						(r.size.w, r.size.h).into(),
-					),
-				})
-				.collect();
-			(damage, attrs.buffer.is_some())
-		});
-
-		let mut root = surface.clone();
-		while let Some(parent) = get_parent(&root) {
-			root = parent;
-		}
-
-		let (kind, offset) = if let Some(popup) = self.popups.find_popup(&root)
-		{
-			let toplevel = get_popup_toplevel_coords(&popup);
-			("popup", toplevel + popup.geometry().loc)
-		} else if let Some(window) = self
-			.space
-			.elements()
-			.find(|w| w.toplevel().map(|t| t.wl_surface()) == Some(&root))
-		{
-			let loc = self.space.element_location(window).unwrap_or_default();
-			("window", loc - window.geometry().loc)
-		} else {
-			("other", (0, 0).into())
-		};
-		let kind = if &root != surface { "subsurface" } else { kind };
-
-		let damage: Vec<_> = damage
-			.into_iter()
-			.map(|mut r| {
-				r.loc += offset;
-				r
-			})
-			.collect();
-		let area: i64 = damage
-			.iter()
-			.map(|r| r.size.w as i64 * r.size.h as i64)
-			.sum();
-		let pid = self
-			.display_handle
-			.get_client(surface.id())
-			.ok()
-			.and_then(|c| c.get_credentials(&self.display_handle).ok())
-			.map(|c| c.pid);
-
-		self.debug.commit(&damage);
-		self.debug.event(
-			"commit",
-			json!({
-				"surface": surface.id().protocol_id(),
-				"pid": pid,
-				"kind": kind,
-				"buffer": buffer,
-				"damage_px": area,
-				"damage": damage
-					.iter()
-					.take(8)
-					.map(|r| [r.loc.x, r.loc.y, r.size.w, r.size.h])
-					.collect::<Vec<_>>(),
-			}),
-		);
-	}
-
 	fn unconstrain_popup(&self, popup: &PopupSurface) {
 		let Ok(root) = find_popup_root_surface(&PopupKind::Xdg(popup.clone()))
 		else {

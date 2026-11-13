@@ -1,13 +1,14 @@
-//! Frame statistics, logged once a minute while frames are drawn so the
-//! journal of a device shows how the compositor performs.
+//! What the journal gets: frame statistics once a minute while frames are
+//! drawn, and warnings which can't flood it (journald keeps only 40M).
 
+use std::fmt::Display;
 use std::time::{Duration, Instant};
 
-use tracing::info;
+use tracing::{info, warn};
 
 const INTERVAL: Duration = Duration::from_secs(60);
 
-pub struct Stats {
+pub struct MinuteStats {
 	since: Instant,
 	frames: u32,
 	failed: u32,
@@ -19,7 +20,7 @@ pub struct Stats {
 	flips: u32,
 }
 
-impl Stats {
+impl MinuteStats {
 	pub fn new() -> Self {
 		Self {
 			since: Instant::now(),
@@ -68,5 +69,30 @@ impl Stats {
 		);
 
 		*self = Self::new();
+	}
+}
+
+/// A warning which is logged at most once a minute, with the number of
+/// times it was suppressed in between.
+#[derive(Default)]
+pub struct LimitedWarn {
+	last: Option<Instant>,
+	suppressed: u32,
+}
+
+impl LimitedWarn {
+	pub fn warn(&mut self, msg: impl Display) {
+		if self.last.is_some_and(|t| t.elapsed() < INTERVAL) {
+			self.suppressed += 1;
+			return;
+		}
+
+		if self.suppressed > 0 {
+			warn!("{msg} ({} more times in the last minute)", self.suppressed);
+		} else {
+			warn!("{msg}");
+		}
+		self.last = Some(Instant::now());
+		self.suppressed = 0;
 	}
 }

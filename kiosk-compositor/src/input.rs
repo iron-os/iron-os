@@ -45,9 +45,7 @@ impl State {
 				if device.has_capability(DeviceCapability::Touch) {
 					self.swallowed_touches.clear();
 					self.touch_stats.cancel();
-					if let Some(touch) = self.seat.get_touch() {
-						touch.cancel(self);
-					}
+					self.cancel_touches();
 				}
 				if device.has_capability(DeviceCapability::Pointer) {
 					self.pointer_devices =
@@ -187,6 +185,10 @@ impl State {
 				});
 				let size = geo.map(|g| g.size);
 				self.touch_stats.down(slot.into(), pos, size, !self.awake);
+				// a new down means the controller lost the up of the last
+				// touch on this slot, end that one first
+				self.swallowed_touches.retain(|s| *s != slot);
+				self.end_forwarded_touch(slot, event.time_msec());
 				if !self.awake {
 					self.touch_event("touch_down", slot, pos, false, true);
 					self.wake_by_input();
@@ -205,6 +207,7 @@ impl State {
 					under.is_some(),
 					false,
 				);
+				self.forwarded_touches.push(slot);
 				touch.down(
 					self,
 					under,
@@ -256,6 +259,7 @@ impl State {
 					return;
 				}
 				self.touch_event("touch_up", slot, None, false, false);
+				self.forwarded_touches.retain(|s| *s != slot);
 				let Some(touch) = self.seat.get_touch() else {
 					return;
 				};
@@ -277,12 +281,31 @@ impl State {
 				self.debug.event("touch_cancel", json!({}));
 				self.touch_stats.cancel();
 				self.swallowed_touches.clear();
-				if let Some(touch) = self.seat.get_touch() {
-					touch.cancel(self);
-				}
+				self.cancel_touches();
 			}
 			_ => {}
 		}
+	}
+
+	/// Sends the client an up for a touch it still has down on this slot.
+	fn end_forwarded_touch(&mut self, slot: TouchSlot, time: u32) {
+		let Some(i) = self.forwarded_touches.iter().position(|s| *s == slot)
+		else {
+			return;
+		};
+		self.forwarded_touches.swap_remove(i);
+		let Some(touch) = self.seat.get_touch() else {
+			return;
+		};
+		touch.up(
+			self,
+			&UpEvent {
+				slot,
+				serial: SERIAL_COUNTER.next_serial(),
+				time,
+			},
+		);
+		touch.frame(self);
 	}
 
 	fn touch_event(
@@ -293,16 +316,18 @@ impl State {
 		focused: bool,
 		swallowed: bool,
 	) {
-		self.debug.event(
-			kind,
-			json!({
-				"slot": i32::from(slot),
-				"x": pos.map(|p| p.x.round()),
-				"y": pos.map(|p| p.y.round()),
-				"focused": focused,
-				"swallowed": swallowed,
-			}),
-		);
+		let data = json!({
+			"slot": i32::from(slot),
+			"x": pos.map(|p| p.x.round()),
+			"y": pos.map(|p| p.y.round()),
+			"focused": focused,
+			"swallowed": swallowed,
+		});
+		if kind == "touch_motion" {
+			self.debug.frequent(kind, data);
+		} else {
+			self.debug.event(kind, data);
+		}
 	}
 
 	fn clamp(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {

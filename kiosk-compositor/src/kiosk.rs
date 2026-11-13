@@ -14,7 +14,7 @@ use smithay::reexports::wayland_server::{
 	Client, DataInit, Dispatch, DisplayHandle, GlobalDispatch, New, Resource,
 };
 use smithay::utils::{Logical, Point, SERIAL_COUNTER};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 pub mod protocol {
 	#![allow(dead_code, non_camel_case_types, unused_unsafe)]
@@ -75,6 +75,9 @@ impl GlobalDispatch<WestonKioskShell, ()> for State {
 	) {
 		info!("bind kiosk shell");
 		let resource = data_init.init(resource, ());
+		// after a compositor restart the service would not know the state
+		resource.state_change(state.awake as u32);
+		state.kiosk.resources.retain(|r| r.is_alive());
 		state.kiosk.resources.push(resource);
 	}
 }
@@ -119,6 +122,7 @@ impl Dispatch<WestonKioskShell, ()> for State {
 
 fn mouse_click(state: &mut State, x: f64, y: f64) {
 	if state.kiosk.click_pending {
+		debug!("click dropped, the last one is still pending");
 		return;
 	}
 

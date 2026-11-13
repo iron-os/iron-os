@@ -20,6 +20,7 @@ use tracing::{info, warn};
 const SUMMARY: Duration = Duration::from_secs(60);
 const CHECK: Duration = Duration::from_secs(10);
 const HELD_TOO_LONG: Duration = Duration::from_secs(30);
+const STUCK_REPEAT: Duration = Duration::from_secs(3600);
 const SHORT: Duration = Duration::from_millis(50);
 const COLS: usize = 4;
 const ROWS: usize = 3;
@@ -40,6 +41,8 @@ pub struct TouchStats {
 	held: Vec<Duration>,
 	grid: [u32; COLS * ROWS],
 	fingers: HashMap<i32, Finger>,
+	/// when only fingers still down were logged
+	stuck_logged: Option<Instant>,
 }
 
 impl TouchStats {
@@ -54,6 +57,7 @@ impl TouchStats {
 			held: vec![],
 			grid: [0; COLS * ROWS],
 			fingers: HashMap::new(),
+			stuck_logged: None,
 		}
 	}
 
@@ -123,13 +127,22 @@ impl TouchStats {
 		if self.since.elapsed() < SUMMARY {
 			return;
 		}
-		if self.downs > 0 || !self.fingers.is_empty() {
+		// a finger which is stuck for good is repeated only once an hour
+		let stuck_logged = self
+			.stuck_logged
+			.is_some_and(|t| t.elapsed() < STUCK_REPEAT);
+		if self.downs > 0 || (!self.fingers.is_empty() && !stuck_logged) {
 			info!("{}", self.summary());
+			if self.downs == 0 {
+				self.stuck_logged = Some(Instant::now());
+			}
 		}
 
 		let fingers = std::mem::take(&mut self.fingers);
+		let stuck_logged = self.stuck_logged;
 		*self = Self::new();
 		self.fingers = fingers;
+		self.stuck_logged = stuck_logged;
 	}
 
 	fn summary(&self) -> String {

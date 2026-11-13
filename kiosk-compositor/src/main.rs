@@ -19,6 +19,10 @@ mod touch_stats;
 
 use state::{Backend, State};
 
+use std::ffi::OsStr;
+use std::os::linux::net::SocketAddrExt;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::net::{SocketAddr, UnixDatagram};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
@@ -55,7 +59,7 @@ fn main() -> ExitCode {
 	let args = Args::parse();
 
 	if let Some(Cmd::Debug { command }) = &args.cmd {
-		return match debug::client(command) {
+		return match debug::client(&args.socket, command) {
 			Ok(()) => ExitCode::SUCCESS,
 			Err(e) => {
 				eprintln!("{e}");
@@ -95,9 +99,9 @@ fn run(args: Args) -> Result<(), String> {
 	let backend = if args.headless {
 		let size = parse_size(&args.headless_size)
 			.ok_or("invalid --headless-size, expected WxH")?;
-		Backend::Headless(headless::init(&display.handle(), size)?)
+		Backend::Headless(Box::new(headless::init(size)?))
 	} else {
-		Backend::Drm(drm::init(&event_loop.handle())?)
+		Backend::Drm(Box::new(drm::init(&event_loop.handle())?))
 	};
 
 	let mut state =
@@ -105,14 +109,14 @@ fn run(args: Args) -> Result<(), String> {
 
 	touch_stats::start(&mut state);
 
-	if let Err(e) = debug::listen(&mut state, &event_loop.handle()) {
+	if let Err(e) =
+		debug::listen(&mut state, &event_loop.handle(), &args.socket)
+	{
 		warn!("no debug socket {e}");
 	}
 
-	match &state.backend {
-		Backend::Drm(_) => drm::start(&mut state),
-		Backend::Headless(_) => headless::start(&mut state),
-	}
+	state.start_backend();
+	notify_ready();
 
 	info!("listening on {}", args.socket);
 
@@ -123,6 +127,24 @@ fn run(args: Args) -> Result<(), String> {
 			let _ = state.display_handle.flush_clients();
 		})
 		.map_err(|e| format!("event loop failed {e}"))
+}
+
+/// Tells systemd (Type=notify) that the wayland socket is ready, so
+/// chromium.service doesn't start before it exists.
+fn notify_ready() {
+	let Some(path) = std::env::var_os("NOTIFY_SOCKET") else {
+		return;
+	};
+	let path = path.as_bytes();
+	let addr = match path.strip_prefix(b"@") {
+		Some(name) => SocketAddr::from_abstract_name(name),
+		None => SocketAddr::from_pathname(OsStr::from_bytes(path)),
+	};
+	let res = UnixDatagram::unbound()
+		.and_then(|s| addr.and_then(|a| s.send_to_addr(b"READY=1", &a)));
+	if let Err(e) = res {
+		warn!("could not notify systemd {e}");
+	}
 }
 
 fn parse_size(s: &str) -> Option<(i32, i32)> {

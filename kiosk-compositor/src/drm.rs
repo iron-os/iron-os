@@ -5,12 +5,11 @@
 //! refresh later, a kiosk must keep running.
 
 use crate::render;
-use crate::state::{Backend, State};
-use crate::stats::Stats;
+use crate::state::{create_output, remove_output_global, Backend, State};
+use crate::stats::LimitedWarn;
 
 use std::time::{Duration, Instant};
 
-use serde_json::json;
 use smithay::backend::allocator::gbm::{
 	GbmAllocator, GbmBufferFlags, GbmDevice,
 };
@@ -35,7 +34,7 @@ use smithay::reexports::drm::control::{connector, crtc, Device as _};
 use smithay::reexports::input::Libinput;
 use smithay::reexports::rustix::fs::OFlags;
 use smithay::reexports::wayland_server::backend::GlobalId;
-use smithay::utils::{DeviceFd, Transform};
+use smithay::utils::DeviceFd;
 use tracing::{error, info, warn};
 
 type GbmDrmCompositor = DrmCompositor<
@@ -61,6 +60,8 @@ pub struct DrmBackend {
 	surface: Option<Surface>,
 	/// false while our session is not in the foreground
 	active: bool,
+	render_warn: LimitedWarn,
+	drm_warn: LimitedWarn,
 }
 
 struct Surface {
@@ -77,7 +78,6 @@ struct Surface {
 	timer_pending: bool,
 	render_queued: bool,
 	redraw: bool,
-	stats: Stats,
 }
 
 pub fn init(
@@ -123,7 +123,11 @@ pub fn init(
 	loop_handle
 		.insert_source(drm_notifier, |event, _meta, state| match event {
 			DrmEvent::VBlank(crtc) => vblank(state, crtc),
-			DrmEvent::Error(e) => error!("drm error {e}"),
+			DrmEvent::Error(e) => {
+				if let Some(b) = backend(state) {
+					b.drm_warn.warn(format!("drm error {e}"));
+				}
+			}
 		})
 		.map_err(|e| format!("drm source {e}"))?;
 
@@ -170,6 +174,8 @@ pub fn init(
 		gbm,
 		surface: None,
 		active: true,
+		render_warn: LimitedWarn::default(),
+		drm_warn: LimitedWarn::default(),
 	})
 }
 
@@ -201,8 +207,9 @@ fn scan_connectors(state: &mut State) {
 		}
 
 		info!("display disconnected");
-		let s = b.surface.take().unwrap();
-		dh.remove_global::<State>(s.global);
+		if let Some(s) = b.surface.take() {
+			remove_output_global(state, s.global);
+		}
 		state.set_output(None);
 		return;
 	}
@@ -293,23 +300,13 @@ fn create_surface(
 		.map_err(|e| format!("drm surface {e}"))?;
 
 	let (phys_w, phys_h) = conn.size().unwrap_or((0, 0));
-	let output = Output::new(
-		name,
-		PhysicalProperties {
-			size: (phys_w as i32, phys_h as i32).into(),
-			subpixel: Subpixel::Unknown,
-			make: "Unknown".into(),
-			model: "Unknown".into(),
-		},
-	);
-	output.change_current_state(
-		Some(mode),
-		Some(Transform::Normal),
-		None,
-		Some((0, 0).into()),
-	);
-	output.set_preferred(mode);
-	let global = output.create_global::<State>(dh);
+	let properties = PhysicalProperties {
+		size: (phys_w as i32, phys_h as i32).into(),
+		subpixel: Subpixel::Unknown,
+		make: "Unknown".into(),
+		model: "Unknown".into(),
+	};
+	let (output, global) = create_output(dh, name, properties, mode);
 
 	let allocator = GbmAllocator::new(
 		b.gbm.clone(),
@@ -353,7 +350,6 @@ fn create_surface(
 		timer_pending: false,
 		render_queued: false,
 		redraw: true,
-		stats: Stats::new(),
 	};
 
 	Ok((surface, output))
@@ -390,37 +386,29 @@ fn render(state: &mut State) {
 	}
 
 	if let Some(since) = s.flip_pending {
-		let elapsed = since.elapsed();
-		if elapsed < FLIP_TIMEOUT {
-			// the vblank renders again, if it never comes this timer does
-			if !s.flip_timer {
-				s.flip_timer = true;
-				let res = state.loop_handle.insert_source(
-					Timer::from_duration(FLIP_TIMEOUT - elapsed),
-					|_, _, state| {
-						if let Some(s) = surface(state) {
-							s.flip_timer = false;
-						}
-						frame_done(state);
-						TimeoutAction::Drop
-					},
-				);
-				if let Err(e) = res {
-					error!("could not insert flip timer {e}");
-				}
+		// the vblank renders again, if it never comes this timer does
+		if !s.flip_timer {
+			s.flip_timer = true;
+			let wait = FLIP_TIMEOUT.saturating_sub(since.elapsed());
+			let res = state.loop_handle.insert_source(
+				Timer::from_duration(wait),
+				|_, _, state| {
+					flip_timeout(state);
+					TimeoutAction::Drop
+				},
+			);
+			if let Err(e) = res {
+				error!("could not insert flip timer {e}");
 			}
-			return;
 		}
-		warn!("page flip did not complete, rendering anyway");
-		s.flip_pending = None;
+		return;
 	}
 
 	s.redraw = false;
 	// always draw complete frames: with one fullscreen window this costs
 	// almost nothing and partial updates showed stale areas (virtio-gpu only
-	// copies the damaged rects, panels with psr2 do the same, and after the
-	// display was off a still pending flip can mark old buffers as valid)
-	s.compositor.reset_buffers();
+	// copies the damaged rects, panels with psr2 do the same)
+	s.compositor.reset_buffer_ages();
 
 	let start = Instant::now();
 	let elements = render::elements(
@@ -440,20 +428,18 @@ fn render(state: &mut State) {
 		Ok(res) if !res.is_empty => match s.compositor.queue_frame(()) {
 			Ok(()) => true,
 			Err(e) => {
-				warn!("queue frame failed {e}");
+				b.render_warn.warn(format!("queue frame failed {e}"));
 				false
 			}
 		},
 		Ok(_) => false,
 		Err(e) => {
-			warn!("render frame failed {e:?}");
+			b.render_warn.warn(format!("render frame failed {e:?}"));
 			false
 		}
 	};
 
-	let took = start.elapsed();
-	s.stats.frame(took, queued);
-	state.debug.frame(took, queued);
+	state.debug.frame(start.elapsed(), queued);
 	// the debug overlays change every frame
 	if state.debug.animating() {
 		s.redraw = true;
@@ -485,7 +471,10 @@ fn render(state: &mut State) {
 }
 
 fn vblank(state: &mut State, crtc: crtc::Handle) {
-	let Some(s) = surface(state) else {
+	let Some(b) = backend(state) else {
+		return;
+	};
+	let Some(s) = &mut b.surface else {
 		return;
 	};
 	if s.crtc != crtc {
@@ -493,15 +482,43 @@ fn vblank(state: &mut State, crtc: crtc::Handle) {
 	}
 
 	let took = s.flip_pending.take().map(|since| since.elapsed());
-	if let Some(took) = took {
-		s.stats.flipped(took);
-	}
 	if let Err(e) = s.compositor.frame_submitted() {
-		warn!("frame submitted {e}");
+		b.render_warn.warn(format!("frame submitted {e}"));
 	}
 	if let Some(took) = took {
-		let ms = took.as_secs_f64() * 1000.0;
-		state.debug.event("flip", json!({ "ms": ms }));
+		state.debug.flipped(took);
+	}
+
+	frame_done(state);
+}
+
+/// The vblank of a queued frame did not come. Without it smithay keeps the
+/// frame as pending and never submits a new one, so the screen would freeze:
+/// mark it as done ourselves.
+fn flip_timeout(state: &mut State) {
+	let Some(b) = backend(state) else {
+		return;
+	};
+	let Some(s) = &mut b.surface else {
+		return;
+	};
+	s.flip_timer = false;
+
+	let Some(since) = s.flip_pending else {
+		return;
+	};
+	if since.elapsed() < FLIP_TIMEOUT {
+		// a new flip was queued after the timer was set
+		frame_done(state);
+		return;
+	}
+
+	b.render_warn.warn("page flip did not complete");
+	s.flip_pending = None;
+	if s.compositor.frame_submitted().is_err() {
+		if let Err(e) = s.compositor.reset_state() {
+			warn!("reset state {e}");
+		}
 	}
 
 	frame_done(state);
@@ -524,8 +541,12 @@ pub fn set_awake(state: &mut State, awake: bool) {
 	if awake {
 		// the next frame turns the crtc on again
 		s.redraw = true;
-	} else if let Err(e) = s.compositor.clear() {
-		warn!("could not turn the display off {e}");
+	} else {
+		if let Err(e) = s.compositor.clear() {
+			warn!("could not turn the display off {e}");
+		}
+		// clear drops a pending frame, its vblank must not be waited for
+		s.flip_pending = None;
 	}
 }
 
@@ -548,6 +569,7 @@ fn session_event(state: &mut State, event: SessionEvent) {
 			}
 			if let Err(e) = b.device.activate(false) {
 				error!("could not activate drm device {e}");
+				return;
 			}
 			b.active = true;
 			if let Some(s) = &mut b.surface {
@@ -555,7 +577,11 @@ fn session_event(state: &mut State, event: SessionEvent) {
 				if let Err(e) = s.compositor.reset_state() {
 					warn!("reset state {e}");
 				}
-				s.compositor.reset_buffers();
+			}
+			// a display may have been plugged in or out while paused
+			scan_connectors(state);
+			if !state.awake {
+				set_awake(state, false);
 			}
 			state.schedule_render();
 		}

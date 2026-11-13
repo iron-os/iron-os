@@ -14,7 +14,7 @@ use smithay::reexports::wayland_server::{
 	WEnum,
 };
 use smithay::wayland::shm::with_buffer_contents_mut;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 pub mod protocol {
 	#![allow(dead_code, non_camel_case_types, unused_unsafe)]
@@ -43,13 +43,8 @@ use protocol::weston_capture_v1::{self, WestonCaptureV1};
 /// DRM_FORMAT_XRGB8888
 const FORMAT_XRGB8888: u32 = 0x34325258;
 
-pub struct CaptureState;
-
-impl CaptureState {
-	pub fn new(dh: &DisplayHandle) -> Self {
-		dh.create_global::<State, WestonCaptureV1, ()>(2, ());
-		Self
-	}
+pub fn init(dh: &DisplayHandle) {
+	dh.create_global::<State, WestonCaptureV1, ()>(2, ());
 }
 
 impl GlobalDispatch<WestonCaptureV1, ()> for State {
@@ -95,6 +90,9 @@ impl Dispatch<WestonCaptureV1, ()> for State {
 				let Some(mode) =
 					state.output.as_ref().and_then(|o| o.current_mode())
 				else {
+					// the client waits for a size, without one it would
+					// wait forever
+					src.failed(Some("output unavailable".into()));
 					return;
 				};
 
@@ -183,7 +181,7 @@ fn capture(state: &mut State, src: &WestonCaptureSourceV1, buffer: &WlBuffer) {
 
 	match res {
 		Ok(true) => {
-			info!("captured {}x{}", size.w, size.h);
+			debug!("captured {}x{}", size.w, size.h);
 			state
 				.debug
 				.event("capture", json!({ "w": size.w, "h": size.h }));
