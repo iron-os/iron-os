@@ -1,6 +1,7 @@
 use crate::capture::CaptureState;
 use crate::debug::Debug;
 use crate::kiosk::KioskState;
+use crate::touch_stats::TouchStats;
 use crate::{drm, headless};
 
 use std::sync::Arc;
@@ -114,6 +115,7 @@ pub struct State {
 	pub swallowed_touches: Vec<TouchSlot>,
 
 	pub debug: Debug,
+	pub touch_stats: TouchStats,
 }
 
 impl State {
@@ -172,6 +174,7 @@ impl State {
 			awake: true,
 			swallowed_touches: vec![],
 			debug: Debug::new(),
+			touch_stats: TouchStats::new(),
 		})
 	}
 
@@ -271,6 +274,14 @@ impl State {
 		info!("display {}", if awake { "on" } else { "off" });
 		self.awake = awake;
 		self.debug.event("display", json!({ "on": awake }));
+
+		// fingers still down (or stuck in the touch controller) must not
+		// carry over to the next wake up
+		if !awake {
+			if let Some(touch) = self.seat.get_touch() {
+				touch.cancel(self);
+			}
+		}
 
 		match &self.backend {
 			Backend::Drm(_) => drm::set_awake(self, awake),

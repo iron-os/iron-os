@@ -40,6 +40,15 @@ impl State {
 					"input_device_removed",
 					json!({ "name": device.name() }),
 				);
+				// a touchscreen which disappears (e.g. an usb reset)
+				// never releases its fingers
+				if device.has_capability(DeviceCapability::Touch) {
+					self.swallowed_touches.clear();
+					self.touch_stats.cancel();
+					if let Some(touch) = self.seat.get_touch() {
+						touch.cancel(self);
+					}
+				}
 				if device.has_capability(DeviceCapability::Pointer) {
 					self.pointer_devices =
 						self.pointer_devices.saturating_sub(1);
@@ -172,19 +181,22 @@ impl State {
 				let slot = event.slot();
 				// a touch on a dark display only wakes it up, the app
 				// should not get a click the user could not see
+				let geo = self.output_size();
+				let pos = geo.map(|geo| {
+					event.position_transformed(geo.size) + geo.loc.to_f64()
+				});
+				let size = geo.map(|g| g.size);
+				self.touch_stats.down(slot.into(), pos, size, !self.awake);
 				if !self.awake {
-					self.touch_event("touch_down", slot, None, false, true);
+					self.touch_event("touch_down", slot, pos, false, true);
 					self.wake_by_input();
 					self.swallowed_touches.push(slot);
 					return;
 				}
-				let (Some(touch), Some(geo)) =
-					(self.seat.get_touch(), self.output_size())
+				let (Some(touch), Some(pos)) = (self.seat.get_touch(), pos)
 				else {
 					return;
 				};
-				let pos =
-					event.position_transformed(geo.size) + geo.loc.to_f64();
 				let under = self.surface_under(pos);
 				self.touch_event(
 					"touch_down",
@@ -235,6 +247,7 @@ impl State {
 			}
 			InputEvent::TouchUp { event } => {
 				let slot = event.slot();
+				self.touch_stats.up(slot.into());
 				if let Some(i) =
 					self.swallowed_touches.iter().position(|s| *s == slot)
 				{
@@ -262,6 +275,7 @@ impl State {
 			}
 			InputEvent::TouchCancel { .. } => {
 				self.debug.event("touch_cancel", json!({}));
+				self.touch_stats.cancel();
 				self.swallowed_touches.clear();
 				if let Some(touch) = self.seat.get_touch() {
 					touch.cancel(self);

@@ -15,6 +15,7 @@ mod kiosk;
 mod render;
 mod state;
 mod stats;
+mod touch_stats;
 
 use state::{Backend, State};
 
@@ -69,6 +70,11 @@ fn main() -> ExitCode {
 		.with_ansi(false)
 		.init();
 
+	// a panic is an error in the journal, that's what we look for on devices
+	std::panic::set_hook(Box::new(|info| {
+		error!("panic: {info}");
+	}));
+
 	info!("starting kiosk-compositor {}", env!("CARGO_PKG_VERSION"));
 
 	match run(args) {
@@ -96,6 +102,8 @@ fn run(args: Args) -> Result<(), String> {
 
 	let mut state =
 		State::new(display, &event_loop.handle(), backend, &args.socket)?;
+
+	touch_stats::start(&mut state);
 
 	if let Err(e) = debug::listen(&mut state, &event_loop.handle()) {
 		warn!("no debug socket {e}");
