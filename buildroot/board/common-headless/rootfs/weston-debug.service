@@ -7,8 +7,10 @@
 Description=Run the kiosk compositor
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/kiosk-compositor -S wayland-0
+# ready once the wayland socket exists, chromium.service waits for it
+Type=notify
+NotifyAccess=main
+ExecStart=/usr/bin/kiosk-compositor -S wayland-0 --tracing kiosk_compositor=debug,warn
 Restart=always
 RestartSec=2
 # a compositor that keeps failing must not flood the journal
