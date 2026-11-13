@@ -1,6 +1,7 @@
 ## Unreleased
 - Keep retrying the display connection instead of restarting the service,
   so package updates also work while the compositor is broken
+- Keep running if chromium can't be started or restarted
 - Display requests fail right away while the compositor is away, old clicks
   are dropped when it comes back
 

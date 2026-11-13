@@ -9,6 +9,7 @@
 //! what a controller looks like which lost a release.
 
 use crate::state::State;
+use crate::stats::LimitedWarn;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -43,6 +44,7 @@ pub struct TouchStats {
 	fingers: HashMap<i32, Finger>,
 	/// when only fingers still down were logged
 	stuck_logged: Option<Instant>,
+	again_warn: LimitedWarn,
 }
 
 impl TouchStats {
@@ -58,6 +60,7 @@ impl TouchStats {
 			grid: [0; COLS * ROWS],
 			fingers: HashMap::new(),
 			stuck_logged: None,
+			again_warn: LimitedWarn::default(),
 		}
 	}
 
@@ -90,11 +93,12 @@ impl TouchStats {
 		);
 		if let Some(old) = old {
 			self.again += 1;
-			warn!(
+			// a noisy controller can do this all the time
+			self.again_warn.warn(format!(
 				"touch: slot {slot} down again without a release, it was \
 				 down for {:.1}s",
 				old.since.elapsed().as_secs_f32()
-			);
+			));
 		}
 	}
 
@@ -140,9 +144,11 @@ impl TouchStats {
 
 		let fingers = std::mem::take(&mut self.fingers);
 		let stuck_logged = self.stuck_logged;
+		let again_warn = std::mem::take(&mut self.again_warn);
 		*self = Self::new();
 		self.fingers = fingers;
 		self.stuck_logged = stuck_logged;
+		self.again_warn = again_warn;
 	}
 
 	fn summary(&self) -> String {

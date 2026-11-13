@@ -1,6 +1,7 @@
 use crate::capture;
 use crate::debug::{self, Debug};
 use crate::kiosk::KioskState;
+use crate::touch::Touches;
 use crate::touch_stats::TouchStats;
 use crate::{drm, headless};
 
@@ -8,7 +9,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde_json::json;
-use smithay::backend::input::TouchSlot;
 use smithay::backend::renderer::gles::GlesRenderer;
 use smithay::backend::renderer::utils::on_commit_buffer_handler;
 use smithay::backend::renderer::{ImportDma, ImportMemWl};
@@ -137,10 +137,10 @@ pub struct State {
 
 	/// if the display is on
 	pub awake: bool,
-	/// touch points that woke the display, these are not forwarded
-	pub swallowed_touches: Vec<TouchSlot>,
-	/// touch points the client got a down for and no up yet
-	pub forwarded_touches: Vec<TouchSlot>,
+	pub touches: Touches,
+	/// mouse buttons pressed on a dark display, their release is not
+	/// forwarded either
+	pub swallowed_buttons: Vec<u32>,
 
 	pub debug: Debug,
 	pub touch_stats: TouchStats,
@@ -196,8 +196,8 @@ impl State {
 			seat,
 			pointer_devices: 0,
 			awake: true,
-			swallowed_touches: vec![],
-			forwarded_touches: vec![],
+			touches: Touches::default(),
+			swallowed_buttons: vec![],
 			debug: Debug::new(),
 			touch_stats: TouchStats::new(),
 		})
@@ -324,14 +324,6 @@ impl State {
 		}
 
 		true
-	}
-
-	/// Tells the client that all its touch points are gone.
-	pub fn cancel_touches(&mut self) {
-		self.forwarded_touches.clear();
-		if let Some(touch) = self.seat.get_touch() {
-			touch.cancel(self);
-		}
 	}
 
 	/// The display was woken up by input.

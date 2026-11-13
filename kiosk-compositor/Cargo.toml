@@ -5,6 +5,10 @@ edition = "2021"
 rust-version = "1.88"
 description = "Wayland kiosk compositor for Iron OS, replaces weston"
 
+[features]
+# lets the integration tests inject touch events over the debug socket
+test-input = []
+
 [dependencies]
 smithay = { version = "0.7", default-features = false, features = [
 	"backend_drm",
@@ -30,3 +34,4 @@ lto = true
 
 [dev-dependencies]
 wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client"] }

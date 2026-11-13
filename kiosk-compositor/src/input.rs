@@ -5,14 +5,13 @@ use smithay::backend::input::{
 	AbsolutePositionEvent, Axis, AxisSource, ButtonState, Device,
 	DeviceCapability, Event, InputBackend, InputEvent, KeyState,
 	KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
-	TouchEvent, TouchSlot,
+	TouchEvent,
 };
 use smithay::input::keyboard::FilterResult;
 use smithay::input::pointer::{
 	AxisFrame, ButtonEvent, MotionEvent, RelativeMotionEvent,
 };
-use smithay::input::touch::{DownEvent, MotionEvent as TouchMotion, UpEvent};
-use smithay::utils::{Logical, Point, SERIAL_COUNTER};
+use smithay::utils::{Logical, Point, Size, SERIAL_COUNTER};
 use tracing::info;
 
 impl State {
@@ -43,9 +42,7 @@ impl State {
 				// a touchscreen which disappears (e.g. an usb reset)
 				// never releases its fingers
 				if device.has_capability(DeviceCapability::Touch) {
-					self.swallowed_touches.clear();
-					self.touch_stats.cancel();
-					self.cancel_touches();
+					self.touch_device_cancel();
 				}
 				if device.has_capability(DeviceCapability::Pointer) {
 					self.pointer_devices =
@@ -106,13 +103,12 @@ impl State {
 			}
 			InputEvent::PointerMotionAbsolute { event } => {
 				self.wake_by_input();
-				let (Some(pointer), Some(geo)) =
-					(self.seat.get_pointer(), self.output_size())
+				let pos =
+					self.output_pos(|size| event.position_transformed(size));
+				let (Some(pointer), Some(pos)) = (self.seat.get_pointer(), pos)
 				else {
 					return;
 				};
-				let pos =
-					event.position_transformed(geo.size) + geo.loc.to_f64();
 				let under = self.surface_under(pos);
 				pointer.motion(
 					self,
@@ -133,7 +129,23 @@ impl State {
 						"pressed": event.state() == ButtonState::Pressed,
 					}),
 				);
-				self.wake_by_input();
+				// like a touch, a click on a dark display only wakes it
+				let button = event.button_code();
+				if event.state() == ButtonState::Pressed && !self.awake {
+					self.wake_by_input();
+					self.swallowed_buttons.push(button);
+					return;
+				}
+				if event.state() == ButtonState::Released {
+					let swallowed = self
+						.swallowed_buttons
+						.iter()
+						.position(|b| *b == button);
+					if let Some(i) = swallowed {
+						self.swallowed_buttons.swap_remove(i);
+						return;
+					}
+				}
 				let Some(pointer) = self.seat.get_pointer() else {
 					return;
 				};
@@ -176,158 +188,31 @@ impl State {
 				pointer.frame(self);
 			}
 			InputEvent::TouchDown { event } => {
-				let slot = event.slot();
-				// a touch on a dark display only wakes it up, the app
-				// should not get a click the user could not see
-				let geo = self.output_size();
-				let pos = geo.map(|geo| {
-					event.position_transformed(geo.size) + geo.loc.to_f64()
-				});
-				let size = geo.map(|g| g.size);
-				self.touch_stats.down(slot.into(), pos, size, !self.awake);
-				// a new down means the controller lost the up of the last
-				// touch on this slot, end that one first
-				self.swallowed_touches.retain(|s| *s != slot);
-				self.end_forwarded_touch(slot, event.time_msec());
-				if !self.awake {
-					self.touch_event("touch_down", slot, pos, false, true);
-					self.wake_by_input();
-					self.swallowed_touches.push(slot);
-					return;
-				}
-				let (Some(touch), Some(pos)) = (self.seat.get_touch(), pos)
-				else {
-					return;
-				};
-				let under = self.surface_under(pos);
-				self.touch_event(
-					"touch_down",
-					slot,
-					Some(pos),
-					under.is_some(),
-					false,
-				);
-				self.forwarded_touches.push(slot);
-				touch.down(
-					self,
-					under,
-					&DownEvent {
-						slot,
-						location: pos,
-						serial: SERIAL_COUNTER.next_serial(),
-						time: event.time_msec(),
-					},
-				);
+				let pos =
+					self.output_pos(|size| event.position_transformed(size));
+				self.touch_down(event.slot(), pos, event.time_msec());
 			}
 			InputEvent::TouchMotion { event } => {
-				if self.swallowed_touches.contains(&event.slot()) {
-					return;
-				}
-				let (Some(touch), Some(geo)) =
-					(self.seat.get_touch(), self.output_size())
-				else {
-					return;
-				};
 				let pos =
-					event.position_transformed(geo.size) + geo.loc.to_f64();
-				let under = self.surface_under(pos);
-				self.touch_event(
-					"touch_motion",
-					event.slot(),
-					Some(pos),
-					under.is_some(),
-					false,
-				);
-				touch.motion(
-					self,
-					under,
-					&TouchMotion {
-						slot: event.slot(),
-						location: pos,
-						time: event.time_msec(),
-					},
-				);
+					self.output_pos(|size| event.position_transformed(size));
+				self.touch_motion(event.slot(), pos, event.time_msec());
 			}
 			InputEvent::TouchUp { event } => {
-				let slot = event.slot();
-				self.touch_stats.up(slot.into());
-				if let Some(i) =
-					self.swallowed_touches.iter().position(|s| *s == slot)
-				{
-					self.touch_event("touch_up", slot, None, false, true);
-					self.swallowed_touches.swap_remove(i);
-					return;
-				}
-				self.touch_event("touch_up", slot, None, false, false);
-				self.forwarded_touches.retain(|s| *s != slot);
-				let Some(touch) = self.seat.get_touch() else {
-					return;
-				};
-				touch.up(
-					self,
-					&UpEvent {
-						slot,
-						serial: SERIAL_COUNTER.next_serial(),
-						time: event.time_msec(),
-					},
-				);
+				self.touch_up(event.slot(), event.time_msec());
 			}
-			InputEvent::TouchFrame { .. } => {
-				if let Some(touch) = self.seat.get_touch() {
-					touch.frame(self);
-				}
-			}
-			InputEvent::TouchCancel { .. } => {
-				self.debug.event("touch_cancel", json!({}));
-				self.touch_stats.cancel();
-				self.swallowed_touches.clear();
-				self.cancel_touches();
-			}
+			InputEvent::TouchFrame { .. } => self.touch_frame(),
+			InputEvent::TouchCancel { .. } => self.touch_device_cancel(),
 			_ => {}
 		}
 	}
 
-	/// Sends the client an up for a touch it still has down on this slot.
-	fn end_forwarded_touch(&mut self, slot: TouchSlot, time: u32) {
-		let Some(i) = self.forwarded_touches.iter().position(|s| *s == slot)
-		else {
-			return;
-		};
-		self.forwarded_touches.swap_remove(i);
-		let Some(touch) = self.seat.get_touch() else {
-			return;
-		};
-		touch.up(
-			self,
-			&UpEvent {
-				slot,
-				serial: SERIAL_COUNTER.next_serial(),
-				time,
-			},
-		);
-		touch.frame(self);
-	}
-
-	fn touch_event(
-		&mut self,
-		kind: &str,
-		slot: TouchSlot,
-		pos: Option<Point<f64, Logical>>,
-		focused: bool,
-		swallowed: bool,
-	) {
-		let data = json!({
-			"slot": i32::from(slot),
-			"x": pos.map(|p| p.x.round()),
-			"y": pos.map(|p| p.y.round()),
-			"focused": focused,
-			"swallowed": swallowed,
-		});
-		if kind == "touch_motion" {
-			self.debug.frequent(kind, data);
-		} else {
-			self.debug.event(kind, data);
-		}
+	/// A position from the touchscreen or a tablet in output coordinates.
+	fn output_pos(
+		&self,
+		transformed: impl FnOnce(Size<i32, Logical>) -> Point<f64, Logical>,
+	) -> Option<Point<f64, Logical>> {
+		let geo = self.output_size()?;
+		Some(transformed(geo.size) + geo.loc.to_f64())
 	}
 
 	fn clamp(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {

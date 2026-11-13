@@ -15,6 +15,7 @@ mod kiosk;
 mod render;
 mod state;
 mod stats;
+mod touch;
 mod touch_stats;
 
 use state::{Backend, State};

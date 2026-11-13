@@ -549,6 +549,18 @@ fn command(state: &mut State, stream: &mut UnixStream, cmd: &str) {
 			reply(stream, json!({ "damage": state.debug.damage_overlay }));
 			state.schedule_render();
 		}
+		Some("display") => {
+			let awake = on(parts.next());
+			if state.set_awake(awake) {
+				state.kiosk.send_state_change(awake);
+			}
+			reply(stream, json!({ "display": state.awake }));
+		}
+		#[cfg(feature = "test-input")]
+		Some("inject") => {
+			let res = inject(state, parts);
+			reply(stream, json!({ "inject": res }));
+		}
 		Some("hud") => {
 			state.debug.hud = on(parts.next());
 			reply(stream, json!({ "hud": state.debug.hud }));
@@ -558,11 +570,44 @@ fn command(state: &mut State, stream: &mut UnixStream, cmd: &str) {
 			stream,
 			json!({
 				"commands": [
-					"events", "dump", "stats", "damage on|off", "hud on|off"
+					"events", "dump", "stats", "damage on|off", "hud on|off",
+					"display on|off"
 				]
 			}),
 		),
 	}
+}
+
+/// Touch events for the integration tests:
+/// `inject down|motion <slot> <x> <y>`, `inject up <slot>`, `inject frame`,
+/// `inject cancel`, x and y from 0 to 1.
+#[cfg(feature = "test-input")]
+fn inject<'a>(
+	state: &mut State,
+	mut parts: impl Iterator<Item = &'a str>,
+) -> bool {
+	use smithay::backend::input::TouchSlot;
+
+	let kind = parts.next();
+	let mut num = || parts.next().and_then(|p| p.parse::<f64>().ok());
+	let slot = num().map(|s| TouchSlot::from(Some(s as u32)));
+	let pos = match (num(), num(), state.output_size()) {
+		(Some(x), Some(y), Some(geo)) => Some(
+			(x * geo.size.w as f64, y * geo.size.h as f64).into(),
+		),
+		_ => None,
+	};
+	let time = state.start_time.elapsed().as_millis() as u32;
+
+	match (kind, slot) {
+		(Some("down"), Some(slot)) => state.touch_down(slot, pos, time),
+		(Some("motion"), Some(slot)) => state.touch_motion(slot, pos, time),
+		(Some("up"), Some(slot)) => state.touch_up(slot, time),
+		(Some("frame"), _) => state.touch_frame(),
+		(Some("cancel"), _) => state.touch_device_cancel(),
+		_ => return false,
+	}
+	true
 }
 
 /// `kiosk-compositor debug <command>`: sends the command to the running

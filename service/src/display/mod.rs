@@ -15,7 +15,8 @@ pub use kiosk_api::State;
 use kiosk_api::{Event, WestonKioskShell};
 use tokio::io::{Interest, Ready};
 
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::{io, thread};
 
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
@@ -61,29 +62,47 @@ enum Message {
 	MouseClick { x: f32, y: f32 },
 }
 
+/// What the display should be, sent again after every reconnect.
+#[derive(Default)]
+struct Wanted {
+	state: Option<State>,
+	brightness: Option<u8>,
+}
+
 #[derive(Clone)]
 pub struct Display {
 	tx: mpsc::Sender<Message>,
 	// subscribe to state change
 	rx: watch::Receiver<State>,
+	// never wait for the compositor: while it is away requests fail right
+	// away, the wanted state and brightness are applied when it is back
+	connected: Arc<AtomicBool>,
+	wanted: Arc<Mutex<Wanted>>,
 }
 
 impl Display {
 	pub async fn set_state(&self, state: State) -> Option<()> {
 		eprintln!("Display: set_state {:?}", state);
-		// never wait for the compositor, while it is away the requests
-		// fail instead of piling up
-		self.tx.try_send(Message::ChangeState(state)).ok()
+		self.wanted.lock().unwrap().state = Some(state);
+		self.send(Message::ChangeState(state))
 	}
 
 	pub async fn set_brightness(&self, brightness: u8) -> Option<()> {
 		eprintln!("Display: set_brightness {:?}", brightness);
-		self.tx.try_send(Message::ChangeBrightness(brightness)).ok()
+		self.wanted.lock().unwrap().brightness = Some(brightness);
+		self.send(Message::ChangeBrightness(brightness))
 	}
 
 	pub async fn mouse_click(&self, x: f32, y: f32) -> Option<()> {
 		eprintln!("Display: mouse_click x:{} y:{}", x, y);
-		self.tx.try_send(Message::MouseClick { x, y }).ok()
+		self.send(Message::MouseClick { x, y })
+	}
+
+	fn send(&self, msg: Message) -> Option<()> {
+		if !self.connected.load(Ordering::Relaxed) {
+			return None;
+		}
+		self.tx.try_send(msg).ok()
 	}
 
 	#[allow(dead_code)]
@@ -99,12 +118,17 @@ pub fn start() -> (JoinHandle<()>, Display) {
 	let (w_tx, w_rx) = watch::channel(State::On);
 	let (tx, rx) = mpsc::channel(MPSC_CAP);
 
+	let connected = Arc::new(AtomicBool::new(false));
+	let wanted = Arc::new(Mutex::new(Wanted::default()));
 	let display = Display {
 		tx: tx.clone(),
 		rx: w_rx,
+		connected: connected.clone(),
+		wanted: wanted.clone(),
 	};
 
 	if context::is_headless() {
+		connected.store(true, Ordering::Relaxed);
 		// if we are in headless
 		// no display is available so just make a mok display
 		let task = tokio::spawn(async move {
@@ -125,20 +149,15 @@ pub fn start() -> (JoinHandle<()>, Display) {
 		// could not be fixed by an update
 		let mut wait = Duration::from_secs(2);
 		loop {
-			// requests from while the compositor was away: only the last
-			// state and brightness still matter, old clicks would hit
-			// whatever is shown now
-			let mut state = None;
-			let mut brightness = None;
-			while let Ok(msg) = rx.try_recv() {
-				match msg {
-					Message::ChangeState(s) => state = Some(s),
-					Message::ChangeBrightness(b) => brightness = Some(b),
-					Message::MouseClick { .. } => {}
-				}
-			}
-			// without a request power on the screen
-			let state = state.unwrap_or(State::On);
+			// what is left in the channel is from the last connection, old
+			// clicks would hit whatever is shown now
+			while rx.try_recv().is_ok() {}
+			// the new connection gets the wanted state, without one the
+			// screen is powered on
+			let (state, brightness) = {
+				let wanted = wanted.lock().unwrap();
+				(wanted.state.unwrap_or(State::On), wanted.brightness)
+			};
 			let _ = tx.try_send(Message::ChangeState(state));
 			if let Some(b) = brightness {
 				let _ = tx.try_send(Message::ChangeBrightness(b));
@@ -146,7 +165,8 @@ pub fn start() -> (JoinHandle<()>, Display) {
 
 			// a connection which worked for a while starts the backoff again
 			let started = Instant::now();
-			let res = handle_display(w_tx.clone(), &mut rx).await;
+			let res = handle_display(w_tx.clone(), &mut rx, &connected).await;
+			connected.store(false, Ordering::Relaxed);
 			if started.elapsed() > Duration::from_secs(60) {
 				wait = Duration::from_secs(2);
 			}
@@ -168,11 +188,13 @@ const DEFAULT_INTEREST: Interest = Interest::READABLE;
 async fn handle_display(
 	tx: Arc<watch::Sender<State>>,
 	rx: &mut mpsc::Receiver<Message>,
+	connected: &AtomicBool,
 ) -> Result<(), WaylandError> {
 	let display = WlDisplay::connect_to_env()?;
 	let display_fd = AsyncFd::new(display.get_connection_fd())?;
 	let (thread_tx, thread_rx) = mpsc::channel(5);
 	let thread = spawn_thread(display, tx, thread_rx);
+	connected.store(true, Ordering::Relaxed);
 
 	enum SelectState<'a> {
 		Message(Message),
@@ -278,14 +300,13 @@ fn spawn_thread(
 		kiosk.quick_assign(move |_kiosk, ev, _| match ev {
 			Event::StateChange { state } => {
 				let state = State::from_raw(state).unwrap_or(State::Off);
-				tx.send(state).expect("display tokio task failed");
+				// fails only if nobody watches anymore
+				let _ = tx.send(state);
 			}
 		});
 
-		loop {
-			let (work, finished) =
-				rx.blocking_recv().expect("display tokio task failed");
-
+		// ends when handle_display is done with this connection
+		while let Some((work, finished)) = rx.blocking_recv() {
 			match work {
 				ThreadWork::ChangeState(state) => {
 					kiosk.set_state(state.to_raw());
@@ -328,11 +349,12 @@ fn spawn_thread(
 			// now dispatch the events that we have cached
 			event_queue
 				.dispatch_pending(&mut (), |_, _, _| {})
-				.expect("internal wayland error");
+				.map_err(|_| WaylandError::ThreadError)?;
 
-			finished
-				.send((interest, clear_ready))
-				.expect("Display: tokio task failed");
+			// handle_display may have given up on this connection already
+			let _ = finished.send((interest, clear_ready));
 		}
+
+		Ok(())
 	})
 }
