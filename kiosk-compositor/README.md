@@ -37,6 +37,7 @@ kiosk-compositor debug events       # live stream of all events as json lines
 kiosk-compositor debug dump         # the last 2000 rare events
 kiosk-compositor debug damage on    # flash every area a client repaints
 kiosk-compositor debug hud on       # graph: frame interval (line = 60fps), render time, commits
+kiosk-compositor debug display off  # turn the display off/on like the service
 ```
 
 Rare events (kept for `dump`): `display`, `kiosk_*` requests, `touch_down`/`touch_up` (position, if
@@ -44,6 +45,12 @@ a window got it, if it only woke the display), `touch_cancel`, `pointer_button`,
 `input_device_*`, `window_*`, `output`, `capture`. Frequent events (only live): `commit` (client,
 surface, damage rects), `frame` (render time, interval), `flip` (time until the frame was on the
 display), `touch_motion`. The overlays also show up in screenshots.
+
+## Tests
+`cargo test --features test-input` also runs `tests/touch.rs` (needs `/dev/dri/renderD128`): it starts
+the compositor headless with a wayland client, injects touches over the debug socket (`inject ...`,
+only with the test-input feature) and checks what the client gets for a tap, a lost release, a
+finger down when the display turns off, a touch on the dark display and a touchscreen cancel.
 
 ## Run
 `kiosk-compositor -S wayland-0` from weston.service (logind session on tty1, `Type=notify`: ready

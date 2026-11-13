@@ -1,5 +1,6 @@
 use crate::capture;
-use crate::debug::{self, Debug};
+use crate::debug::Debug;
+use crate::handlers::ClientState;
 use crate::kiosk::KioskState;
 use crate::touch::Touches;
 use crate::touch_stats::TouchStats;
@@ -10,57 +11,27 @@ use std::time::{Duration, Instant};
 
 use serde_json::json;
 use smithay::backend::renderer::gles::GlesRenderer;
-use smithay::backend::renderer::utils::on_commit_buffer_handler;
 use smithay::backend::renderer::{ImportDma, ImportMemWl};
-use smithay::desktop::{
-	find_popup_root_surface, get_popup_toplevel_coords, PopupKind,
-	PopupManager, Space, Window, WindowSurfaceType,
-};
+use smithay::desktop::{PopupManager, Space, Window, WindowSurfaceType};
 use smithay::input::keyboard::XkbConfig;
-use smithay::input::{Seat, SeatHandler, SeatState};
+use smithay::input::{Seat, SeatState};
 use smithay::output::{Mode as OutputMode, Output, PhysicalProperties};
 use smithay::reexports::calloop::generic::Generic;
 use smithay::reexports::calloop::timer::{TimeoutAction, Timer};
 use smithay::reexports::calloop::{Interest, LoopHandle, Mode, PostAction};
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
-use smithay::reexports::wayland_server::backend::{
-	ClientData, ClientId, DisconnectReason, GlobalId,
-};
-use smithay::reexports::wayland_server::protocol::{
-	wl_buffer, wl_seat, wl_surface::WlSurface,
-};
-use smithay::reexports::wayland_server::{
-	Client, Display, DisplayHandle, Resource,
-};
-use smithay::utils::{
-	Logical, Point, Rectangle, Serial, Transform, SERIAL_COUNTER,
-};
-use smithay::wayland::buffer::BufferHandler;
-use smithay::wayland::compositor::{
-	get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler,
-	CompositorState,
-};
-use smithay::wayland::dmabuf::{
-	DmabufGlobal, DmabufHandler, DmabufState, ImportNotifier,
-};
-use smithay::wayland::output::{OutputHandler, OutputManagerState};
-use smithay::wayland::selection::data_device::{
-	set_data_device_focus, ClientDndGrabHandler, DataDeviceHandler,
-	DataDeviceState, ServerDndGrabHandler,
-};
-use smithay::wayland::selection::SelectionHandler;
-use smithay::wayland::shell::xdg::{
-	PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler,
-	XdgShellState,
-};
-use smithay::wayland::shm::{ShmHandler, ShmState};
+use smithay::reexports::wayland_server::backend::GlobalId;
+use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+use smithay::reexports::wayland_server::{Display, DisplayHandle};
+use smithay::utils::{Logical, Point, Rectangle, Transform, SERIAL_COUNTER};
+use smithay::wayland::compositor::{get_parent, CompositorState};
+use smithay::wayland::dmabuf::DmabufState;
+use smithay::wayland::output::OutputManagerState;
+use smithay::wayland::selection::data_device::DataDeviceState;
+use smithay::wayland::shell::xdg::XdgShellState;
+use smithay::wayland::shm::ShmState;
 use smithay::wayland::socket::ListeningSocketSource;
 use smithay::wayland::viewporter::ViewporterState;
-use smithay::{
-	delegate_compositor, delegate_data_device, delegate_dmabuf,
-	delegate_output, delegate_seat, delegate_shm, delegate_viewporter,
-	delegate_xdg_shell,
-};
 use tracing::{info, warn};
 
 pub enum Backend {
@@ -94,6 +65,24 @@ pub fn create_output(
 	output.set_preferred(mode);
 	let global = output.create_global::<State>(dh);
 	(output, global)
+}
+
+/// The surface at the root of a subsurface tree.
+pub fn root_surface(surface: &WlSurface) -> WlSurface {
+	let mut root = surface.clone();
+	while let Some(parent) = get_parent(&root) {
+		root = parent;
+	}
+	root
+}
+
+/// Time between two frames at this refresh rate in mHz.
+pub fn refresh_duration(refresh: i32) -> Duration {
+	if refresh > 0 {
+		Duration::from_micros(1_000_000_000 / refresh as u64)
+	} else {
+		Duration::from_millis(16)
+	}
 }
 
 /// Removes an output global, delayed so a client which binds it at the same
@@ -235,7 +224,7 @@ impl State {
 		}
 	}
 
-	fn configure_fullscreen(&self, window: &Window) {
+	pub fn configure_fullscreen(&self, window: &Window) {
 		let Some(toplevel) = window.toplevel() else {
 			return;
 		};
@@ -250,6 +239,13 @@ impl State {
 		if toplevel.is_initial_configure_sent() {
 			toplevel.send_pending_configure();
 		}
+	}
+
+	/// The window whose toplevel is this surface.
+	pub fn window_for(&self, surface: &WlSurface) -> Option<&Window> {
+		self.space
+			.elements()
+			.find(|w| w.toplevel().map(|t| t.wl_surface()) == Some(surface))
 	}
 
 	pub fn surface_under(
@@ -269,7 +265,7 @@ impl State {
 	}
 
 	/// Focus the window on top for keyboard input.
-	fn focus_top(&mut self) {
+	pub fn focus_top(&mut self) {
 		let surface = self
 			.space
 			.elements()
@@ -383,269 +379,3 @@ fn listen(
 
 	Ok(())
 }
-
-#[derive(Default)]
-pub struct ClientState {
-	pub compositor_state: CompositorClientState,
-}
-
-impl ClientData for ClientState {
-	fn initialized(&self, _client_id: ClientId) {}
-	fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
-}
-
-impl CompositorHandler for State {
-	fn compositor_state(&mut self) -> &mut CompositorState {
-		&mut self.compositor_state
-	}
-
-	fn client_compositor_state<'a>(
-		&self,
-		client: &'a Client,
-	) -> &'a CompositorClientState {
-		&client.get_data::<ClientState>().unwrap().compositor_state
-	}
-
-	fn commit(&mut self, surface: &WlSurface) {
-		// before the buffer handler, it takes the buffer and the damage
-		debug::commit(self, surface);
-		on_commit_buffer_handler::<Self>(surface);
-
-		if !is_sync_subsurface(surface) {
-			let mut root = surface.clone();
-			while let Some(parent) = get_parent(&root) {
-				root = parent;
-			}
-			if let Some(window) = self
-				.space
-				.elements()
-				.find(|w| w.toplevel().map(|t| t.wl_surface()) == Some(&root))
-			{
-				window.on_commit();
-			}
-		}
-
-		// send the initial configure of toplevels
-		if let Some(window) = self
-			.space
-			.elements()
-			.find(|w| w.toplevel().map(|t| t.wl_surface()) == Some(surface))
-		{
-			if let Some(toplevel) = window.toplevel() {
-				if !toplevel.is_initial_configure_sent() {
-					toplevel.send_configure();
-				}
-			}
-		}
-
-		// and the one of popups
-		self.popups.commit(surface);
-		if let Some(PopupKind::Xdg(popup)) = self.popups.find_popup(surface) {
-			if !popup.is_initial_configure_sent() {
-				let _ = popup.send_configure();
-			}
-		}
-
-		self.schedule_render();
-	}
-}
-
-impl BufferHandler for State {
-	fn buffer_destroyed(&mut self, _buffer: &wl_buffer::WlBuffer) {}
-}
-
-impl ShmHandler for State {
-	fn shm_state(&self) -> &ShmState {
-		&self.shm_state
-	}
-}
-
-impl DmabufHandler for State {
-	fn dmabuf_state(&mut self) -> &mut DmabufState {
-		&mut self.dmabuf_state
-	}
-
-	fn dmabuf_imported(
-		&mut self,
-		_global: &DmabufGlobal,
-		dmabuf: smithay::backend::allocator::dmabuf::Dmabuf,
-		notifier: ImportNotifier,
-	) {
-		if self.backend.renderer().import_dmabuf(&dmabuf, None).is_ok() {
-			let _ = notifier.successful::<State>();
-		} else {
-			notifier.failed();
-		}
-	}
-}
-
-impl XdgShellHandler for State {
-	fn xdg_shell_state(&mut self) -> &mut XdgShellState {
-		&mut self.xdg_shell_state
-	}
-
-	fn new_toplevel(&mut self, surface: ToplevelSurface) {
-		info!("new window");
-		let surface_id = surface.wl_surface().id().protocol_id();
-		self.debug
-			.event("window_new", json!({ "surface": surface_id }));
-		let window = Window::new_wayland_window(surface);
-		self.configure_fullscreen(&window);
-		// the newest window is always on top
-		self.space.map_element(window, (0, 0), true);
-		self.focus_top();
-	}
-
-	fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
-		info!("window closed");
-		let surface_id = surface.wl_surface().id().protocol_id();
-		self.debug
-			.event("window_closed", json!({ "surface": surface_id }));
-		let window = self
-			.space
-			.elements()
-			.find(|w| w.toplevel() == Some(&surface))
-			.cloned();
-		if let Some(window) = window {
-			self.space.unmap_elem(&window);
-		}
-		self.focus_top();
-		self.schedule_render();
-	}
-
-	fn new_popup(&mut self, surface: PopupSurface, _pos: PositionerState) {
-		self.unconstrain_popup(&surface);
-		let _ = self.popups.track_popup(PopupKind::Xdg(surface));
-	}
-
-	fn reposition_request(
-		&mut self,
-		surface: PopupSurface,
-		positioner: PositionerState,
-		token: u32,
-	) {
-		surface.with_pending_state(|state| {
-			state.geometry = positioner.get_geometry();
-			state.positioner = positioner;
-		});
-		self.unconstrain_popup(&surface);
-		surface.send_repositioned(token);
-	}
-
-	fn grab(
-		&mut self,
-		_surface: PopupSurface,
-		_seat: wl_seat::WlSeat,
-		_: Serial,
-	) {
-		// popups close themselves when the user taps elsewhere,
-		// chromium does that on its own
-	}
-
-	// windows are always fullscreen, all requests to change that are
-	// answered with the unchanged state
-	fn fullscreen_request(
-		&mut self,
-		surface: ToplevelSurface,
-		_output: Option<
-			smithay::reexports::wayland_server::protocol::wl_output::WlOutput,
-		>,
-	) {
-		answer_configure(&surface);
-	}
-
-	fn unfullscreen_request(&mut self, surface: ToplevelSurface) {
-		answer_configure(&surface);
-	}
-
-	fn maximize_request(&mut self, surface: ToplevelSurface) {
-		answer_configure(&surface);
-	}
-
-	fn unmaximize_request(&mut self, surface: ToplevelSurface) {
-		answer_configure(&surface);
-	}
-}
-
-/// The client waits for a configure after a request, even if nothing changed.
-fn answer_configure(surface: &ToplevelSurface) {
-	// before the initial commit the initial configure answers
-	if surface.is_initial_configure_sent() {
-		surface.send_configure();
-	}
-}
-
-impl State {
-	fn unconstrain_popup(&self, popup: &PopupSurface) {
-		let Ok(root) = find_popup_root_surface(&PopupKind::Xdg(popup.clone()))
-		else {
-			return;
-		};
-		let Some(window) = self
-			.space
-			.elements()
-			.find(|w| w.toplevel().map(|t| t.wl_surface()) == Some(&root))
-		else {
-			return;
-		};
-		let (Some(output_geo), Some(window_geo)) =
-			(self.output_size(), self.space.element_geometry(window))
-		else {
-			return;
-		};
-
-		// the target geometry is relative to the parent
-		let mut target = output_geo;
-		target.loc -= get_popup_toplevel_coords(&PopupKind::Xdg(popup.clone()));
-		target.loc -= window_geo.loc;
-
-		popup.with_pending_state(|state| {
-			state.geometry =
-				state.positioner.get_unconstrained_geometry(target);
-		});
-	}
-}
-
-impl SeatHandler for State {
-	type KeyboardFocus = WlSurface;
-	type PointerFocus = WlSurface;
-	type TouchFocus = WlSurface;
-
-	fn seat_state(&mut self) -> &mut SeatState<State> {
-		&mut self.seat_state
-	}
-
-	fn focus_changed(
-		&mut self,
-		seat: &Seat<Self>,
-		focused: Option<&WlSurface>,
-	) {
-		let dh = &self.display_handle;
-		let client = focused.and_then(|s| dh.get_client(s.id()).ok());
-		set_data_device_focus(dh, seat, client);
-	}
-}
-
-impl SelectionHandler for State {
-	type SelectionUserData = ();
-}
-
-impl DataDeviceHandler for State {
-	fn data_device_state(&self) -> &DataDeviceState {
-		&self.data_device_state
-	}
-}
-
-impl ClientDndGrabHandler for State {}
-impl ServerDndGrabHandler for State {}
-
-impl OutputHandler for State {}
-
-delegate_compositor!(State);
-delegate_shm!(State);
-delegate_dmabuf!(State);
-delegate_xdg_shell!(State);
-delegate_seat!(State);
-delegate_data_device!(State);
-delegate_output!(State);
-delegate_viewporter!(State);

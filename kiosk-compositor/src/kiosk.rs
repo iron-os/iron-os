@@ -2,6 +2,9 @@
 //! display on and off, set the brightness and click.
 
 use crate::backlight;
+use crate::protocols::kiosk_shell::weston_kiosk_shell::{
+	self, WestonKioskShell,
+};
 use crate::state::State;
 
 use std::time::Duration;
@@ -15,27 +18,6 @@ use smithay::reexports::wayland_server::{
 };
 use smithay::utils::{Logical, Point, SERIAL_COUNTER};
 use tracing::{debug, info, warn};
-
-pub mod protocol {
-	#![allow(dead_code, non_camel_case_types, unused_unsafe)]
-	#![allow(unused_variables, non_upper_case_globals, non_snake_case)]
-	#![allow(unused_imports, missing_docs, clippy::all)]
-
-	use wayland_server;
-	use wayland_server::protocol::*;
-
-	pub mod __interfaces {
-		use wayland_server::protocol::__interfaces::*;
-		wayland_scanner::generate_interfaces!(
-			"protocols/weston-kiosk-shell.xml"
-		);
-	}
-	use self::__interfaces::*;
-
-	wayland_scanner::generate_server_code!("protocols/weston-kiosk-shell.xml");
-}
-
-use protocol::weston_kiosk_shell::{self, WestonKioskShell};
 
 const BTN_LEFT: u32 = 0x110;
 /// time a client gets to bind the pointer if we had to create one
@@ -86,7 +68,7 @@ impl Dispatch<WestonKioskShell, ()> for State {
 	fn request(
 		state: &mut Self,
 		_client: &Client,
-		resource: &WestonKioskShell,
+		_resource: &WestonKioskShell,
 		request: weston_kiosk_shell::Request,
 		_data: &(),
 		_dh: &DisplayHandle,
@@ -96,8 +78,9 @@ impl Dispatch<WestonKioskShell, ()> for State {
 			weston_kiosk_shell::Request::SetState { state: s } => {
 				let awake = s != 0;
 				state.debug.event("kiosk_set_state", json!({ "on": awake }));
+				// every connection should know, not only the one asking
 				if state.set_awake(awake) {
-					resource.state_change(awake as u32);
+					state.kiosk.send_state_change(awake);
 				}
 			}
 			weston_kiosk_shell::Request::SetBrightness { brightness } => {

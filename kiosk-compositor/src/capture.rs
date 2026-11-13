@@ -3,6 +3,12 @@
 //! Captures always render the current window offscreen, so they also work
 //! while the display is off.
 
+use crate::protocols::output_capture::weston_capture_source_v1::{
+	self, WestonCaptureSourceV1,
+};
+use crate::protocols::output_capture::weston_capture_v1::{
+	self, WestonCaptureV1,
+};
 use crate::render;
 use crate::state::State;
 
@@ -15,30 +21,6 @@ use smithay::reexports::wayland_server::{
 };
 use smithay::wayland::shm::with_buffer_contents_mut;
 use tracing::{debug, warn};
-
-pub mod protocol {
-	#![allow(dead_code, non_camel_case_types, unused_unsafe)]
-	#![allow(unused_variables, non_upper_case_globals, non_snake_case)]
-	#![allow(unused_imports, missing_docs, clippy::all)]
-
-	use wayland_server;
-	use wayland_server::protocol::*;
-
-	pub mod __interfaces {
-		use wayland_server::protocol::__interfaces::*;
-		wayland_scanner::generate_interfaces!(
-			"protocols/weston-output-capture.xml"
-		);
-	}
-	use self::__interfaces::*;
-
-	wayland_scanner::generate_server_code!(
-		"protocols/weston-output-capture.xml"
-	);
-}
-
-use protocol::weston_capture_source_v1::{self, WestonCaptureSourceV1};
-use protocol::weston_capture_v1::{self, WestonCaptureV1};
 
 /// DRM_FORMAT_XRGB8888
 const FORMAT_XRGB8888: u32 = 0x34325258;

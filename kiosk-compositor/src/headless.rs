@@ -2,11 +2,11 @@
 //! compositor on a machine without a screen (screenshots still work).
 
 use crate::render;
-use crate::state::{create_output, Backend, State};
+use crate::state::{create_output, refresh_duration, Backend, State};
 
 use std::fs::OpenOptions;
 use std::os::fd::OwnedFd;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use smithay::backend::allocator::gbm::GbmDevice;
 use smithay::backend::allocator::Fourcc;
@@ -90,7 +90,7 @@ pub fn schedule_render(state: &mut State) {
 	}
 	backend.frame_pending = true;
 
-	let refresh = Duration::from_micros(1_000_000_000 / REFRESH as u64);
+	let refresh = refresh_duration(REFRESH as i32);
 	let res = state.loop_handle.insert_source(
 		Timer::from_duration(refresh),
 		|_, _, state| {
@@ -143,7 +143,9 @@ fn render(state: &mut State) {
 		warn!("{e}");
 	}
 
-	state.debug.frame(start.elapsed(), res.is_ok());
+	state
+		.debug
+		.frame(start.elapsed(), res.is_ok(), res.is_err());
 	state.send_frames();
 	if state.debug.animating() {
 		schedule_render(state);

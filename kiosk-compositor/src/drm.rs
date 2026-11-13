@@ -5,7 +5,9 @@
 //! refresh later, a kiosk must keep running.
 
 use crate::render;
-use crate::state::{create_output, remove_output_global, Backend, State};
+use crate::state::{
+	create_output, refresh_duration, remove_output_global, Backend, State,
+};
 use crate::stats::LimitedWarn;
 
 use std::time::{Duration, Instant};
@@ -74,6 +76,8 @@ struct Surface {
 	flip_pending: Option<Instant>,
 	/// a timer checks that the pending flip completes
 	flip_timer: bool,
+	/// flips lost in a row
+	flip_timeouts: u32,
 	/// waiting a refresh after a frame without damage or an error
 	timer_pending: bool,
 	render_queued: bool,
@@ -211,9 +215,12 @@ fn scan_connectors(state: &mut State) {
 			remove_output_global(state, s.global);
 		}
 		state.set_output(None);
-		return;
 	}
 
+	// use another display which is still connected
+	let Some(b) = backend(state) else {
+		return;
+	};
 	let Some((conn, crtc)) = find_connector(&b.device) else {
 		info!("no display connected");
 		return;
@@ -333,11 +340,7 @@ fn create_surface(
 		format!("drm compositor {e}")
 	})?;
 
-	let refresh = if mode.refresh > 0 {
-		Duration::from_micros(1_000_000_000 / mode.refresh as u64)
-	} else {
-		Duration::from_millis(16)
-	};
+	let refresh = refresh_duration(mode.refresh);
 
 	let surface = Surface {
 		connector: conn.handle(),
@@ -347,6 +350,7 @@ fn create_surface(
 		refresh,
 		flip_pending: None,
 		flip_timer: false,
+		flip_timeouts: 0,
 		timer_pending: false,
 		render_queued: false,
 		redraw: true,
@@ -424,22 +428,23 @@ fn render(state: &mut State) {
 		FrameFlags::empty(),
 	);
 
-	let queued = match res {
+	let (queued, failed) = match res {
 		Ok(res) if !res.is_empty => match s.compositor.queue_frame(()) {
-			Ok(()) => true,
+			Ok(()) => (true, false),
 			Err(e) => {
 				b.render_warn.warn(format!("queue frame failed {e}"));
-				false
+				(false, true)
 			}
 		},
-		Ok(_) => false,
+		// nothing changed
+		Ok(_) => (false, false),
 		Err(e) => {
 			b.render_warn.warn(format!("render frame failed {e:?}"));
-			false
+			(false, true)
 		}
 	};
 
-	state.debug.frame(start.elapsed(), queued);
+	state.debug.frame(start.elapsed(), queued, failed);
 	// the debug overlays change every frame
 	if state.debug.animating() {
 		s.redraw = true;
@@ -482,6 +487,7 @@ fn vblank(state: &mut State, crtc: crtc::Handle) {
 	}
 
 	let took = s.flip_pending.take().map(|since| since.elapsed());
+	s.flip_timeouts = 0;
 	if let Err(e) = s.compositor.frame_submitted() {
 		b.render_warn.warn(format!("frame submitted {e}"));
 	}
@@ -504,6 +510,10 @@ fn flip_timeout(state: &mut State) {
 	};
 	s.flip_timer = false;
 
+	// while paused the resume resets everything
+	if !b.active {
+		return;
+	}
 	let Some(since) = s.flip_pending else {
 		return;
 	};
@@ -515,7 +525,10 @@ fn flip_timeout(state: &mut State) {
 
 	b.render_warn.warn("page flip did not complete");
 	s.flip_pending = None;
-	if s.compositor.frame_submitted().is_err() {
+	s.flip_timeouts += 1;
+	// if flips keep getting lost the kernel state is stuck, start over
+	if s.compositor.frame_submitted().is_err() || s.flip_timeouts >= 3 {
+		s.flip_timeouts = 0;
 		if let Err(e) = s.compositor.reset_state() {
 			warn!("reset state {e}");
 		}
@@ -542,11 +555,24 @@ pub fn set_awake(state: &mut State, awake: bool) {
 		// the next frame turns the crtc on again
 		s.redraw = true;
 	} else {
-		if let Err(e) = s.compositor.clear() {
-			warn!("could not turn the display off {e}");
-		}
 		// clear drops a pending frame, its vblank must not be waited for
 		s.flip_pending = None;
+		if let Err(e) = s.compositor.clear() {
+			warn!("could not turn the display off {e}, retrying");
+			// a display which stays lit would burn in, try again
+			let res = state.loop_handle.insert_source(
+				Timer::from_duration(Duration::from_secs(1)),
+				|_, _, state| {
+					if !state.awake {
+						set_awake(state, false);
+					}
+					TimeoutAction::Drop
+				},
+			);
+			if let Err(e) = res {
+				error!("could not insert display off timer {e}");
+			}
+		}
 	}
 }
 

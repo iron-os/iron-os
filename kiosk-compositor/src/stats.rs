@@ -34,9 +34,9 @@ impl MinuteStats {
 		}
 	}
 
-	pub fn frame(&mut self, took: Duration, ok: bool) {
+	pub fn frame(&mut self, took: Duration, failed: bool) {
 		self.frames += 1;
-		if !ok {
+		if failed {
 			self.failed += 1;
 		}
 		self.render += took;

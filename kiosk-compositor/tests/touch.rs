@@ -182,7 +182,8 @@ fn start() -> Compositor {
 
 /// Sends a debug command and returns its reply.
 fn debug(dir: &Path, cmd: &str) -> String {
-	let mut s = UnixStream::connect(dir.join("wayland-test-debug.sock")).unwrap();
+	let mut s =
+		UnixStream::connect(dir.join("wayland-test-debug.sock")).unwrap();
 	writeln!(s, "{cmd}").unwrap();
 	let mut line = String::new();
 	BufReader::new(s).read_line(&mut line).unwrap();
@@ -201,7 +202,11 @@ fn client(dir: &Path) -> (Client, EventQueue<Client>) {
 	queue.roundtrip(&mut c).unwrap();
 
 	let surface = c.compositor.as_ref().unwrap().create_surface(&qh, ());
-	let xdg = c.wm_base.as_ref().unwrap().get_xdg_surface(&surface, &qh, ());
+	let xdg = c
+		.wm_base
+		.as_ref()
+		.unwrap()
+		.get_xdg_surface(&surface, &qh, ());
 	let _toplevel = xdg.get_toplevel(&qh, ());
 	surface.commit();
 	while !c.configured {
@@ -221,15 +226,8 @@ fn client(dir: &Path) -> (Client, EventQueue<Client>) {
 			.as_ref()
 			.unwrap()
 			.create_pool(file.as_fd(), W * H * 4, &qh, ());
-	let buffer = pool.create_buffer(
-		0,
-		W,
-		H,
-		W * 4,
-		wl_shm::Format::Xrgb8888,
-		&qh,
-		(),
-	);
+	let buffer =
+		pool.create_buffer(0, W, H, W * 4, wl_shm::Format::Xrgb8888, &qh, ());
 	surface.attach(Some(&buffer), 0, 0);
 	surface.damage_buffer(0, 0, W, H);
 	surface.commit();
@@ -271,7 +269,12 @@ fn touch_events() {
 		&dir,
 		&mut c,
 		&mut queue,
-		&["inject down 0 0.5 0.5", "inject frame", "inject up 0", "inject frame"],
+		&[
+			"inject down 0 0.5 0.5",
+			"inject frame",
+			"inject up 0",
+			"inject frame",
+		],
 	);
 	assert_eq!(ev, ["down 0", "frame", "up 0", "frame"]);
 
@@ -302,7 +305,12 @@ fn touch_events() {
 		&dir,
 		&mut c,
 		&mut queue,
-		&["inject down 1 0.5 0.5", "inject frame", "inject up 1", "inject frame"],
+		&[
+			"inject down 1 0.5 0.5",
+			"inject frame",
+			"inject up 1",
+			"inject frame",
+		],
 	);
 	assert!(ev.is_empty(), "{ev:?}");
 	assert!(debug(&dir, "stats").contains("\"awake\":true"));
