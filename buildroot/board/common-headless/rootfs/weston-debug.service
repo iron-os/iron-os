@@ -1,16 +1,19 @@
-# This will start the main weston process
+# This will start the kiosk compositor (the unit keeps the name weston, the
+# service-bootloader and chromium.service use it)
 # Since we don't autostart it we can get away with some stuff
 # example from here: https://github.com/Hjdskes/cage/wiki/Starting-Cage-on-boot-with-systemd
 
 [Unit]
-Description=Run weston
+Description=Run the kiosk compositor
 
 [Service]
 Type=simple
-# kiosk-compositor replaces weston, touch /data/use-weston to go back
-ExecStart=/bin/sh -c 'if [ -e /data/use-weston ]; then exec /usr/bin/weston -c /etc/weston/weston.ini -S wayland-0 --debug; else exec /usr/bin/kiosk-compositor -S wayland-0; fi'
+ExecStart=/usr/bin/kiosk-compositor -S wayland-0
 Restart=always
 RestartSec=2
+# a compositor that keeps failing must not flood the journal
+RestartSteps=5
+RestartMaxDelaySec=60
 User=user
 # Log this user with utmp, letting it show up with commands 'w' and
 # 'who'. This is needed since we replace (a)getty.
