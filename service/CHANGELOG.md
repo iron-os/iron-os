@@ -1,3 +1,10 @@
+## Unreleased
+- Keep retrying the display connection instead of restarting the service,
+  so package updates also work while the compositor is broken
+- Display requests fail right away while the compositor is away, the last
+  display state and brightness are restored when it comes back, old clicks
+  are dropped
+
 ## 1.2.8
 - Grow the root partitions of devices installed before 2026.10 to 1000MiB on
   the next image update, without touching the data partition (#22)
