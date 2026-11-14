@@ -1,9 +1,19 @@
 ## Unreleased
+- first image from master, requires image 2026.11.2 so devices completed the
+  partition migration (#22) on the lts line first
 - update to buildroot 2026.02.3
 - update weston to 16.0.0
 - rootfs 600M (was 500M), the Debug rootfs was full
+- installer: lock the new disk against udev while writing it
+
+## 2026.11.2
+- same as 2026.11.1, the second image update completes the partition
+  migration of older devices (merges the old roots into root a, #22)
+
+## 2026.11.1
+- update to buildroot 2025.02.18
 - new installs: boot partition 128M, root partitions 1.5GiB (#22)
-- requires service 1.2.7, which migrates older devices to 1000MiB root
+- requires service 1.2.8, which migrates older devices to 1000MiB root
   partitions (#22)
 - install_on: wait for udev before formatting the data partition, refuse
   disks and install images which don't fit
