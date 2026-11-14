@@ -4,6 +4,7 @@
 - Display requests fail right away while the compositor is away, the last
   display state and brightness are restored when it comes back, old clicks
   are dropped
+- Keep running if chromium can't be started or restarted
 
 ## 1.2.8
 - Grow the root partitions of devices installed before 2026.10 to 1000MiB on

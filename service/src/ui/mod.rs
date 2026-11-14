@@ -39,8 +39,13 @@ pub async fn start(
 		start_server(8888, client.clone(), receiver, web_watchdog.clone());
 
 	// only start chromium if we have a context
+	// chromium needs the compositor, if that is broken the service still
+	// has to run to install the update which fixes it
 	if context::is_release() {
-		chromium::start("http://127.0.0.1:8888", &client).await?;
+		if let Err(e) = chromium::start("http://127.0.0.1:8888", &client).await
+		{
+			eprintln!("could not start chromium {:?}", e);
+		}
 	}
 
 	let watchdog_task = tokio::spawn(async move {
@@ -53,10 +58,10 @@ pub async fn start(
 				eprintln!("chromium watchdog failed");
 
 				if context::is_release() {
-					client
-						.systemd_restart("chromium")
-						.await
-						.expect("could not restart chromium");
+					let res = client.systemd_restart("chromium").await;
+					if let Err(e) = res {
+						eprintln!("could not restart chromium {:?}", e);
+					}
 				}
 			}
 		}

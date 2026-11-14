@@ -56,8 +56,11 @@ impl PackageCfg {
 
 request_handler! {
 	fn systemd_restart(req: SystemdRestart) -> Result<(), Error> {
+		// only queue the restart: chromium depends on the compositor, a
+		// blocking restart would fail (and the service with it) while the
+		// compositor is broken, and then no update could fix it
 		Command::new("systemctl")
-			.args(&["restart", &req.name])
+			.args(&["restart", "--no-block", "--", &req.name])
 			.exec()
 			.map_err(Error::internal_display)
 	}
