@@ -14,6 +14,7 @@
 //!  - current // folder of the current left|right
 //!  - binary // Option<String>
 
+mod reboot;
 mod update;
 
 use update::update;
@@ -177,6 +178,14 @@ pub async fn start(
 			// a restart is required so we don't need to check in a loop
 			eprintln!("not installed, only updating when installed");
 			return;
+		}
+
+		if reboot::should_reboot(&version_info.version_str).await {
+			eprintln!("rebooting into image {}", version_info.version_str);
+			match client.restart().await {
+				Ok(_) => return,
+				Err(e) => eprintln!("could not restart the system {e:?}"),
+			}
 		}
 
 		let times = UpdateIntervalTimes::from_channel(packages.channel().await);
