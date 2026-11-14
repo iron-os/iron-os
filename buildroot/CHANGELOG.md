@@ -1,6 +1,9 @@
-## Unreleased
+## 2026.12.1
 - first image from master, requires image 2026.11.2 so devices completed the
   partition migration (#22) on the lts line first
+- replace weston with our own compositor kiosk-compositor (weston stays in
+  the image for weston-screenshooter only)
+- requires service 1.2.9, which keeps running while the compositor restarts
 - update to buildroot 2026.02.3
 - update weston to 16.0.0
 - rootfs 600M (was 500M), the Debug rootfs was full
