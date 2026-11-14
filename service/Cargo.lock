@@ -542,9 +542,9 @@ dependencies = [
 
 [[package]]
 name = "iron-os-file-db"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e35c22b3cd503c17bbc344003dc561eb19554ae8d4999c9e3f28db8d4eb2b8"
+checksum = "a9725dde81611aaec05191e99c6cf8d09c14ba799accac5be3ae9b534eb079ec"
 dependencies = [
  "serde",
  "serde_json",
