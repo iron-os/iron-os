@@ -13,6 +13,7 @@ lto = true
 [dependencies]
 file-db = { package = "iron-os-file-db", version = "0.2" }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 linux-info = "0.1.8"
 gpt = "4.0.0-rc.2"
 uuid = "1.3"

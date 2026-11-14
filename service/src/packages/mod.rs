@@ -14,6 +14,7 @@
 //!  - current // folder of the current left|right
 //!  - binary // Option<String>
 
+mod reboot;
 mod update;
 
 use update::update;
@@ -179,6 +180,14 @@ pub async fn start(
 			return;
 		}
 
+		if reboot::should_reboot(&version_info.version_str).await {
+			eprintln!("rebooting into image {}", version_info.version_str);
+			match client.restart().await {
+				Ok(_) => return,
+				Err(e) => eprintln!("could not restart the system {e:?}"),
+			}
+		}
+
 		let times = UpdateIntervalTimes::from_channel(packages.channel().await);
 
 		let mut failed = false;
@@ -234,13 +243,22 @@ pub async fn start(
 			let update_res =
 				update(&packages.sources().await, &mut update_data, &client)
 					.await;
-			match update_res {
+
+			let image_was_updated = update_data.image.was_updated();
+			let any_package_was_updated = update_data.any_package_was_updated();
+
+			match &update_res {
 				Ok(_) => failed = false,
 				Err(e) => {
 					eprintln!("update error {:?}", e);
 					failed = true;
 					update_state_error += 1;
-					continue;
+					// what was updated is applied anyway, a failing package
+					// or image must not hold back the others, for example a
+					// service which fixes the failure
+					if !image_was_updated && !any_package_was_updated {
+						continue;
+					}
 				}
 			}
 
@@ -248,9 +266,6 @@ pub async fn start(
 				.apply_update(&update_data)
 				.await
 				.expect("apply_update failed");
-
-			let image_was_updated = update_data.image.was_updated();
-			let any_package_was_updated = update_data.any_package_was_updated();
 
 			eprintln!(
 				"updated: {:?} took {}ms and {} tries",
@@ -261,8 +276,9 @@ pub async fn start(
 			update_state = None;
 			update_state_error = 0;
 
-			// send success
-			match req.take() {
+			// send success, after a failed round the request stays pending
+			let done_req = if update_res.is_ok() { req.take() } else { None };
+			match done_req {
 				Some(PackRequest::AddPackage(name, tx)) => {
 					// let's check if the package was added
 					let _ = tx.send(packages.get(&name).await);
@@ -607,8 +623,10 @@ impl RawPackages {
 						}
 					};
 				}
+				// not finished because the update failed, the next round
+				// starts over with them
 				PackageUpdateState::GatherInfo { .. }
-				| PackageUpdateState::DownloadFile { .. } => unreachable!(),
+				| PackageUpdateState::DownloadFile { .. } => {}
 				PackageUpdateState::NotFound => {}
 			}
 		}
