@@ -53,11 +53,14 @@ pub fn elements(
 	elements
 }
 
-/// An element which is damaged as a whole whenever it changed.
+/// An element which counts as changed as a whole in every frame.
 ///
-/// A buffer scanned out on a plane gets its own damage as damage clips, which
-/// would bring back the stale areas of partial updates (see drm::render).
-pub struct FullDamage(pub Element);
+/// Every frame is drawn completely and its damage (the damage clips of a
+/// plane too) covers every element as a whole: virtio-gpu, vmwgfx and panels
+/// with psr2 only update the damaged rects, partial damage left stale areas.
+/// The counter is the frame's, so unchanged frames are still skipped by
+/// schedule_render.
+pub struct FullDamage(pub Element, pub CommitCounter);
 
 impl ElementTrait for FullDamage {
 	fn id(&self) -> &Id {
@@ -65,7 +68,7 @@ impl ElementTrait for FullDamage {
 	}
 
 	fn current_commit(&self) -> CommitCounter {
-		self.0.current_commit()
+		self.1
 	}
 
 	fn location(&self, scale: Scale<f64>) -> Point<i32, Physical> {
@@ -84,7 +87,8 @@ impl ElementTrait for FullDamage {
 		self.0.geometry(scale)
 	}
 
-	// damage_since keeps the default: the whole element once it changed
+	// damage_since keeps the default: the whole element once the counter
+	// changed
 
 	fn opaque_regions(
 		&self,
