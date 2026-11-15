@@ -1,6 +1,7 @@
+use std::fs::{self, File};
+use std::io::{self, Write};
 use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
-use std::{fs, io};
+use std::path::{Path, PathBuf};
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -63,16 +64,25 @@ impl<T> FileDb<T> {
 		Ok(())
 	}
 
+	/// Writes the data so that a power loss leaves either the old or the new
+	/// file, never an empty or partial one (best effort on vfat, which has no
+	/// journal).
 	pub fn write_sync(&self) -> io::Result<()>
 	where
 		T: Serialize,
 	{
 		let v = serde_json::to_vec(&self.data).map_err(json_err)?;
 
-		// write to the tmp file
-		fs::write(&self.tmp_path, v)?;
+		// write to the tmp file and make sure it is on disk before the rename,
+		// else the rename can reach the disk before the content
+		let mut file = File::create(&self.tmp_path)?;
+		file.write_all(&v)?;
+		file.sync_all()?;
+		drop(file);
+
 		// now rename the file atomically
-		fs::rename(&self.tmp_path, &self.path)
+		fs::rename(&self.tmp_path, &self.path)?;
+		sync_dir(parent_dir(&self.path))
 	}
 
 	pub fn data(&self) -> &T {
@@ -133,16 +143,61 @@ impl<T> FileDb<T> {
 		Ok(())
 	}
 
+	/// Writes the data so that a power loss leaves either the old or the new
+	/// file, never an empty or partial one (best effort on vfat, which has no
+	/// journal).
 	pub async fn write(&self) -> io::Result<()>
 	where
 		T: Serialize,
 	{
+		use tokio::io::AsyncWriteExt;
+
 		let v = serde_json::to_vec(&self.data).map_err(json_err)?;
 
-		// write to the tmp file
-		tokio::fs::write(&self.tmp_path, v).await?;
+		// write to the tmp file and make sure it is on disk before the rename,
+		// else the rename can reach the disk before the content
+		let mut file = tokio::fs::File::create(&self.tmp_path).await?;
+		file.write_all(&v).await?;
+		file.sync_all().await?;
+		drop(file);
+
 		// now rename the file atomically
-		tokio::fs::rename(&self.tmp_path, &self.path).await
+		tokio::fs::rename(&self.tmp_path, &self.path).await?;
+
+		let dir = parent_dir(&self.path);
+		ignore_unsupported(
+			async { tokio::fs::File::open(dir).await?.sync_all().await }.await,
+		)
+	}
+}
+
+fn parent_dir(path: &Path) -> &Path {
+	match path.parent() {
+		Some(p) if !p.as_os_str().is_empty() => p,
+		_ => Path::new("."),
+	}
+}
+
+/// Syncs the directory so the rename itself survives a power loss.
+fn sync_dir(dir: &Path) -> io::Result<()> {
+	ignore_unsupported(File::open(dir).and_then(|dir| dir.sync_all()))
+}
+
+/// Syncing a directory fails with EINVAL or ENOTSUP on some filesystems (vfat
+/// and ext4 support it). Then the error is ignored: the content is already
+/// synced, so after a power loss there is either the old or the new file,
+/// both valid.
+fn ignore_unsupported(r: io::Result<()>) -> io::Result<()> {
+	match r {
+		Err(e)
+			if matches!(
+				e.kind(),
+				io::ErrorKind::InvalidInput | io::ErrorKind::Unsupported
+			) =>
+		{
+			Ok(())
+		}
+		r => r,
 	}
 }
 
