@@ -2,6 +2,7 @@ use crate::debug::Debug;
 
 use smithay::backend::allocator::Fourcc;
 use smithay::backend::renderer::damage::OutputDamageTracker;
+use smithay::backend::renderer::element::memory::MemoryRenderBufferRenderElement;
 use smithay::backend::renderer::element::solid::SolidColorRenderElement;
 use smithay::backend::renderer::element::surface::WaylandSurfaceRenderElement;
 use smithay::backend::renderer::element::{
@@ -28,6 +29,8 @@ smithay::backend::renderer::element::render_elements! {
 		WaylandSurfaceRenderElement<GlesRenderer>,
 	>,
 	Debug=SolidColorRenderElement,
+	Cursor=WaylandSurfaceRenderElement<GlesRenderer>,
+	Arrow=MemoryRenderBufferRenderElement<GlesRenderer>,
 }
 
 /// same as the weston background-color in weston.ini

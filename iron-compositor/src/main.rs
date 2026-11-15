@@ -7,6 +7,7 @@
 
 mod backlight;
 mod capture;
+mod cursor;
 mod debug;
 mod drm;
 mod handlers;

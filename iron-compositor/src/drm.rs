@@ -418,15 +418,21 @@ fn render(state: &mut State) {
 	s.compositor.reset_buffer_ages();
 
 	let start = Instant::now();
-	let elements = render::elements(
+	let pointer = state.seat.get_pointer().map(|p| p.current_location());
+	let mut elements = match pointer {
+		Some(location) => state.cursor.elements(&mut b.renderer, location),
+		None => vec![],
+	};
+	elements.extend(render::elements(
 		&mut b.renderer,
 		&state.space,
 		&output,
 		&mut state.debug,
-	)
-	.into_iter()
-	.map(render::FullDamage)
-	.collect::<Vec<_>>();
+	));
+	let elements = elements
+		.into_iter()
+		.map(render::FullDamage)
+		.collect::<Vec<_>>();
 	// chromium's fullscreen buffer goes straight to the primary plane when
 	// the gpu can scan it out, which saves a copy of every frame; overlay
 	// and cursor planes stay unused. FullDamage keeps the complete frames

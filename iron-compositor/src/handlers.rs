@@ -9,6 +9,7 @@ use smithay::backend::renderer::ImportDma;
 use smithay::desktop::{
 	find_popup_root_surface, get_popup_toplevel_coords, PopupKind, Window,
 };
+use smithay::input::pointer::CursorImageStatus;
 use smithay::input::{Seat, SeatHandler, SeatState};
 use smithay::reexports::wayland_server::backend::ClientData;
 use smithay::reexports::wayland_server::protocol::{
@@ -65,6 +66,7 @@ impl CompositorHandler for State {
 		// before the buffer handler, it takes the buffer and the damage
 		debug::commit(self, surface);
 		on_commit_buffer_handler::<Self>(surface);
+		self.cursor.commit(surface);
 
 		if !is_sync_subsurface(surface) {
 			if let Some(window) = self.window_for(&root_surface(surface)) {
@@ -252,6 +254,13 @@ impl SeatHandler for State {
 
 	fn seat_state(&mut self) -> &mut SeatState<State> {
 		&mut self.seat_state
+	}
+
+	fn cursor_image(&mut self, _seat: &Seat<Self>, image: CursorImageStatus) {
+		self.cursor.set_image(image);
+		if self.cursor.is_visible() {
+			self.schedule_render();
+		}
 	}
 
 	fn focus_changed(
