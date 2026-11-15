@@ -1,4 +1,6 @@
 ## Unreleased
+- Display state and brightness requests wait up to 10s for the compositor
+  before they fail, so apps calling them at boot don't fail
 - Keep retrying the display connection instead of restarting the service,
   so package updates also work while the compositor is broken
 - Display requests fail right away while the compositor is away, the last
