@@ -1,4 +1,5 @@
-## Unreleased
+## 2026.12.4
+- 2026.12.1 to 2026.12.3 were only test builds on two devices
 - first image from master, requires image 2026.11.2 so devices completed the
   partition migration (#22) on the lts line first
 - replace weston with our own compositor iron-compositor (weston stays in
@@ -8,6 +9,11 @@
 - update weston to 16.0.0
 - rootfs 600M (was 500M), the Debug rootfs was full
 - installer: lock the new disk against udev while writing it
+- iron-compositor: chromium finds the gpu (linux-dmabuf v4 main device, Mesa 26
+  has no wl_drm), input devices are added at start, chromium's buffer is
+  scanned out directly, a mouse cursor is drawn
+- iron-compositor: no buffer leak and no half drawn frames without a gpu
+  (VirtualBox VMSVGA without 3D)
 
 ## 2026.11.2
 - same as 2026.11.1, the second image update completes the partition
