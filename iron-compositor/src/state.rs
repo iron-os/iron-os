@@ -1,4 +1,5 @@
 use crate::capture;
+use crate::cursor::Cursor;
 use crate::debug::Debug;
 use crate::handlers::ClientState;
 use crate::kiosk::KioskState;
@@ -139,6 +140,7 @@ pub struct State {
 	/// mouse buttons pressed on a dark display, their release is not
 	/// forwarded either
 	pub swallowed_buttons: Vec<u32>,
+	pub cursor: Cursor,
 
 	pub debug: Debug,
 	pub touch_stats: TouchStats,
@@ -214,6 +216,7 @@ impl State {
 			awake: true,
 			touches: Touches::default(),
 			swallowed_buttons: vec![],
+			cursor: Cursor::new(),
 			debug: Debug::new(),
 			touch_stats: TouchStats::new(),
 		})
@@ -305,6 +308,20 @@ impl State {
 		}
 	}
 
+	/// The mouse was used: shows the cursor and draws it at its new
+	/// location.
+	pub fn show_cursor(&mut self) {
+		self.cursor.set_visible(true);
+		self.schedule_render();
+	}
+
+	/// A touch or the last mouse gone hides the cursor.
+	pub fn hide_cursor(&mut self) {
+		if self.cursor.set_visible(false) {
+			self.schedule_render();
+		}
+	}
+
 	/// Something changed, a new frame should be drawn.
 	pub fn schedule_render(&mut self) {
 		match &self.backend {
@@ -362,6 +379,7 @@ impl State {
 				Some(output.clone())
 			});
 		}
+		self.cursor.send_frames(output, time);
 	}
 }
 

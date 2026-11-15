@@ -18,7 +18,9 @@ Touches still down are cancelled when the display turns off or the touchscreen d
 Not implemented, on purpose for a kiosk:
 - popup grabs: a tap outside a popup (e.g. an open `<select>`) is passed to the window below and
   the popup gets no keyboard focus, chromium closes its popups itself
-- no cursor is drawn, also not with a mouse connected
+- no cursor plane: the cursor (shown once a mouse moves, hidden by a touch) is composited, so
+  while it is visible chromium's buffer is not scanned out directly
+- no cursor theme: named cursors are drawn as a built in arrow
 
 ## Logs
 The journal (40M on Iron OS) gets:

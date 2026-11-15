@@ -49,6 +49,7 @@ impl State {
 						self.pointer_devices.saturating_sub(1);
 					if self.pointer_devices == 0 {
 						self.seat.remove_pointer();
+						self.hide_cursor();
 					}
 				}
 			}
@@ -100,6 +101,7 @@ impl State {
 					},
 				);
 				pointer.frame(self);
+				self.show_cursor();
 			}
 			InputEvent::PointerMotionAbsolute { event } => {
 				self.set_awake(true);
@@ -120,6 +122,7 @@ impl State {
 					},
 				);
 				pointer.frame(self);
+				self.show_cursor();
 			}
 			InputEvent::PointerButton { event } => {
 				self.debug.event(
@@ -188,6 +191,7 @@ impl State {
 				pointer.frame(self);
 			}
 			InputEvent::TouchDown { event } => {
+				self.hide_cursor();
 				let pos =
 					self.output_pos(|size| event.position_transformed(size));
 				self.touch_down(event.slot(), pos, event.time_msec());
