@@ -10,7 +10,7 @@
  - watchdog for chnobli service
    restart if chnobli service does not send
    connected for a given period
- - start weston service
+ - start the compositor (iron-compositor service)
 
 ## Installing
 Installing can be done in two ways either

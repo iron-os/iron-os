@@ -1,0 +1,37 @@
+IRON_COMPOSITOR_SRC_DIR = $(TOPDIR)/../../iron-compositor
+
+IRON_COMPOSITOR_VERSION = 0.1.0
+IRON_COMPOSITOR_SITE = $(IRON_COMPOSITOR_SRC_DIR)
+IRON_COMPOSITOR_SITE_METHOD = local
+# the build runs in the source dir, a copy of its target dir is only slow
+IRON_COMPOSITOR_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = --exclude target
+
+IRON_COMPOSITOR_DEPENDENCIES = host-rustc host-pkgconf seatd libinput \
+	libxkbcommon libegl libgbm udev
+IRON_COMPOSITOR_CARGO_ENV = \
+	CARGO_HOME=$(HOST_DIR)/share/cargo \
+	__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS="nightly" \
+	CARGO_UNSTABLE_TARGET_APPLIES_TO_HOST="true" \
+	CARGO_TARGET_APPLIES_TO_HOST="false" \
+	CARGO_BUILD_TARGET="$(RUSTC_TARGET_NAME)" \
+	CARGO_TARGET_$(call UPPERCASE,$(RUSTC_TARGET_NAME))_LINKER=$(notdir $(TARGET_CROSS))gcc \
+	PKG_CONFIG="$(PKG_CONFIG_HOST_BINARY)" \
+	PKG_CONFIG_ALLOW_CROSS=1
+
+IRON_COMPOSITOR_BIN_DIR = target/$(RUSTC_TARGET_NAME)/release
+IRON_COMPOSITOR_CARGO_OPTS = \
+	--manifest-path=$(IRON_COMPOSITOR_SRC_DIR)/Cargo.toml \
+	--release \
+	--locked
+
+define IRON_COMPOSITOR_BUILD_CMDS
+	$(TARGET_MAKE_ENV) $(IRON_COMPOSITOR_CARGO_ENV) \
+		cargo build $(IRON_COMPOSITOR_CARGO_OPTS)
+endef
+
+define IRON_COMPOSITOR_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0755 $(IRON_COMPOSITOR_SRC_DIR)/$(IRON_COMPOSITOR_BIN_DIR)/iron-compositor \
+		$(TARGET_DIR)/usr/bin/iron-compositor
+endef
+
+$(eval $(generic-package))
