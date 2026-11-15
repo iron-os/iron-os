@@ -1,12 +1,15 @@
-## Unreleased
-- Display state and brightness requests wait up to 10s for the compositor
-  before they fail, so apps calling them at boot don't fail
-- Keep retrying the display connection instead of restarting the service,
-  so package updates also work while the compositor is broken
-- Display requests fail right away while the compositor is away, the last
-  display state and brightness are restored when it comes back, old clicks
+## 1.2.11
+- Requires image 2026.11.2 (devices with the new partition layout, #22),
+  1.2.9 and 1.2.10 were only test builds on two devices
+- Keep running while the compositor is away or chromium can't start, so
+  package updates still arrive: the display connection is retried forever
+- Display state and brightness requests wait up to 10s for the compositor,
+  the last state and brightness are restored when it comes back, old clicks
   are dropped
-- Keep running if chromium can't be started or restarted
+- Apply finished package updates even if another package or the image failed
+- Reboot into an image update which was written but not booted (at most once
+  per image version)
+- Sync package.fdb and version.fdb to disk when writing them (file-db 0.2.1)
 
 ## 1.2.8
 - Grow the root partitions of devices installed before 2026.10 to 1000MiB on

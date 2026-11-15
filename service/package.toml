@@ -1,6 +1,6 @@
 name = "service"
-version = "v1.2.8"
+version = "v1.2.11"
 binary = "service"
 
 [requirements]
-image = ">=2025.9.1"
+image = ">=2026.11.2"
