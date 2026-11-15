@@ -22,6 +22,7 @@ use smithay::backend::drm::{
 	DrmDevice, DrmDeviceFd, DrmEvent, DrmNode, NodeType,
 };
 use smithay::backend::egl::{EGLContext, EGLDevice, EGLDisplay};
+use smithay::backend::input::InputEvent;
 use smithay::backend::libinput::{
 	LibinputInputBackend, LibinputSessionInterface,
 };
@@ -33,7 +34,8 @@ use smithay::output::{Mode, Output, PhysicalProperties, Subpixel};
 use smithay::reexports::calloop::timer::{TimeoutAction, Timer};
 use smithay::reexports::calloop::LoopHandle;
 use smithay::reexports::drm::control::{connector, crtc, Device as _};
-use smithay::reexports::input::Libinput;
+use smithay::reexports::input::event::{DeviceEvent, EventTrait};
+use smithay::reexports::input::{Event as InputEventRaw, Libinput};
 use smithay::reexports::rustix::fs::OFlags;
 use smithay::reexports::wayland_server::backend::GlobalId;
 use smithay::utils::DeviceFd;
@@ -184,6 +186,7 @@ pub fn init(
 }
 
 pub fn start(state: &mut State) {
+	add_pending_devices(state);
 	scan_connectors(state);
 }
 
@@ -576,6 +579,35 @@ pub fn set_awake(state: &mut State, awake: bool) {
 			if let Err(e) = res {
 				error!("could not insert display off timer {e}");
 			}
+		}
+	}
+}
+
+/// Adds the devices udev_assign_seat queued: the libinput fd only becomes
+/// readable with the first input, so the touchscreen was only added at the
+/// first touch. Without a dispatch only device events are queued.
+fn add_pending_devices(state: &mut State) {
+	let Some(b) = backend(state) else {
+		return;
+	};
+	let mut libinput = b.libinput.clone();
+	for event in &mut libinput {
+		match event {
+			InputEventRaw::Device(DeviceEvent::Added(e)) => {
+				state.process_input_event(
+					InputEvent::<LibinputInputBackend>::DeviceAdded {
+						device: e.device(),
+					},
+				);
+			}
+			InputEventRaw::Device(DeviceEvent::Removed(e)) => {
+				state.process_input_event(
+					InputEvent::<LibinputInputBackend>::DeviceRemoved {
+						device: e.device(),
+					},
+				);
+			}
+			_ => {}
 		}
 	}
 }
