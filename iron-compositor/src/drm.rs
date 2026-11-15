@@ -423,12 +423,19 @@ fn render(state: &mut State) {
 		&state.space,
 		&output,
 		&mut state.debug,
-	);
+	)
+	.into_iter()
+	.map(render::FullDamage)
+	.collect::<Vec<_>>();
+	// chromium's fullscreen buffer goes straight to the primary plane when
+	// the gpu can scan it out, which saves a copy of every frame; overlay
+	// and cursor planes stay unused. FullDamage keeps the complete frames
+	// of the reset buffer ages above for it too
 	let res = s.compositor.render_frame(
 		&mut b.renderer,
 		&elements,
 		render::CLEAR_COLOR,
-		FrameFlags::empty(),
+		FrameFlags::ALLOW_PRIMARY_PLANE_SCANOUT,
 	);
 
 	let (queued, failed) = match res {

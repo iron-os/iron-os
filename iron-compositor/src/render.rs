@@ -4,14 +4,22 @@ use smithay::backend::allocator::Fourcc;
 use smithay::backend::renderer::damage::OutputDamageTracker;
 use smithay::backend::renderer::element::solid::SolidColorRenderElement;
 use smithay::backend::renderer::element::surface::WaylandSurfaceRenderElement;
-use smithay::backend::renderer::gles::{GlesRenderer, GlesTexture};
+use smithay::backend::renderer::element::{
+	Element as ElementTrait, Id, Kind, RenderElement, UnderlyingStorage,
+};
+use smithay::backend::renderer::gles::{
+	GlesError, GlesFrame, GlesRenderer, GlesTexture,
+};
+use smithay::backend::renderer::utils::{CommitCounter, OpaqueRegions};
 use smithay::backend::renderer::{
 	Bind, Color32F, ExportMem, Offscreen, TextureMapping,
 };
 use smithay::desktop::space::{space_render_elements, SpaceRenderElements};
 use smithay::desktop::{Space, Window};
 use smithay::output::Output;
-use smithay::utils::{Physical, Rectangle, Size, Transform};
+use smithay::utils::{
+	Buffer, Physical, Point, Rectangle, Scale, Size, Transform,
+};
 
 smithay::backend::renderer::element::render_elements! {
 	pub Element<=GlesRenderer>;
@@ -40,6 +48,75 @@ pub fn elements(
 		.unwrap_or_default();
 	elements.extend(space.into_iter().map(Element::from));
 	elements
+}
+
+/// An element which is damaged as a whole whenever it changed.
+///
+/// A buffer scanned out on a plane gets its own damage as damage clips, which
+/// would bring back the stale areas of partial updates (see drm::render).
+pub struct FullDamage(pub Element);
+
+impl ElementTrait for FullDamage {
+	fn id(&self) -> &Id {
+		self.0.id()
+	}
+
+	fn current_commit(&self) -> CommitCounter {
+		self.0.current_commit()
+	}
+
+	fn location(&self, scale: Scale<f64>) -> Point<i32, Physical> {
+		self.0.location(scale)
+	}
+
+	fn src(&self) -> Rectangle<f64, Buffer> {
+		self.0.src()
+	}
+
+	fn transform(&self) -> Transform {
+		self.0.transform()
+	}
+
+	fn geometry(&self, scale: Scale<f64>) -> Rectangle<i32, Physical> {
+		self.0.geometry(scale)
+	}
+
+	// damage_since keeps the default: the whole element once it changed
+
+	fn opaque_regions(
+		&self,
+		scale: Scale<f64>,
+	) -> OpaqueRegions<i32, Physical> {
+		self.0.opaque_regions(scale)
+	}
+
+	fn alpha(&self) -> f32 {
+		self.0.alpha()
+	}
+
+	fn kind(&self) -> Kind {
+		self.0.kind()
+	}
+}
+
+impl RenderElement<GlesRenderer> for FullDamage {
+	fn draw(
+		&self,
+		frame: &mut GlesFrame<'_, '_>,
+		src: Rectangle<f64, Buffer>,
+		dst: Rectangle<i32, Physical>,
+		damage: &[Rectangle<i32, Physical>],
+		opaque_regions: &[Rectangle<i32, Physical>],
+	) -> Result<(), GlesError> {
+		self.0.draw(frame, src, dst, damage, opaque_regions)
+	}
+
+	fn underlying_storage(
+		&self,
+		renderer: &mut GlesRenderer,
+	) -> Option<UnderlyingStorage<'_>> {
+		self.0.underlying_storage(renderer)
+	}
 }
 
 /// Draws the elements into a texture, age 0 draws everything.
