@@ -15,13 +15,14 @@ pub use kiosk_api::State;
 use kiosk_api::{Event, WestonKioskShell};
 use tokio::io::{Interest, Ready};
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{io, thread};
 
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch, Notify};
 use tokio::task::JoinHandle;
-use tokio::time::{sleep, Duration, Instant};
+use tokio::time::{sleep, timeout, timeout_at, Duration, Instant};
 
 use wayland_client::{
 	ConnectError, Display as WlDisplay, GlobalError, GlobalManager,
@@ -69,6 +70,9 @@ enum Message {
 #[derive(Default)]
 struct Wanted {
 	connected: bool,
+	/// counts the connections, a request which waited knows if a connection
+	/// sent its value with send_all
+	connections: u64,
 	state: Option<State>,
 	brightness: Option<u8>,
 }
@@ -90,30 +94,86 @@ pub struct Display {
 	tx: mpsc::Sender<Message>,
 	// subscribe to state change
 	rx: watch::Receiver<State>,
-	// never wait for the compositor: while it is away requests fail right
-	// away, the wanted state and brightness are applied when it is back
+	// state and brightness wait CONNECT_WAIT for the compositor (it starts
+	// at the same time as the service), then fail; the wanted values are
+	// applied when it is back
 	wanted: Arc<Mutex<Wanted>>,
+	// only changed while holding the wanted lock
+	connected: watch::Receiver<bool>,
+	// while requests wait the display task retries every second
+	waiting: Arc<Waiting>,
 }
+
+#[derive(Default)]
+struct Waiting {
+	count: AtomicUsize,
+	notify: Notify,
+}
+
+/// Counts a waiting request until it is dropped, also when the request is
+/// cancelled.
+struct WaitingGuard<'a>(&'a Waiting);
+
+impl<'a> WaitingGuard<'a> {
+	fn new(waiting: &'a Waiting) -> Self {
+		waiting.count.fetch_add(1, Ordering::SeqCst);
+		waiting.notify.notify_one();
+		Self(waiting)
+	}
+}
+
+impl Drop for WaitingGuard<'_> {
+	fn drop(&mut self) {
+		self.0.count.fetch_sub(1, Ordering::SeqCst);
+	}
+}
+
+/// How long state and brightness requests wait for the compositor, long
+/// enough for it to start at boot or after a crash.
+const CONNECT_WAIT: Duration = Duration::from_secs(10);
 
 impl Display {
 	pub async fn set_state(&self, state: State) -> Option<()> {
 		eprintln!("Display: set_state {:?}", state);
-		let mut wanted = self.wanted.lock().unwrap();
-		wanted.state = Some(state);
-		self.send(&wanted, Message::ChangeState(state))
+		self.set(|w| w.state = Some(state), Message::ChangeState(state))
+			.await
 	}
 
 	pub async fn set_brightness(&self, brightness: u8) -> Option<()> {
 		eprintln!("Display: set_brightness {:?}", brightness);
-		let mut wanted = self.wanted.lock().unwrap();
-		wanted.brightness = Some(brightness);
-		self.send(&wanted, Message::ChangeBrightness(brightness))
+		let msg = Message::ChangeBrightness(brightness);
+		self.set(|w| w.brightness = Some(brightness), msg).await
 	}
 
+	/// Clicks don't wait for the compositor, a late click would hit whatever
+	/// is shown then.
 	pub async fn mouse_click(&self, x: f32, y: f32) -> Option<()> {
 		eprintln!("Display: mouse_click x:{} y:{}", x, y);
 		let wanted = self.wanted.lock().unwrap();
 		self.send(&wanted, Message::MouseClick { x, y })
+	}
+
+	/// Stores the wanted value and sends it, or waits up to CONNECT_WAIT for
+	/// a new connection, which sends the wanted values when it starts.
+	async fn set(
+		&self,
+		update: impl FnOnce(&mut Wanted),
+		msg: Message,
+	) -> Option<()> {
+		let connections = {
+			let mut wanted = self.wanted.lock().unwrap();
+			update(&mut wanted);
+			if wanted.connected {
+				return self.send(&wanted, msg);
+			}
+			wanted.connections
+		};
+
+		let _guard = WaitingGuard::new(&self.waiting);
+		let mut connected = self.connected.clone();
+		let _ = timeout(CONNECT_WAIT, connected.wait_for(|c| *c)).await;
+		let wanted = self.wanted.lock().unwrap();
+		(wanted.connected && wanted.connections != connections).then_some(())
 	}
 
 	fn send(&self, wanted: &Wanted, msg: Message) -> Option<()> {
@@ -137,14 +197,19 @@ pub fn start() -> (JoinHandle<()>, Display) {
 	let (tx, rx) = mpsc::channel(MPSC_CAP);
 
 	let wanted = Arc::new(Mutex::new(Wanted::default()));
+	let (connected_tx, connected_rx) = watch::channel(false);
+	let waiting = Arc::new(Waiting::default());
 	let display = Display {
 		tx: tx.clone(),
 		rx: w_rx,
 		wanted: wanted.clone(),
+		connected: connected_rx,
+		waiting: waiting.clone(),
 	};
 
 	if context::is_headless() {
 		wanted.lock().unwrap().connected = true;
+		let _ = connected_tx.send(true);
 		// if we are in headless
 		// no display is available so just make a mok display
 		let task = tokio::spawn(async move {
@@ -171,8 +236,19 @@ pub fn start() -> (JoinHandle<()>, Display) {
 
 			// a connection which worked for a while starts the backoff again
 			let started = Instant::now();
-			let res = handle_display(w_tx.clone(), &tx, &mut rx, &wanted).await;
-			wanted.lock().unwrap().connected = false;
+			let res = handle_display(
+				w_tx.clone(),
+				&tx,
+				&mut rx,
+				&wanted,
+				&connected_tx,
+			)
+			.await;
+			{
+				let mut wanted = wanted.lock().unwrap();
+				wanted.connected = false;
+				let _ = connected_tx.send(false);
+			}
 			if started.elapsed() > Duration::from_secs(60) {
 				wait = Duration::from_secs(2);
 			}
@@ -180,7 +256,18 @@ pub fn start() -> (JoinHandle<()>, Display) {
 				eprintln!("handle display error {:?}, retry in {:?}", e, wait);
 			}
 
-			sleep(wait).await;
+			// retry every second while a request waits, else after the
+			// backoff
+			let backoff = Instant::now() + wait;
+			sleep(Duration::from_secs(1)).await;
+			while waiting.count.load(Ordering::SeqCst) == 0 {
+				if timeout_at(backoff, waiting.notify.notified())
+					.await
+					.is_err()
+				{
+					break;
+				}
+			}
 			wait = (wait * 2).min(Duration::from_secs(10));
 		}
 	});
@@ -196,6 +283,7 @@ async fn handle_display(
 	msg_tx: &mpsc::Sender<Message>,
 	rx: &mut mpsc::Receiver<Message>,
 	wanted: &Arc<Mutex<Wanted>>,
+	connected_tx: &watch::Sender<bool>,
 ) -> Result<(), WaylandError> {
 	let display = WlDisplay::connect_to_env()?;
 	let display_fd = AsyncFd::new(display.get_connection_fd())?;
@@ -205,7 +293,9 @@ async fn handle_display(
 	{
 		let mut wanted = wanted.lock().unwrap();
 		wanted.connected = true;
+		wanted.connections += 1;
 		wanted.send_all(msg_tx);
+		let _ = connected_tx.send(true);
 	}
 
 	enum SelectState<'a> {
