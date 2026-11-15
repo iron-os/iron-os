@@ -49,7 +49,7 @@ It also includes which package server and which channel to use.
 ### Service bootloader
 
 The service bootloader is a small systemd service which runs as root and is started
-once the os has booted. It is responsible for starting the main service, weston
+once the os has booted. It is responsible for starting the main service, iron-compositor
 (the compositor) and doing some hardware configuration. It also executes image updates
 and os installations from a usb stick.
 

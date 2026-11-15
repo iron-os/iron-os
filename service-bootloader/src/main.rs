@@ -41,7 +41,7 @@ fn main() {
 	#[cfg(not(feature = "headless"))]
 	{
 		let res = Command::new("systemctl")
-			.args(&["start", "--no-block", "weston"])
+			.args(&["start", "--no-block", "iron-compositor"])
 			.exec();
 		if let Err(e) = res {
 			eprintln!("could not start the compositor {e}");

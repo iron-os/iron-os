@@ -1,8 +1,8 @@
 [Unit]
 Description=Run Chromium
-Requires=weston.service
-BindsTo=weston.service
-After=weston.service
+Requires=iron-compositor.service
+BindsTo=iron-compositor.service
+After=iron-compositor.service
 
 [Service]
 ExecStart=/data/packages/chromium/start.sh

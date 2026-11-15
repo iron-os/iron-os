@@ -24,9 +24,9 @@ fn post_build(host_dir, target_dir, binaries_dir) {
 	// copy service-bootloader
 	let systemd_folder = target_dir + "/etc/systemd/system/";
 	if channel == "Debug" {
-		fs::copy("./rootfs/weston-debug.service", systemd_folder + "weston.service");
+		fs::copy("./rootfs/iron-compositor-debug.service", systemd_folder + "iron-compositor.service");
 	} else {
-		fs::copy("./rootfs/weston.service", systemd_folder);
+		fs::copy("./rootfs/iron-compositor.service", systemd_folder);
 	}
 	fs::copy("./rootfs/service-bootloader.service", systemd_folder);
 	fs::copy("./rootfs/subprocess.service", systemd_folder);

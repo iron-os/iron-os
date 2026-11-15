@@ -36,7 +36,7 @@ for software that changes fast.
  - watchdog for iron service
    restart if iron service does not send
    connected for a given period
- - start weston service
+ - start the compositor (iron-compositor service)
 
 ## service
 
