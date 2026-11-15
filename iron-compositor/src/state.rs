@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde_json::json;
+use smithay::backend::drm::DrmNode;
 use smithay::backend::renderer::gles::GlesRenderer;
 use smithay::backend::renderer::{ImportDma, ImportMemWl};
 use smithay::desktop::{PopupManager, Space, Window, WindowSurfaceType};
@@ -25,7 +26,7 @@ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{Display, DisplayHandle};
 use smithay::utils::{Logical, Point, Rectangle, Transform, SERIAL_COUNTER};
 use smithay::wayland::compositor::{get_parent, CompositorState};
-use smithay::wayland::dmabuf::DmabufState;
+use smithay::wayland::dmabuf::{DmabufFeedbackBuilder, DmabufState};
 use smithay::wayland::output::OutputManagerState;
 use smithay::wayland::selection::data_device::DataDeviceState;
 use smithay::wayland::shell::xdg::XdgShellState;
@@ -44,6 +45,14 @@ impl Backend {
 		match self {
 			Self::Drm(b) => &mut b.renderer,
 			Self::Headless(b) => &mut b.renderer,
+		}
+	}
+
+	/// The render node clients should allocate their buffers on.
+	pub fn main_device(&self) -> Option<DrmNode> {
+		match self {
+			Self::Drm(b) => Some(b.render_node),
+			Self::Headless(b) => b.node,
 		}
 	}
 }
@@ -158,7 +167,25 @@ impl State {
 
 		let mut dmabuf_state = DmabufState::new();
 		let formats = backend.renderer().dmabuf_formats();
-		dmabuf_state.create_global::<Self>(&dh, formats);
+		// clients find the gpu through the main device of the default
+		// feedback (linux-dmabuf v4), mesa no longer provides wl_drm: without
+		// it chromium's gpu process doesn't start and it renders in software
+		let feedback = backend.main_device().map(|node| {
+			DmabufFeedbackBuilder::new(node.dev_id(), formats.clone()).build()
+		});
+		match feedback {
+			Some(Ok(feedback)) => {
+				dmabuf_state.create_global_with_default_feedback::<Self>(
+					&dh, &feedback,
+				);
+			}
+			res => {
+				if let Some(Err(e)) = res {
+					warn!("no dmabuf feedback {e}");
+				}
+				dmabuf_state.create_global::<Self>(&dh, formats);
+			}
+		}
 
 		let mut seat = seat_state.new_wl_seat(&dh, "seat0");
 		seat.add_keyboard(XkbConfig::default(), 200, 25)

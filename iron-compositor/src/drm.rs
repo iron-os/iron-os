@@ -56,7 +56,7 @@ pub struct DrmBackend {
 	session: LibSeatSession,
 	libinput: Libinput,
 	node: DrmNode,
-	render_node: DrmNode,
+	pub render_node: DrmNode,
 	device: DrmDevice,
 	gbm: GbmDevice<DrmDeviceFd>,
 	surface: Option<Surface>,

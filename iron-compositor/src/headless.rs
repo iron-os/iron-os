@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use smithay::backend::allocator::gbm::GbmDevice;
 use smithay::backend::allocator::Fourcc;
-use smithay::backend::drm::DrmDeviceFd;
+use smithay::backend::drm::{DrmDeviceFd, DrmNode};
 use smithay::backend::egl::{EGLContext, EGLDisplay};
 use smithay::backend::renderer::damage::OutputDamageTracker;
 use smithay::backend::renderer::gles::{GlesRenderer, GlesTexture};
@@ -25,6 +25,7 @@ const REFRESH: u32 = 60_000;
 
 pub struct HeadlessBackend {
 	pub renderer: GlesRenderer,
+	pub node: Option<DrmNode>,
 	size: (i32, i32),
 	frame_pending: bool,
 	target: Option<(GlesTexture, OutputDamageTracker)>,
@@ -37,6 +38,7 @@ pub fn init(size: (i32, i32)) -> Result<HeadlessBackend, String> {
 		.open(RENDER_NODE)
 		.map_err(|e| format!("could not open {RENDER_NODE}: {e}"))?;
 	let fd = DrmDeviceFd::new(DeviceFd::from(OwnedFd::from(file)));
+	let node = DrmNode::from_file(&fd).ok();
 	let gbm = GbmDevice::new(fd).map_err(|e| format!("gbm {e}"))?;
 	let display =
 		unsafe { EGLDisplay::new(gbm) }.map_err(|e| format!("egl {e}"))?;
@@ -49,6 +51,7 @@ pub fn init(size: (i32, i32)) -> Result<HeadlessBackend, String> {
 
 	Ok(HeadlessBackend {
 		renderer,
+		node,
 		size,
 		frame_pending: false,
 		target: None,
