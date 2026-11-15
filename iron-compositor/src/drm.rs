@@ -27,6 +27,7 @@ use smithay::backend::libinput::{
 	LibinputInputBackend, LibinputSessionInterface,
 };
 use smithay::backend::renderer::gles::GlesRenderer;
+use smithay::backend::renderer::utils::CommitCounter;
 use smithay::backend::session::libseat::LibSeatSession;
 use smithay::backend::session::{Event as SessionEvent, Session};
 use smithay::backend::udev::{all_gpus, primary_gpu, UdevBackend, UdevEvent};
@@ -84,6 +85,8 @@ struct Surface {
 	timer_pending: bool,
 	render_queued: bool,
 	redraw: bool,
+	/// see render::FullDamage
+	frame_commit: CommitCounter,
 }
 
 pub fn init(
@@ -357,6 +360,7 @@ fn create_surface(
 		timer_pending: false,
 		render_queued: false,
 		redraw: true,
+		frame_commit: CommitCounter::default(),
 	};
 
 	Ok((surface, output))
@@ -412,10 +416,11 @@ fn render(state: &mut State) {
 	}
 
 	s.redraw = false;
-	// always draw complete frames: with one fullscreen window this costs
-	// almost nothing and partial updates showed stale areas (virtio-gpu only
-	// copies the damaged rects, panels with psr2 do the same)
-	s.compositor.reset_buffer_ages();
+	// complete frames come from FullDamage below. Not reset_buffer_ages():
+	// it replaces a buffer which is still on screen with a new one, on vmwgfx
+	// without 3d in every frame, and the replaced buffers were never freed
+	// (out of memory within minutes)
+	s.frame_commit.increment();
 
 	let start = Instant::now();
 	let pointer = state.seat.get_pointer().map(|p| p.current_location());
@@ -431,12 +436,11 @@ fn render(state: &mut State) {
 	));
 	let elements = elements
 		.into_iter()
-		.map(render::FullDamage)
+		.map(|e| render::FullDamage(e, s.frame_commit))
 		.collect::<Vec<_>>();
 	// chromium's fullscreen buffer goes straight to the primary plane when
 	// the gpu can scan it out, which saves a copy of every frame; overlay
-	// and cursor planes stay unused. FullDamage keeps the complete frames
-	// of the reset buffer ages above for it too
+	// and cursor planes stay unused
 	let res = s.compositor.render_frame(
 		&mut b.renderer,
 		&elements,
