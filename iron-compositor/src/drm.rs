@@ -10,6 +10,7 @@ use crate::state::{
 };
 use crate::stats::LimitedWarn;
 
+use std::ffi::{c_char, CStr};
 use std::time::{Duration, Instant};
 
 use smithay::backend::allocator::gbm::{
@@ -26,7 +27,7 @@ use smithay::backend::input::InputEvent;
 use smithay::backend::libinput::{
 	LibinputInputBackend, LibinputSessionInterface,
 };
-use smithay::backend::renderer::gles::GlesRenderer;
+use smithay::backend::renderer::gles::{ffi, GlesRenderer};
 use smithay::backend::renderer::utils::CommitCounter;
 use smithay::backend::session::libseat::LibSeatSession;
 use smithay::backend::session::{Event as SessionEvent, Session};
@@ -67,6 +68,8 @@ pub struct DrmBackend {
 	active: bool,
 	render_warn: LimitedWarn,
 	drm_warn: LimitedWarn,
+	/// mesa renders in software (llvmpipe), see render
+	software: bool,
 }
 
 struct Surface {
@@ -126,8 +129,9 @@ pub fn init(
 		.unwrap_or(node);
 	let context =
 		EGLContext::new(&display).map_err(|e| format!("egl context {e}"))?;
-	let renderer = unsafe { GlesRenderer::new(context) }
+	let mut renderer = unsafe { GlesRenderer::new(context) }
 		.map_err(|e| format!("gles {e}"))?;
+	let software = is_software(&mut renderer);
 
 	loop_handle
 		.insert_source(drm_notifier, |event, _meta, state| match event {
@@ -175,6 +179,7 @@ pub fn init(
 
 	Ok(DrmBackend {
 		renderer,
+		software,
 		session,
 		libinput,
 		node,
@@ -448,6 +453,12 @@ fn render(state: &mut State) {
 		FrameFlags::ALLOW_PRIMARY_PLANE_SCANOUT,
 	);
 
+	// llvmpipe draws in threads and the frame has no fence the kernel waits
+	// for, vmwgfx without 3d showed half drawn frames until the next one
+	if b.software && matches!(&res, Ok(r) if !r.is_empty) {
+		let _ = b.renderer.with_context(|gl| unsafe { gl.Finish() });
+	}
+
 	let (queued, failed) = match res {
 		Ok(res) if !res.is_empty => match s.compositor.queue_frame(()) {
 			Ok(()) => (true, false),
@@ -598,6 +609,25 @@ pub fn set_awake(state: &mut State, awake: bool) {
 			}
 		}
 	}
+}
+
+/// Whether mesa renders in software, e.g. on vmwgfx without 3d.
+fn is_software(renderer: &mut GlesRenderer) -> bool {
+	let name = renderer.with_context(|gl| unsafe {
+		let s = gl.GetString(ffi::RENDERER);
+		if s.is_null() {
+			String::new()
+		} else {
+			CStr::from_ptr(s as *const c_char)
+				.to_string_lossy()
+				.into_owned()
+		}
+	});
+	let name = name.unwrap_or_default();
+	info!("renderer {name}");
+	["llvmpipe", "softpipe", "Software"]
+		.iter()
+		.any(|s| name.contains(s))
 }
 
 /// Adds the devices udev_assign_seat queued: the libinput fd only becomes
