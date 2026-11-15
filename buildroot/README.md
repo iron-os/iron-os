@@ -37,7 +37,7 @@ If changes are done with `riji config` call `riji save`.
 2. Linux
 3. Systemd
 5. service_bootloader
-6. > weston
+6. > iron-compositor
 7. service
 8. > chromium
 9. $on_run
